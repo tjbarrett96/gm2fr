@@ -20,12 +20,25 @@ datasets.py
 documentation
 testing
 
-# Ignore any subdirectories in gm2fr/simulation, except an empty data folder.
+# Generally, ignore any subdirectories unless explicitly allowed below.
+*/
 simulation/*/
-!simulation/data/.gitkeep
-
-# Ignore any subdirectories in gm2fr/analysis, except an empty results folder.
 analysis/*/
+
+# Keep the simulation and analysis subdirectories.
+!simulation
+!analysis
+
+# Keep an empty gm2fr/simulation/data folder, but not any contents.
+!simulation/data
+!simulation/data/.gitkeep
+simulation/data/*
+
+# Keep the simulation examples folder and files, but not subdirectories.
+!simulation/examples
+simulation/examples/*/
+
+# Keep an empty gm2fr/analysis/results folder, but not any contents.
+!analysis/results
 !analysis/results/.gitkeep
-
-
+analysis/results/*
