@@ -1,0 +1,28 @@
+# File extensions to ignore, in general.
+*.root # ROOT output files
+*.txt  # text output files
+*.pdf  # PDF output files
+*.pyc  # compiled Python files
+*.npz  # NumPy output files
+
+# Ignore Python cache directories.
+__pycache__
+analysis/__pycache__
+simulation/__pycache__
+
+# Ignore specific files.
+datasets.py
+
+# Ignore specific subdirectories.
+documentation
+testing
+
+# Ignore any subdirectories in gm2fr/simulation, except an empty data folder.
+simulation/*/
+!simulation/data/.gitkeep
+
+# Ignore any subdirectories in gm2fr/analysis, except an empty results folder.
+analysis/*/
+!analysis/results/.gitkeep
+
+
