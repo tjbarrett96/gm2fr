@@ -5,6 +5,9 @@
 *.pyc  # compiled Python files
 *.npz  # NumPy output files
 
+# Include the documentation PDF.
+!gm2fr.pdf
+
 # Ignore Python cache directories.
 __pycache__
 analysis/__pycache__
