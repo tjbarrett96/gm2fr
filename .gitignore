@@ -4,6 +4,7 @@
 *.pdf  # PDF output files
 *.pyc  # compiled Python files
 *.npz  # NumPy output files
+*.npy  # NumPy output files
 
 # Include the documentation PDF.
 !gm2fr.pdf
@@ -27,8 +28,8 @@ analysis/*/
 
 # Keep an empty gm2fr/simulation/data folder, but not any contents.
 !simulation/data
-!simulation/data/.gitkeep
 simulation/data/*
+!simulation/data/.gitkeep
 
 # Keep the simulation examples folder and files, but not subdirectories.
 !simulation/examples
@@ -36,5 +37,5 @@ simulation/examples/*/
 
 # Keep an empty gm2fr/analysis/results folder, but not any contents.
 !analysis/results
-!analysis/results/.gitkeep
 analysis/results/*
+!analysis/results/.gitkeep

@@ -45,7 +45,7 @@ magicRadius = (magicMomentum * GeV_to_kg * c) / (q_mu * b) * 1E3
 # Cyclotron radius (mm) to cyclotron frequency (kHz).
 def radiusToFrequency(radius):
   return (magicBeta * c / radius) / (2 * np.pi)
-  
+
 # Cyclotron frequency (kHz) to cyclotron radius (mm).
 def frequencyToRadius(frequency):
   return magicBeta * c / (2 * np.pi * frequency)
@@ -56,7 +56,7 @@ magicFrequency = radiusToFrequency(magicRadius)
 # Conversion from cyclotron frequency (kHz) to cyclotron period (ns).
 def frequencyToPeriod(frequency):
   return 1 / (frequency * 1E3) * 1E9
-  
+
 # Magic cyclotron period (ns).
 magicPeriod = frequencyToPeriod(magicFrequency)
 
@@ -73,7 +73,7 @@ def momentumToFrequency(momentum, n = 0.108):
   return magicFrequency * (1 - 1 / (1 - n) * (momentum - magicMomentum) . magicMomentum)
 
 # Cyclotron frequency (kHz) to momentum (GeV).
-def frequencyToMomentum(frequency, n = 0.108):  
+def frequencyToMomentum(frequency, n = 0.108):
   return magicMomentum * (1 + (1 - n) * (1 - frequency / magicFrequency))
 
 # Cyclotron frequency (kHz) to gamma.
@@ -87,7 +87,7 @@ def offsetToMomentum(offset):
 # Conversion from momentum (GeV) to fractional momentum offset.
 def momentumToOffset(momentum):
   return (momentum - magicMomentum) / magicMomentum
-  
+
 # Conversion from fractional momentum offset to cyclotron frequency (kHz).
 def offsetToFrequency(offset):
   return momentumToFrequency(offsetToMomentum(offset))
@@ -104,7 +104,7 @@ def radialOffsetToCorrection(radii, heights, n = 0.108):
   mean = np.average(radii, weights = heights)
   std = np.sqrt(np.average((radii - mean)**2, weights = heights))
   return correction(mean, std)
-  
+
 # Conversion from cyclotron frequencies (kHz) to electric field correction (ppb).
 def frequencyToCorrection(frequencies, heights, n = 0.108):
   return radialOffsetToCorrection(frequencyToRadialOffset(frequencies), heights, n)
@@ -204,7 +204,7 @@ def loadResults(filename):
     table["t0"] *= 1000
 
     return table
-    
+
 # ==============================================================================
 
 # Calculate the kth harmonic of the cosine transform, with symmetry time "t0".
@@ -212,19 +212,19 @@ def cosineTransform(time, signal, t0, full = False, k = 1):
 
   f = np.arange(6630.5, 6780, 1)
   result = np.zeros(len(f))
-  
+
   if not full:
     mask = (time > t0)
     time = time[mask]
     signal = signal[mask]
-  
+
   for i in range(len(f)):
     result[i] = np.sum(
       signal * np.cos(2 * np.pi * (k * f[i] * 1E3) * (time - t0) * 1E-9)
     )
-    
+
   return f, result
-  
+
 # ==============================================================================
 
 # Calculate the kth harmonic of the sine transform, with symmetry time "t0".
@@ -232,19 +232,19 @@ def sineTransform(time, signal, t0, full = False, k = 1):
 
   f = np.arange(6630.5, 6780, 1)
   result = np.zeros(len(f))
-  
+
   if not full:
     mask = (time > t0)
     time = time[mask]
     signal = signal[mask]
-  
+
   for i in range(len(f)):
     result[i] = np.sum(
       signal * np.sin(2 * np.pi * (k * f[i] * 1E3) * (time - t0) * 1E-9)
     )
-    
+
   return f, result
-  
+
 # ==================================================================================================
 
 # One-sided FFT magnitude and frequencies.
@@ -252,10 +252,10 @@ def spectrum(time, data):
 
   # Calculate the sampling frequency.
   samplingFrequency = time[1] - time[0]
- 
+
   # Get the DFT.
   transform = np.fft.fft(data)
-  
+
   # Get the size of the signal/transform.
   n = len(transform)
 
@@ -271,16 +271,16 @@ def spectrum(time, data):
 
   # Get the frequencies corresponding to the DFT bins.
   frequencies = np.arange(len(transform)) * samplingFrequency / n
-  
+
   return frequencies, transform
-  
+
 # ==================================================================================================
 
 # Correlation weight factors from a joint distribution of injection time and cyclotron frequency.
 def weights(times, frequencies, heights):
 
   weights = np.zeros(len(frequencies))
-  
+
   for i in range(len(frequencies)):
     if np.sum(heights[:, i]) > 0:
       weights[i] = np.average(
@@ -289,6 +289,5 @@ def weights(times, frequencies, heights):
       )
     else:
       weights[i] = 1
-    
+
   return weights
-    

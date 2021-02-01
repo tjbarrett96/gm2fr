@@ -129,9 +129,7 @@ class BackgroundFit:
   # ============================================================================
 
   # Error fit function.
-  # TODO: clean this up!
   def error(self, f, a, fc, s, b):
-    #return a * np.exp(-(f-fc)**2/s**2) * np.imag(sp.erfi(-(f-fc)/s + 1.0j*s*b))
     return a * np.exp(-s**2*b**2) * np.imag(np.exp(-2j*(f-fc)*b) * sp.dawsn(-(f-fc)/s+1j*s*b))
 
   # ============================================================================
