@@ -16,18 +16,14 @@ simulation/__pycache__
 # Ignore specific files.
 datasets.py
 
-# Ignore specific subdirectories.
-documentation
-testing
-
 # Generally, ignore any subdirectories unless explicitly allowed below.
 */
-simulation/*/
-analysis/*/
 
-# Keep the simulation and analysis subdirectories.
+# Keep the simulation and analysis subdirectories, but ignore further subdirectories.
 !simulation
 !analysis
+simulation/*/
+analysis/*/
 
 # Keep an empty gm2fr/simulation/data folder, but not any contents.
 !simulation/data
