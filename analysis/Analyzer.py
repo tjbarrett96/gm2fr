@@ -127,11 +127,13 @@ class Analyzer:
     df = 2,
     # Cutoff (in units of fit pulls) for inclusion in the background definition.
     cutoff = 3,
-    # Range and step size (in us) for the initial coarse t0 scan range.
+    # +/- range (in us) for the initial coarse t0 scan range.
     coarseRange = 0.020,
+    # Step size (in us) for the initial coarse t0 scan range.
     coarseStep = 0.0005,
-    # Range and step size (in us) for the subsequent fine t0 scan ranges.
+    # +/- range (in us) for the subsequent fine t0 scan ranges.
     fineRange = 0.0005,
+    # Step size (in us) for the subsequent fine t0 scan ranges.
     fineStep = 0.000025
   ):
 
@@ -162,35 +164,41 @@ class Analyzer:
         coarseRange,
         coarseStep,
         fineRange,
-        fineStep
+        fineStep,
+        self.output,
+        optimize,
+        bounds,
+        t0
       )
 
-      self.transform.process(t0, optimize, self.output, bounds)
+      self.transform.process()
 
-      # Define the quantities to go in the results array.
-      columns = [
-        "t0",
-        "start",
-        "end",
-        "<f>",
-        "sigma_f"
-      ]
-
-      # Initialize the results array with zeros.
-      self.results = np.zeros(1, dtype = [(col, np.float32) for col in columns])
-
-      # Fill the results array.
-      # TODO: consider asking each object (i.e. FastRotation, Transform, BackgroundFit, WiggleFit)
-      # TODO: to consolidate its own save results, for clarity and simplicity
-      # TODO: can use numpy.lib.recfunctions.merge_arrays(...)
-      # TODO: also want to save resulting distributions, plot them overlaid, etc.
-      self.results["t0"][0] = self.transform.t0
-      self.results["start"][0] = self.transform.start
-      self.results["end"][0] = self.transform.end
-      self.results["<f>"][0] = self.transform.getMean("frequency")
-      self.results["sigma_f"][0] = self.transform.getWidth("frequency")
-
-      # Save the results array.
+      # Save the results to disk.
       if self.output is not None:
+
+        # Define the quantities to go in the results array.
+        columns = [
+          "t0",
+          "start",
+          "end",
+          "<f>",
+          "sigma_f"
+        ]
+
+        # Initialize the results array with zeros.
+        self.results = np.zeros(1, dtype = [(col, np.float32) for col in columns])
+
+        # Fill the results array.
+        # TODO: consider asking each object (i.e. FastRotation, Transform, BackgroundFit, WiggleFit)
+        # TODO: to consolidate its own save results, for clarity and simplicity
+        # TODO: can use numpy.lib.recfunctions.merge_arrays(...)
+        # TODO: also want to save resulting distributions, plot them overlaid, etc.
+        self.results["t0"][0] = self.transform.t0
+        self.results["start"][0] = self.transform.start
+        self.results["end"][0] = self.transform.end
+        self.results["<f>"][0] = self.transform.getMean("frequency")
+        self.results["sigma_f"][0] = self.transform.getWidth("frequency")
+
+        # Save the results array.
         np.save(f"{self.output}/results.npy", self.results)
         np.savetxt(f"{self.output}/results.txt", self.results, fmt = "%.4f", header = ",".join(columns), delimiter = ",")

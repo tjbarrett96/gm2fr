@@ -43,7 +43,15 @@ class Transform:
     # Half-width of t0 window (in us) for subsequent fine optimization scans.
     fineRange = 0.0005,
     # Step size of t0 window (in us) for subsequent fine optimization scans.
-    fineStep = 0.000025
+    fineStep = 0.000025,
+    # Output directory.
+    output = None,
+    # Boolean switch to enable or disable t0 optimization.
+    optimize = True,
+    # If not None, fix the background fit bounds to these provided.
+    bounds = None,
+    # Initial t0 guess (in us), optimized or fixed based on "optimize" option.
+    t0 = 0.060
   ):
 
     # The start and end times.
@@ -82,6 +90,18 @@ class Transform:
     self.coarseStep = coarseStep
     self.fineRange = fineRange
     self.fineStep = fineStep
+
+    # Output directory.
+    self.output = output
+
+    # Whether or not to run t0 optimization.
+    self.optimization = optimize
+
+    # Fit bounds.
+    self.bounds = bounds
+
+    # Initial t0 guess (in us).
+    self.t0 = t0
 
     # Convert frequency to other units.
     self.axes = {
@@ -181,7 +201,6 @@ class Transform:
     seed,
     mode,
     bounds,
-    output = None, # output directory for plots
     index = None,  # iteration index
     subindex = 0   # sub-iteration index, if minimum not found
   ):
@@ -221,14 +240,9 @@ class Transform:
     # Find the fit with the smallest (not-yet-normalized) chi-squared.
     minimum = min(scanResults, key = lambda fit: fit.chi2dof)
 
-    # Interpret the minimum's spread in fit residuals as the fit uncertainty.
-    uncertainty = minimum.spread
-
     # Re-scale each chi-squared using the optimal uncertainty, and re-estimate the new fit bounds.
     for i in range(len(times)):
-      scanResults[i].fitUncertainty = uncertainty
-      scanResults[i].chi2dof /= uncertainty**2
-      scanResults[i].predictBounds()
+      scanResults[i].update(minimum.spread)
 
     # Define how to determine if BackgroundFit "a" is better than "b".
     def better(a, b):
@@ -251,7 +265,7 @@ class Transform:
     scanRightBound = np.array([fit.newBounds[1] for fit in scanResults])
 
     # Plot the scan results.
-    if output is not None:
+    if self.output is not None:
 
       substring = f"-{subindex}" if subindex > 0 else ""
 
@@ -262,7 +276,7 @@ class Transform:
         plt.rcParams["text.usetex"] = False
 
         # Initialize the multi-page PDF file for scan plots.
-        pdf = PdfPages(f"{output}/background/AllFits_Opt{index}{substring}.pdf")
+        pdf = PdfPages(f"{self.output}/background/AllFits_Opt{index}{substring}.pdf")
 
         # Initialize the plot objects, for speed.
         # TODO: just use the mask here, and make the BGFit object take the mask? Don't duplicate masking code.
@@ -316,7 +330,7 @@ class Transform:
       plt.legend(lines, [line.get_label() for line in lines], loc = "best")
 
       # Save the result to disk.
-      plt.savefig(f"{output}/background/ChiSquared_Opt{index}{substring}.pdf")
+      plt.savefig(f"{self.output}/background/ChiSquared_Opt{index}{substring}.pdf")
 
       # Fully close (instead of clear) to reset the adjusted padding.
       plt.close()
@@ -335,13 +349,16 @@ class Transform:
       print(f"Trying again with re-estimated t0 seed: {est*1000:.4f} ns.")
 
       # Make a recursive call to optimize again using the new estimate.
-      self.optimize(est, mode, bounds, output, index + 1, subindex + 1)
+      self.optimize(est, mode, bounds, index + 1, subindex + 1)
 
     # Otherwise, if there is a minimum sufficiently inside the scan window...
     else:
 
       # Remember the optimal fit from the scan.
       self.bgFit = scanResults[optIndex]
+
+      # Plot the best fit result.
+      self.bgFit.plot(output = f"{self.output}/background/BestFit_Opt{index}.pdf")
 
       # Update the t0 estimate.
       if mode == "coarse":
@@ -371,57 +388,35 @@ class Transform:
   # ============================================================================
 
   # Process the cosine transform by fitting and removing the background.
-  # TODO: automate the approximation of 'spread', instead of assuming an initial value
-  # TODO: print an update for moving the bounds inward
-  # TODO: fixed bounds are pretty rudimentary; probably a better way to implement it
   # TODO: too much copying of BackgroundFit code; clean it up
-  # TODO: consider putting these options in the constructor, including reference to Analyzer object (for output handling)
-  def process(
-    self,
-    t0 = 0.100,      # t_0 seed (us)
-    optimize = True, # whether to optimize t0 (True) or fix t0 (False)
-    output = None,   # output directory for plots
-    bounds = None    # if not None, fix the fit bounds to those provided
-  ):
+  def process(self):
 
+    # Status update, and begin timing.
     print("\nProcessing frequency distribution...")
     begin = time.time()
 
-    # Set the initial t0 seed.
-    self.t0 = t0
-
-    if bounds is not None:
+    # Set the fit bounds, and determine if they're fixed or should float.
+    if self.bounds is not None:
       fixed = True
+      bounds = self.bounds
     else:
       fixed = False
-      # Start with the unphysical regions beyond the collimator boundaries.
       bounds = (util.minFrequency, util.maxFrequency)
 
+    # Remember the previous iteration's fit bounds, to check if they've changed.
     oldBounds = (None, None)
-    spread = 0.005
 
     # Scan over symmetry times to find the best background fit.
-    if optimize:
+    if self.optimization:
 
       # Run the coarse optimization routine.
-      self.optimize(
-        self.t0,
-        "coarse",
-        bounds,
-        output = output,
-        index = 0
-      )
-
-      # Status print-out and plot.
-      if output is not None:
-        self.bgFit.plot(output = f"{output}/background/BestFit_Opt0.pdf")
-        plt.clf()
+      self.optimize(self.t0, "coarse", bounds, index = 0)
 
       # Countinue iterating the bounds until they don't change anymore.
       counter = 0
-      while not fixed and self.bgFit.newBounds != oldBounds:
+      while self.bgFit.newBounds != oldBounds:
 
-        # Update the previous bounds used.
+        # Update the previous bounds used, and the number of iterations.
         oldBounds = self.bgFit.newBounds
         counter += 1
 
@@ -430,19 +425,25 @@ class Transform:
           self.t0,
           "fine",
           self.bgFit.newBounds if not fixed else bounds,
-          output = output,
           index = counter
         )
 
-        if output is not None:
-          self.bgFit.plot(output = f"{output}/background/BestFit_Opt{counter}.pdf")
-          plt.clf()
+        # If the bounds are fixed, stop here; the optimized t0 won't change.
+        if fixed:
+          break
 
-        # if fixed:
-        #   break
-
-      # Perform a final cosine transform after optimizing t0.
+      # Do the final transform and fit, using the optimized t0.
       self.transform(self.t0)
+      self.bgFit = BackgroundFit(
+        self.frequency,
+        self.signal,
+        self.bgModel,
+        self.start - self.t0,
+        self.bgFit.newBounds if not fixed else bounds,
+        self.bgFit.spread,
+        self.bgCutoff
+      )
+      self.bgFit.fit()
 
     # Fix the supplied t0, and simply find the optimal bounds.
     # TODO: if the fixed t0 is bad, bound optimization will fail; find a way to catch and handle this elegantly
@@ -452,7 +453,6 @@ class Transform:
       self.transform(self.t0)
 
       # Perform an initial background fit.
-      # TODO: this has not yet been made independent of the initial spread estimate
       self.bgFit = BackgroundFit(
         self.frequency,
         self.signal,
@@ -464,9 +464,8 @@ class Transform:
       )
       self.bgFit.fit()
 
-      self.bgFit.fitUncertainty = self.bgFit.spread
-      self.bgFit.chi2dof /= self.bgFit.fitUncertainty**2
-      self.bgFit.predictBounds()
+      # TODO: put this routine in an "update" method for the BGFit
+      self.bgFit.update(self.bgFit.spread)
 
       # Countinue iterating the bounds until they don't change anymore.
       while not fixed and self.bgFit.newBounds != oldBounds:
@@ -486,28 +485,12 @@ class Transform:
         )
         self.bgFit.fit()
 
-        # if fixed:
-        #   break
-
-    # Do the final transform and fit, using the optimized t0.
-    self.transform(self.t0)
-    self.bgFit = BackgroundFit(
-      self.frequency,
-      self.signal,
-      self.bgModel,
-      self.start - self.t0,
-      self.bgFit.newBounds if not fixed else bounds,
-      self.bgFit.spread,
-      self.bgCutoff
-    )
-    self.bgFit.fit()
-
     print("\nCompleted final background fit.")
     print(f"{'chi2/dof':>16} = {self.bgFit.chi2dof:.4f}")
 
     # Plot final background fit result.
-    if output is not None:
-      self.bgFit.plot(output = f"{output}/BackgroundFit.pdf")
+    if self.output is not None:
+      self.bgFit.plot(output = f"{self.output}/BackgroundFit.pdf")
       plt.clf()
 
     # Subtract the background and re-normalize.
@@ -515,18 +498,18 @@ class Transform:
     self.signal /= np.max(np.abs(self.signal))
 
     # Plot the background-subtracted result.
-    if output is not None:
-      for axis in self.axes.keys():
-        self.plot(axis, f"{output}/{axis}.pdf")
+    for axis in self.axes.keys():
+      self.plot(axis)
 
     print(f"\nFinished background removal, in {(time.time() - begin):.2f} seconds.")
 
   # ============================================================================
 
   # Plot the result.
-  def plot(self, axis = "frequency", output = None):
+  def plot(self, axis = "frequency"):
 
-    if output is not None:
+    # Don't bother if there's no output destination.
+    if self.output is not None:
 
       # Plot the specified distribution.
       plt.plot(self.axes[axis], self.signal, 'o-', ms = 4)
@@ -552,14 +535,14 @@ class Transform:
       )
 
       # Save to disk.
-      plt.savefig(output)
+      plt.savefig(f"{self.output}/{axis}.pdf")
 
       # Clear the figure.
       plt.clf()
 
   # ============================================================================
 
-  # Calculate the mean of the specified axis between the collimator limits.
+  # Calculate the mean of the specified axis within physical limits.
   def getMean(self, axis = "frequency"):
     return np.average(
       self.axes[axis][self.fMask],
@@ -568,7 +551,7 @@ class Transform:
 
   # ============================================================================
 
-  # Calculate the standard deviation of the specified axis between the collimator limits.
+  # Calculate the std. dev. of the specified axis within physical limits.
   def getWidth(self, axis = "frequency"):
     mean = self.getMean(axis)
     return np.sqrt(
@@ -582,6 +565,10 @@ class Transform:
 
   # Calculate the electric field correction.
   def getCorrection(self, n = 0.108):
-    return util.radialOffsetToCorrection(self.radius[self.fMask], self.signal[self.fMask], n)
+    return util.radialOffsetToCorrection(
+      self.radius[self.fMask],
+      self.signal[self.fMask],
+      n
+    )
 
   # ============================================================================

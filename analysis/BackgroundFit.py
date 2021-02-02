@@ -161,8 +161,8 @@ class BackgroundFit:
     chi2 = self.fitResiduals.T @ self.fitResiduals / self.fitUncertainty**2
     self.chi2dof = chi2 / (len(self.fitX) - len(self.pOpt))
 
-    # Predict the new fit boundaries.
-    self.predictBounds()
+    # Predict the new fit boundaries, using the fit uncertainty.
+    self.update(self.fitUncertainty)
 
     # print([f"{x:.4f}" for x in self.pOpt])
 
@@ -224,6 +224,8 @@ class BackgroundFit:
       if output is not None:
         plt.savefig(output)
 
+      plt.clf()
+
     # Update the existing plot objects from the supplied handles, for speed.
     else:
 
@@ -249,8 +251,12 @@ class BackgroundFit:
 
   # ============================================================================
 
-  # Predict the new fit bounds based on the current residuals.
-  def predictBounds(self):
+  # Update the fit uncertainty and re-estimate the fit bounds.
+  def update(self, uncertainty):
+
+    # Update the chi-squared with the new uncertainty.
+    self.chi2dof *= self.fitUncertainty**2 / uncertainty**2
+    self.fitUncertainty = uncertainty
 
     # Step inward from the low edge to find the new predicted boundary.
     # Break when current point *and* next higher point are both beyond the cutoff.
