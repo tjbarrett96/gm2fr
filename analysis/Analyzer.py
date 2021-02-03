@@ -25,6 +25,8 @@ class Analyzer:
     input,
     # Desired output directory name, within gm2fr/analysis/results.
     tags = None,
+    # Name for a top-level directory containing each individual result folder.
+    group = None,
     # Time units. Options: "ns" / "us".
     units = "us"
   ):
@@ -61,6 +63,12 @@ class Analyzer:
     else:
       raise ValueError(f"\nOutput tags do not match input format.")
 
+    # Validate the output group.
+    if group is None or type(group) is str:
+      self.group = group
+    else:
+      raise ValueError(f"\nOutput group '{group}' not recognized.")
+
     # The current output directory path.
     self.output = None
 
@@ -83,20 +91,27 @@ class Analyzer:
 
   # ============================================================================
 
-  # Setup the output directory 'gm2fr/analysis/results/{tag}'.
+  # Setup the output directory 'gm2fr/analysis/results/{group}/{tag}'.
   def setup(self, tag):
+
+    # Check if the group directory exists.
+    if self.group is not None and not os.path.isdir(f"{self.parent}/{self.group}"):
+      os.mkdir(f"{self.parent}/{self.group}")
 
     if tag is not None:
 
       # Set the path for the current analysis within the results directory.
-      self.output = f"{self.parent}/{tag}"
+      if self.group is not None:
+        self.output = f"{self.parent}/{self.group}/{tag}"
+      else:
+        self.output = f"{self.parent}/{tag}"
 
       # If it already exists, clear its contents.
       if os.path.isdir(self.output):
         shutil.rmtree(self.output)
 
       # Make the output directory.
-      print(f"\nCreating output directory 'gm2fr/analysis/results/{tag}'.")
+      print(f"\nCreating output directory '{tag}'.")
       os.mkdir(self.output)
 
       # Make the background and signal directories.
@@ -126,7 +141,7 @@ class Analyzer:
     # Frequency interval (kHz) for the cosine transform.
     df = 2,
     # Cutoff (in units of fit pulls) for inclusion in the background definition.
-    cutoff = 3,
+    cutoff = 2,
     # +/- range (in us) for the initial coarse t0 scan range.
     coarseRange = 0.020,
     # Step size (in us) for the initial coarse t0 scan range.
@@ -134,7 +149,9 @@ class Analyzer:
     # +/- range (in us) for the subsequent fine t0 scan ranges.
     fineRange = 0.0005,
     # Step size (in us) for the subsequent fine t0 scan ranges.
-    fineStep = 0.000025
+    fineStep = 0.000025,
+    # Plotting option. 0 = nothing, 1 = main results, 2 = t0 scan too.
+    plots = 2
   ):
 
     # Loop over all specified inputs.
@@ -168,7 +185,8 @@ class Analyzer:
         self.output,
         optimize,
         bounds,
-        t0
+        t0,
+        plots
       )
 
       self.transform.process()
@@ -182,7 +200,9 @@ class Analyzer:
           "start",
           "end",
           "<f>",
-          "sigma_f"
+          "sigma_f",
+          "<x_e>",
+          "sigma_x"
         ]
 
         # Initialize the results array with zeros.
@@ -198,7 +218,17 @@ class Analyzer:
         self.results["end"][0] = self.transform.end
         self.results["<f>"][0] = self.transform.getMean("frequency")
         self.results["sigma_f"][0] = self.transform.getWidth("frequency")
+        self.results["<x_e>"][0] = self.transform.getMean("radius")
+        self.results["sigma_x"][0] = self.transform.getWidth("radius")
 
         # Save the results array.
         np.save(f"{self.output}/results.npy", self.results)
         np.savetxt(f"{self.output}/results.txt", self.results, fmt = "%.4f", header = ",".join(columns), delimiter = ",")
+
+      # If this input is part of a group, keep track of what files finished.
+      if self.group is not None:
+        with open(f"{self.parent}/{self.group}/finished.txt", "a") as finished:
+          if type(input) is tuple:
+            finished.write(f"{input[0]}\n")
+          else:
+            finished.write(f"{input}\n")

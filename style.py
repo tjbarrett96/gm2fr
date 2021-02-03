@@ -15,15 +15,15 @@ def setStyle():
   plt.rcParams["xtick.labelsize"] = 16
   plt.rcParams["ytick.labelsize"] = 16
   plt.rcParams["legend.fontsize"] = 14
-  
+
   # LaTeX options.
   plt.rcParams["text.usetex"] = True
   plt.rcParams['text.latex.preamble'] = r"\usepackage{amsmath}"
-  
+
   # Marker and line options.
-  plt.rcParams["lines.markersize"] = 2
+  plt.rcParams["lines.markersize"] = 4
   plt.rcParams["lines.linewidth"] = 2
-  
+
   # Draw grid.
   plt.rcParams["axes.grid"] = True
   plt.rcParams["grid.alpha"] = 0.25
@@ -49,16 +49,16 @@ def setStyle():
   plt.rcParams["xtick.minor.size"] = 4
   plt.rcParams["ytick.major.size"] = 8
   plt.rcParams["ytick.minor.size"] = 4
-  
+
   # Dynamically choose the number of histogram bins.
   plt.rcParams["hist.bins"] = "auto"
-  
+
   # Space between axes and legend, in font units.
   plt.rcParams["legend.borderaxespad"] = 1
   plt.rcParams["legend.handlelength"] = 1
   plt.rcParams["legend.columnspacing"] = 1.4
   plt.rcParams["legend.handletextpad"] = 0.6
-  
+
   # Default subplot spacing.
   plt.rcParams["figure.subplot.wspace"] = 0.3
   plt.rcParams["figure.subplot.hspace"] = 0.3
@@ -78,11 +78,17 @@ def ylabel(label):
 # ==============================================================================
 
 # Keyword arguments for colorbar formatting.
-colorbarStyle = {"pad": 0.01, "fraction": 0.04, "aspect": 18}
+# colorbarStyle = {"pad": 0.01, "fraction": 0.04, "aspect": 18}
 
 # Override plt.colorbar with automatic formatting.
-def colorbar(cLabel = None):
-  cbar = plt.colorbar(**colorbarStyle)
+def colorbar(
+  cLabel = None,
+  pad = 0.01,
+  fraction = 0.06,
+  aspect = 18,
+  **kwargs
+):
+  cbar = plt.colorbar(pad = pad, fraction = fraction, aspect = aspect, **kwargs)
   if cLabel is not None:
     cbar.set_label(cLabel, ha = "right", y = 1)
   return cbar
@@ -109,22 +115,22 @@ def errorbar(x, y, err, obj = plt, fmt = "o", ms = 4, **kwargs):
 def databox(*args):
 
   if plt.rcParams["text.usetex"]:
-  
+
     string = r"\begin{align*}"
     for arg in args:
       string += f"{arg[0]} &= {arg[1]:.4f}"
       string += fr" \; \text{{{arg[2]}}}" if arg[2] is not None else ""
       string += r" \\[-0.5ex]"
     string += r"\end{align*}"
-    
+
   else:
-    
+
     string = ""
     for arg in args:
       string += f"${arg[0]}$ = {arg[1]:.4f}"
       string += f" {arg[2]}" if arg[2] is not None else ""
       string += "\n"
-  
+
   plt.text(
     0.03,
     0.96,
@@ -149,7 +155,7 @@ def imshow(x, y, heights, cLabel = None, **kwargs):
   )
   cbar = colorbar(cLabel)
   return result, cbar
-  
+
 # ==============================================================================
 
 # Keyword arguments for dotted lines.
@@ -158,7 +164,7 @@ dotStyle = {"linestyle": ":", "color": "k"}
 # Draw a horizontal line at y = 0.
 def yZero():
   return plt.axhline(0, **dotStyle)
-  
+
 # Draw a vertical line at x = 0.
 def xZero():
   return plt.axvline(0, **dotStyle)
@@ -169,10 +175,10 @@ def xStats(avg, std, units = None, color = "k"):
 
   # Remember the current y-limits.
   yMin, yMax = plt.ylim()
-  
+
   # Plot the average line.
   line = plt.axvline(avg, linestyle = "--", color = color, linewidth = 1)
-  
+
   # Plot the spread.
   fill = plt.fill_between(
     [avg - std, avg + std],
@@ -182,14 +188,14 @@ def xStats(avg, std, units = None, color = "k"):
     linewidth = 0,
     color = color
   )
-  
+
   # Restore the original y-limits.
   plt.ylim(yMin, yMax)
-  
+
   # Return the plot objects and legend label.
   label = f"${avg:.2f} \pm {std:.2f}$" + f" {units}" if units is not None else ""
   return line, fill, label
-  
+
 # ==============================================================================
 
 def yStats(
@@ -202,19 +208,19 @@ def yStats(
   xHigh = None,
   color = "k"
 ):
-  
+
   # Remember the current x-axis viewing range.
   axLeft, axRight = plt.xlim()
-  
+
   # Set the x-axis limits for the average and standard deviation.
   xLow = axLeft if xLow is None else xLow
   xHigh = axRight if xHigh is None else xHigh
   mask = (x >= xLow) & (x <= xHigh)
-  
+
   # Calculate the (weighted) average and spread.
   avg = np.average(y[mask], weights = weights)
   std = np.sqrt(np.average((y[mask] - avg)**2, weights = weights))
-  
+
   # Plot the horizontal average line.
   line, = plt.plot(
     [xLow, xHigh],
@@ -224,7 +230,7 @@ def yStats(
     color = color,
     zorder = 0
   )
-  
+
   # Plot a horizontal shaded region for the spread.
   fill = None
   if width:
@@ -236,9 +242,9 @@ def yStats(
       color = color,
       linewidth = 0
     )
-    
+
   # Restore the original axis limits.
   plt.xlim(axLeft, axRight)
-  
+
   label = f"${avg:.2f} \pm {std:.2f}$" + f" {units}" if units is not None else ""
   return line, fill, label

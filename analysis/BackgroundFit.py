@@ -1,7 +1,9 @@
 import numpy as np
 import scipy.optimize as opt
 import scipy.special as sp
+
 import matplotlib.pyplot as plt
+import matplotlib.text
 
 import gm2fr.utilities as util
 import gm2fr.style as style
@@ -17,18 +19,20 @@ class BackgroundFit:
   # Constructor.
   def __init__(
     self,
-    frequency,
+    # The Transform object, whose background will be fit.
     transform,
-    model = "parabola",
-    gap = None, # start time gap size (us)
+    # The fit bounds to use.
     bounds = (util.minFrequency, util.maxFrequency),
-    uncertainty = 0.005,
-    cutoff = 3
+    # The uncertainty to associate with the data points.
+    uncertainty = 0.005
   ):
 
     # Cosine transform data.
-    self.frequency = frequency.copy()
-    self.transform = transform.copy()
+    self.frequency = transform.frequency.copy()
+    self.transform = transform.signal.copy()
+
+    # Store t0, for reference.
+    self.t0 = transform.t0
 
     # Map from model names to functions.
     self.modelFunctions = {
@@ -65,7 +69,7 @@ class BackgroundFit:
     }
 
     # Fit model.
-    self.model = model
+    self.model = transform.bgModel
     self.function = self.modelFunctions[self.model]
     self.pSeeds = self.modelSeeds[self.model]
     self.pBounds = self.modelBounds[self.model]
@@ -73,19 +77,19 @@ class BackgroundFit:
     # Fit options.
     self.fitBounds = bounds
     self.fitUncertainty = uncertainty
-    self.fitCutoff = cutoff
+    self.fitCutoff = transform.bgCutoff
 
-    # Store the start time gap size, for help setting initial seeds.
+    # Get the start time gap size, for help setting initial seeds.
     kHz_us = 1E-3
-    self.gap = gap * kHz_us
+    gap = (transform.start - transform.t0) * kHz_us
 
     # Update some of the initial seeds based on the mathematical expectation.
-    if model == "sinc":
-      self.pSeeds[2] = 1 / (2 * np.pi * self.gap)
+    if self.model == "sinc":
+      self.pSeeds[2] = 1 / (2 * np.pi * gap)
       self.pBounds[0][2] = 0.95 * self.pSeeds[2]
       self.pBounds[1][2] = 1.05 * self.pSeeds[2]
-    elif model == "error":
-      self.pSeeds[3] = np.pi * self.gap
+    elif self.model == "error":
+      self.pSeeds[3] = np.pi * gap
       self.pBounds[0][3] = 0.95 * self.pSeeds[3]
       self.pBounds[1][3] = 1.05 * self.pSeeds[3]
 
@@ -97,7 +101,7 @@ class BackgroundFit:
     # Fit results.
     self.pOpt = None
     self.pCov = None
-    self.fitResult = None
+    self.fitResult = np.zeros(len(self.frequency))
 
     # Fit result details.
     self.chi2dof = None
@@ -106,12 +110,9 @@ class BackgroundFit:
     self.spread = None
     self.newBounds = None
 
-    # Conversion factor.
-    self.kHz_us = 1E-3
-
-    # First indices strictly outside the collimator bounds.
-    self.lowEdge = np.searchsorted(frequency, util.minimum["frequency"])
-    self.highEdge = np.searchsorted(frequency, util.maximum["frequency"])
+    # First indices inside the collimator bounds.
+    self.lowEdge = np.argmax(transform.fMask)
+    self.highEdge = (len(self.frequency) - 1) - np.argmax(np.flip(transform.fMask))
 
   # ============================================================================
 
@@ -168,90 +169,7 @@ class BackgroundFit:
 
   # ============================================================================
 
-  # Plot the background fit.
-  # TODO: make the start time & t0 arguments in the constructor, to have them available anywhere instead of passing here
-  # TODO: add text label annotation (incl. list of lines) to style file
-  def plot(
-    self,
-    standalone = True, # if True, make a fresh plot (default); if False, update the supplied handles for existing plot objects
-    output = None,
-    label = None,
-    tfLine = None, # existing line object for cosine transform, for fast updating
-    bgLine = None, # existing line object for background data, for fast updating
-    fitLine = None, # existing line object for background fit, for fast updating
-    labelObj = None # existing text object for t0 label, for fast updating
-  ):
-
-    # Make a plot from scratch.
-    if standalone:
-
-      # Plot the cosine transform.
-      plt.plot(
-        self.frequency,
-        self.transform,
-        'o-',
-        ms = 4,
-        label = "Cosine Transform"
-      )
-
-      # Plot the background data points.
-      style.errorbar(
-        self.fitX,
-        self.fitY,
-        self.fitUncertainty,
-        fmt = 'ko',
-        label = "Background"
-      )
-
-      # Plot the background fit curve.
-      plt.plot(
-        self.frequency,
-        self.fitResult,
-        'g',
-        label = "Background Fit"
-      )
-
-      # Make a t0 label.
-      if label is not None:
-        plt.text(self.frequency[0], 1, label, ha = "left", va = "top")
-
-      # Plot labels.
-      plt.legend()
-      style.xlabel("Frequency (kHz)")
-      style.ylabel("Arbitrary Units")
-
-      # Save, if specified.
-      if output is not None:
-        plt.savefig(output)
-
-      plt.clf()
-
-    # Update the existing plot objects from the supplied handles, for speed.
-    else:
-
-      # Plot the cosine transform.
-      if tfLine is not None:
-        tfLine.set_ydata(self.transform)
-
-      # Plot the background data points.
-      if bgLine is not None:
-        bgLine.set_ydata(self.fitY)
-
-      # Plot the background fit curve.
-      if fitLine is not None:
-        fitLine.set_ydata(self.fitResult)
-
-      # Make a t0 label.
-      if labelObj is not None and label is not None:
-        labelObj.set_text(label)
-
-      # Rescale the y-axis.
-      plt.gca().relim()
-      plt.gca().autoscale()
-
-  # ============================================================================
-
-  # Update the fit uncertainty and re-estimate the fit bounds.
+  # Update the fit uncertainty and chi-squared, then re-estimate the new bounds.
   def update(self, uncertainty):
 
     # Update the chi-squared with the new uncertainty.
@@ -259,18 +177,18 @@ class BackgroundFit:
     self.fitUncertainty = uncertainty
 
     # Step inward from the low edge to find the new predicted boundary.
-    # Break when current point *and* next higher point are both beyond the cutoff.
     lowIndex = self.lowEdge
     for i in range(lowIndex, len(self.fullResiduals) - 1):
-      if (np.abs(self.fullResiduals[i:i+2]) > self.fitCutoff * self.fitUncertainty).all():
+      # Break when current point *and* next 2 higher points are beyond the cutoff.
+      if (np.abs(self.fullResiduals[i:i+3]) > self.fitCutoff * self.fitUncertainty).all():
         lowIndex = i
         break
 
     # Step inward from the high edge to find the new predicted boundary.
-    # Break when current point *and* next lower point are both beyond the cutoff.
     highIndex = self.highEdge
     for i in range(highIndex, 0, -1):
-      if (np.abs(self.fullResiduals[i-1:i+1]) > self.fitCutoff * self.fitUncertainty).all():
+      # Break when current point *and* next 2 lower points are beyond the cutoff.
+      if (np.abs(self.fullResiduals[i-2:i+1]) > self.fitCutoff * self.fitUncertainty).all():
         highIndex = i
         break
 
@@ -281,7 +199,70 @@ class BackgroundFit:
 
   # Check if this fit's bounds are closer together than "other".
   def betterBounds(self, other):
-#    left = (other.newBounds[0] >= self.newBounds[0])
-#    right = (other.newBounds[1] <= self.newBounds[1])
-#    return (left and right)
-    return abs(self.newBounds[1] - self.newBounds[0]) <= abs(other.newBounds[1] - other.newBounds[0])
+    thisDiff = abs(self.newBounds[1] - self.newBounds[0])
+    otherDiff = abs(other.newBounds[1] - other.newBounds[0])
+    return thisDiff < otherDiff
+
+  # ============================================================================
+
+  # Plot this background fit.
+  # TODO: add text label annotation (incl. list of lines) to style file
+  def plot(
+    self,
+    # Path to desired output file.
+    output = None,
+    # Assume plot objects exist already in plt.gca(), and update them for speed.
+    update = False
+  ):
+
+    # Make a text label for t0.
+    label = f"$t_0 = {self.t0*1000:.4f}$ ns"
+
+    # Make a plot from scratch.
+    if not update:
+
+      # Plot the transform, background points, and background fit.
+      plt.plot(self.frequency, self.transform, 'o-', label = "Cosine Transform")
+      plt.plot(self.fitX, self.fitY, 'ko', label = "Background")
+      plt.plot(self.frequency, self.fitResult, 'g', label = "Background Fit")
+
+      # Display the t0 label.
+      plt.text(self.frequency[0], 1, label, ha = "left", va = "top")
+
+      # Make the axis labels and legend.
+      style.xlabel("Frequency (kHz)")
+      style.ylabel("Arbitrary Units")
+      plt.legend()
+
+      # Save to disk and clear the figure, if specified.
+      if output is not None:
+        plt.savefig(output)
+        plt.clf()
+
+    # Update the existing plot objects for speed, assuming the above order.
+    else:
+
+      # Update the transform, background points, and background fit.
+      plt.gca().lines[0].set_ydata(self.transform)
+      plt.gca().lines[1].set_ydata(self.fitY)
+      plt.gca().lines[2].set_ydata(self.fitResult)
+
+      # Update the t0 label.
+      plt.gca().findobj(matplotlib.text.Text)[0].set_text(label)
+
+      # Rescale the y-axis.
+      plt.gca().relim()
+      plt.gca().autoscale()
+
+  # ============================================================================
+
+  # Save this background fit in NumPy format.
+  def save(self, output = None):
+    if output is not None:
+        np.savez(
+          output,
+          frequency = self.frequency,
+          transform = self.transform,
+          fitResult = self.fitResult,
+          bounds = np.array([self.fitBounds[0], self.fitBounds[1]])
+        )
