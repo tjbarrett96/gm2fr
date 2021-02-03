@@ -72,8 +72,7 @@ class Transform:
     self.plots = plots
 
     # Define the frequency values for evaluating the cosine transform.
-    # self.frequency = np.arange(6631, 6780, df)
-    self.frequency = np.arange(6601, 6810, df)
+    self.frequency = np.arange(6631, 6780, df)
 
     # Mask selecting only physical frequencies determined by the collimators.
     self.fMask = (self.frequency >= util.minimum["frequency"]) & (self.frequency <= util.maximum["frequency"])
