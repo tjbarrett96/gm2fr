@@ -60,25 +60,33 @@ class Transform:
     self.fr = fastRotation
 
     # The start and end times.
-    self.start = start
-    self.end = end
+    self.start = max(start, self.fr.time[0])
+    self.end = min(end, self.fr.time[-1])
 
     # Apply the start/end mask to the fast rotation data.
     self.tMask = (self.fr.time >= self.start) & (self.fr.time <= self.end)
     self.frTime = self.fr.time[self.tMask]
     self.frSignal = self.fr.signal[self.tMask]
+    self.frError = self.fr.error[self.tMask]
 
     # Plotting option.
     self.plots = plots
 
     # Define the frequency values for evaluating the cosine transform.
     self.frequency = np.arange(6631, 6780, df)
+    #self.frequency = np.arange(6601, 6810, df)
 
     # Mask selecting only physical frequencies determined by the collimators.
     self.fMask = (self.frequency >= util.minimum["frequency"]) & (self.frequency <= util.maximum["frequency"])
 
     # Initialize the transform bin heights.
     self.signal = np.zeros(len(self.frequency))
+
+    # Keep track of the normalization factor used.
+    self.normalization = 1
+
+    # Initialize the covariance matrix among the transform bins.
+    self.cov = np.zeros((len(self.frequency), len(self.frequency)))
 
     # The background fit model.
     self.bgModel = model
@@ -122,46 +130,63 @@ class Transform:
 
     # TODO: these dictionaries perhaps could go in utilities.py?
 
-    # Unit strings for each axis.
-    self.units = {
-      "frequency": "kHz",
-      "period": "ns",
-      "radius": "mm",
-      "momentum": "GeV",
-      "gamma": None,
-      "lifetime": r"$\mu$s",
-      "offset": r"\%"
-    }
-
-    # Symbols for each axis.
-    self.symbols = {
-      "frequency": "f",
-      "period": "T",
-      "radius": "x_e",
-      "momentum": "p",
-      "gamma": r"\gamma",
-      "lifetime": r"\tau",
-      "offset": r"\delta p / p_0"
-    }
-
-    # Labels for each axis.
     self.labels = {
-      "frequency": "Revolution Frequency",
-      "period": "Revolution Period",
-      "radius": "Equilibrium Radius",
-      "momentum": "Momentum",
-      "gamma": "Gamma Factor",
-      "lifetime": "Muon Lifetime",
-      "offset": "Momentum Offset"
+      "frequency": {"math": "f", "simple": "f", "units": "kHz", "plot": "Revolution Frequency"},
+      "period": {"math": "T", "simple": "T", "units": "ns", "plot": "Revolution Period"},
+      "radius": {"math": "x_e", "simple": "x", "units": "mm", "plot": "Equilibrium Radius"},
+      "momentum": {"math": "p", "simple": "p", "units": "GeV", "plot": "Momentum"},
+      "gamma": {"math": r"\gamma", "simple": "gamma", "units": None, "plot": "Gamma Factor"},
+      "lifetime": {"math": r"\tau", "simple": "tau", "units": r"$\mu$s", "plot": "Muon Lifetime"},
+      "offset": {"math": r"\delta p/p_0", "simple": "dp/p0", "units": r"\%", "plot": "Fractional Momentum Offset"}
     }
+
+    # Initialize the structured array of results, with column headers.
+    self.results = np.zeros(
+      1,
+      dtype =   [(f"<{self.labels[axis]['simple']}>", np.float32) for axis in self.labels.keys()] \
+              + [(f"sigma_{self.labels[axis]['simple']}", np.float32) for axis in self.labels.keys()]
+    )
+
+    # # Unit strings for each axis.
+    # self.units = {
+    #   "frequency": "kHz",
+    #   "period": "ns",
+    #   "radius": "mm",
+    #   "momentum": "GeV",
+    #   "gamma": None,
+    #   "lifetime": r"$\mu$s",
+    #   "offset": r"\%"
+    # }
+    #
+    # # Symbols for each axis.
+    # self.symbols = {
+    #   "frequency": "f",
+    #   "period": "T",
+    #   "radius": "x_e",
+    #   "momentum": "p",
+    #   "gamma": r"\gamma",
+    #   "lifetime": r"\tau",
+    #   "offset": r"\delta p / p_0"
+    # }
+    #
+    # # Labels for each axis.
+    # self.labels = {
+    #   "frequency": "Revolution Frequency",
+    #   "period": "Revolution Period",
+    #   "radius": "Equilibrium Radius",
+    #   "momentum": "Momentum",
+    #   "gamma": "Gamma Factor",
+    #   "lifetime": "Muon Lifetime",
+    #   "offset": "Momentum Offset"
+    # }
 
   # ============================================================================
 
-  # Calculate the cosine transform using Numba, editing "result" in-place.
+  # Calculate the cosine transform using Numba.
   # For speed, need to take everything as arguments; no "self" references.
   @staticmethod
   @nb.njit(fastmath = True, parallel = True)
-  def fastTransform(result, t, S, f, t0):
+  def fastTransform(t, S, S_err, f, t0, result):
 
     # Conversion from (kHz * us) to the standard (Hz * s).
     kHz_us = 1E-3
@@ -172,27 +197,76 @@ class Transform:
       for j in range(len(t)):
         result[i] += S[j] * np.cos(2 * np.pi * f[i] * (t[j] - t0) * kHz_us)
 
-    # Normalize the maximum value to 1.
-    result /= np.max(result)
+  # ============================================================================
+
+  # Calculate the covariance matrix of the cosine transform using Numba.
+  # For speed, need to take everything as arguments; no "self" references.
+  @staticmethod
+  @nb.njit(fastmath = True, parallel = True)
+  def fastCovariance(t, S_err, f, t0, cov, mask):
+
+    # Conversion from (kHz * us) to the standard (Hz * s).
+    kHz_us = 1E-3
+
+    # Ensure everything is reset to zero first.
+    cov.fill(0)
+
+    # Calculate the covariance matrix, parallelizing the first frequency loop.
+    for i in nb.prange(len(f)):
+      if mask[i]:
+        for j in range(i, len(f)):
+          if mask[j]:
+            for k in range(len(t)):
+              cov[i, j] += np.cos(2*np.pi*f[i]*(t[k]-t0)*kHz_us) \
+                           * np.cos(2*np.pi*f[j]*(t[k]-t0)*kHz_us) * S_err[k]**2
+            cov[j, i] = cov[i, j]
+
+  # ============================================================================
+
+  # Update this object's covariance matrix using the current transform.
+  # This is a wrapper for the Numba implementation, which can't use "self".
+  def covariance(self, bounds = None):
+
+    if bounds is None:
+      mask = np.ones(len(self.frequency))
+    else:
+      mask = (self.frequency < bounds[0]) | (self.frequency > bounds[1])
+
+    # Pass this object's instance variables to the Numba implementation.
+    Transform.fastCovariance(
+      self.frTime,
+      self.frError,
+      self.frequency,
+      self.t0,
+      self.cov,
+      mask = mask
+    )
+
+    # self.cov /= self.normalization**2
 
   # ============================================================================
 
   # Update this object's cosine transform using the current self.t0.
   # This is a wrapper for the Numba implementation, which can't use "self".
-  def transform(self):
+  def transform(self, reset = True):
 
     # Pass this object's instance variables to the Numba implementation.
     Transform.fastTransform(
-      self.signal,
       self.frTime,
       self.frSignal,
+      self.frError,
       self.frequency,
-      self.t0
+      self.t0,
+      self.signal
     )
 
-    # Calculate the frequency bin covariance matrix.
-    # temp = np.cos(2 * np.pi * np.outer(k * f, times - t0) * kHz_ns)
-    # cov = np.einsum("ik, jk, k -> ij", temp, temp, errors**2) / scale
+    # Normalize the maximum value to 1.
+    # self.normalization = np.max(self.signal)
+    # self.signal /= self.normalization
+
+    # Ensure the covariance matrix is reset.
+    if reset:
+      self.cov.fill(0)
 
   # ============================================================================
 
@@ -200,29 +274,34 @@ class Transform:
   # TODO: save only ~10 representative sample plots from the scan to speed things up
   def optimize(
     self,
-    mode,
     bounds,
-    index = None,  # iteration index
-    subindex = 0   # sub-iteration index, if minimum not found
+    index = 0,  # iteration index
+    subindex = 0,   # sub-iteration index, if minimum not found
+    cov = False # use covariance matrix for chi-squared
   ):
 
     # Make the list of t0 for the scan.
-    if mode == "fine":
+    if index > 0:
       times = np.arange(self.t0 - self.fineRange, self.t0 + self.fineRange, self.fineStep)
-    elif mode == "coarse":
+    elif index == 0:
       times = np.arange(self.t0 - self.coarseRange, self.t0 + self.coarseRange, self.coarseStep)
     else:
-      raise ValueError(f"Optimization mode '{mode}' not recognized.")
+      raise ValueError(f"Optimization index '{index}' not recognized.")
 
     # Initialize the list of BackgroundFit objects for each time in the scan.
     scanResults = [None] * len(times)
+
+    # Over a small t0 window, the covariance doesn't change much.
+    # Just calculate it once at the start.
+    if index > 0 and cov:
+      self.covariance(bounds)
 
     # For each symmetry time...
     for i in range(len(times)):
 
       # Set the current t0, and update the cosine transform.
       self.t0 = times[i]
-      self.transform()
+      self.transform(reset = False if index > 0 and cov else True)
 
       # Create the BackgroundFit object and perform the fit.
       scanResults[i] = BackgroundFit(self, bounds = bounds)
@@ -261,7 +340,7 @@ class Transform:
       substring = f"-{subindex}" if subindex > 0 else ""
 
       # Only plot each background fit during the coarse scan.
-      if mode == "coarse" and self.plots >= 2:
+      if index == 0 and self.plots >= 2:
 
         # Temporarily turn off LaTeX rendering for faster plots.
         latex = plt.rcParams["text.usetex"]
@@ -324,7 +403,7 @@ class Transform:
       print(f"Trying again with re-estimated t0 seed: {self.t0*1000:.4f} ns.")
 
       # Make a recursive call to optimize again using the new estimate.
-      self.optimize(mode, bounds, index + 1, subindex + 1)
+      self.optimize(bounds, index, subindex + 1)
 
     # Otherwise, if there is a minimum sufficiently inside the scan window...
     else:
@@ -354,7 +433,7 @@ class Transform:
       self.t0 = -popt[1] / (2 * popt[0]) # -b/2a (quadratic formula)
 
       # Print an update, completing this round of optimization.
-      print(f"\nCompleted {mode} background optimization.")
+      print(f"\nCompleted background optimization {index}.")
       print(f"{'chi2/dof':>16} = {self.bgFit.chi2dof:.4f}")
       print(f"{'bounds':>16} = {self.bgFit.newBounds} kHz")
       print(f"{'spread':>16} = {self.bgFit.spread:.4f}")
@@ -379,15 +458,15 @@ class Transform:
 
     # Remember the previous iteration's fit bounds, to check if they've changed.
     oldBounds = (None, None)
+    counter = 0
 
     # Scan over symmetry times to find the best background fit.
     if self.optimization:
 
       # Run the coarse optimization routine.
-      self.optimize("coarse", bounds, index = 0)
+      self.optimize(bounds, index = 0)
 
       # Countinue iterating the bounds until they don't change anymore.
-      counter = 0
       while self.bgFit.newBounds != oldBounds:
 
         # Update the previous bounds used, and the number of iterations.
@@ -396,7 +475,6 @@ class Transform:
 
         # Run the fine optimization routine.
         self.optimize(
-          "fine",
           self.bgFit.newBounds if not fixed else bounds,
           index = counter
         )
@@ -405,14 +483,16 @@ class Transform:
         if fixed:
           break
 
+      self.optimize(bounds = self.bgFit.newBounds if not fixed else bounds, index = counter + 1, cov = True)
+
       # Do the final transform and fit, using the optimized t0.
-      self.transform()
-      self.bgFit = BackgroundFit(
-        self,
-        self.bgFit.newBounds if not fixed else bounds,
-        self.bgFit.spread
-      )
-      self.bgFit.fit()
+      # self.transform()
+      # self.bgFit = BackgroundFit(
+      #   self,
+      #   self.bgFit.newBounds if not fixed else bounds,
+      #   self.bgFit.spread
+      # )
+      # self.bgFit.fit()
 
     # Fix the supplied t0, and simply find the optimal bounds.
     # TODO: if the fixed t0 is bad, bound optimization will fail; find a way to catch and handle this elegantly
@@ -440,8 +520,20 @@ class Transform:
         )
         self.bgFit.fit()
 
+    # Calculate a final transform and covariance.
+    self.transform()
+    self.covariance()
+
+    # Perform the final background fit.
+    self.bgFit = BackgroundFit(
+      self,
+      bounds = self.bgFit.newBounds if not fixed else bounds,
+      uncertainty = self.bgFit.spread
+    )
+    self.bgFit.fit()
+
     print("\nCompleted final background fit.")
-    print(f"{'chi2/dof':>16} = {self.bgFit.chi2dof:.4f}")
+    print(f"{'chi2/dof':>16} = {self.bgFit.chi2:.4f} / {self.bgFit.dof} = {self.bgFit.chi2dof:.4f}")
 
     # Plot final background fit result.
     if self.output is not None:
@@ -464,6 +556,11 @@ class Transform:
       self.save()
       self.bgFit.save(f"{self.output}/background.npz")
 
+    # Save key results.
+    for i in self.labels.keys():
+      self.results[f"<{self.labels[i]['simple']}>"] = self.getMean(i)
+      self.results[f"sigma_{self.labels[i]['simple']}"] = self.getWidth(i)
+
     print(f"\nFinished background removal, in {(time.time() - begin):.2f} seconds.")
 
   # ============================================================================
@@ -483,18 +580,18 @@ class Transform:
       # Axis labels.
       style.ylabel("Arbitrary Units")
       style.xlabel(
-        f"{self.labels[axis]}" \
-        + (f" ({self.units[axis]})" if self.units[axis] is not None else "")
+        f"{self.labels[axis]['plot']}" \
+        + (f" ({self.labels[axis]['units']})" if self.labels[axis]["units"] is not None else "")
       )
 
       # Infobox containing mean and standard deviation.
       style.databox(
-        (fr"\langle {self.symbols[axis]} \rangle",
+        (fr"\langle {self.labels[axis]['math']} \rangle",
           self.getMean(axis),
-          self.units[axis]),
-        (fr"\sigma_{{{self.symbols[axis]}}}",
+          self.labels[axis]["units"]),
+        (fr"\sigma_{{{self.labels[axis]['math']}}}",
           self.getWidth(axis),
-          self.units[axis])
+          self.labels[axis]["units"])
       )
 
       # Save to disk.
@@ -538,7 +635,7 @@ class Transform:
   # Calculate the electric field correction.
   def getCorrection(self, n = 0.108):
     return util.radialOffsetToCorrection(
-      self.radius[self.fMask],
+      self.axes["radius"][self.fMask],
       self.signal[self.fMask],
       n
     )

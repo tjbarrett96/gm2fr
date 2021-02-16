@@ -27,12 +27,16 @@ class BackgroundFit:
     uncertainty = 0.005
   ):
 
+    # Remember the transform object.
+    self.transform = transform
+
     # Cosine transform data.
     self.frequency = transform.frequency.copy()
-    self.transform = transform.signal.copy()
+    self.signal = transform.signal.copy()
 
     # Store t0, for reference.
     self.t0 = transform.t0
+    self.end = transform.end
 
     # Map from model names to functions.
     self.modelFunctions = {
@@ -52,8 +56,8 @@ class BackgroundFit:
     self.modelBounds = {
 
       "parabola": (
-        [0, util.minFrequency, -1],
-        [1, util.maxFrequency, 0 ]
+        [0,      util.minFrequency, -np.inf],
+        [np.inf, util.maxFrequency, 0 ]
       ),
 
       "sinc": (
@@ -62,17 +66,31 @@ class BackgroundFit:
       ),
 
       "error": (
-        [-np.inf, util.minFrequency, 0,      0     ],
-        [0,       util.maxFrequency, np.inf, np.inf]
+        [-np.inf, util.minFrequency, 0,      -np.inf],
+        [0,       util.maxFrequency, np.inf,  np.inf]
       )
 
     }
 
-    # Fit model.
+    self.wiggleSeeds = [0.1]
+    self.wiggleBounds = ([-np.inf], [np.inf])
+
+    # Background fit model.
     self.model = transform.bgModel
-    self.function = self.modelFunctions[self.model]
-    self.pSeeds = self.modelSeeds[self.model]
-    self.pBounds = self.modelBounds[self.model]
+
+    wiggle = True
+    if wiggle:
+      # Merge background function with oversampling wiggle function.
+      self.function = lambda f, *p: self.modelFunctions[self.model](f, *p[:-1]) + self.wiggle(f, *p[-1:])
+      self.pSeeds = self.modelSeeds[self.model] + self.wiggleSeeds
+      self.pBounds = (
+        self.modelBounds[self.model][0] + self.wiggleBounds[0],
+        self.modelBounds[self.model][1] + self.wiggleBounds[1],
+      )
+    else:
+      self.function = self.modelFunctions[self.model]
+      self.pSeeds = self.modelSeeds[self.model]
+      self.pBounds = self.modelBounds[self.model]
 
     # Fit options.
     self.fitBounds = bounds
@@ -96,7 +114,30 @@ class BackgroundFit:
     # Fit data, with boundary mask applied.
     mask = (self.frequency < self.fitBounds[0]) | (self.frequency > self.fitBounds[1])
     self.fitX = self.frequency[mask]
-    self.fitY = self.transform[mask]
+    self.fitY = self.signal[mask]
+
+    # Check if there's any covariance data to use in the fit.
+    if (self.transform.cov == 0).all():
+      self.fitCov = None
+    else:
+      self.fitCov = self.transform.cov[mask][:, mask]
+      print(self.fitCov)
+      self.fitVar = np.diag(self.fitCov)
+      self.fitCorr = np.diag(1/np.sqrt(self.fitVar)) @ self.fitCov @ np.diag(1/np.sqrt(self.fitVar))
+      print(self.fitCorr)
+      # plt.imshow(self.fitCorr)
+      # plt.colorbar()
+      # plt.show()
+      # Remove negative eigenvalues from floating point errors.
+      vals, V = np.linalg.eig(self.fitCov)
+      vals = np.real(np.maximum(vals, 1E-10))
+      # print(vals)
+      self.fitCov = V @ np.diag(vals) @ V.T
+      # print(self.fitCov)
+      # this scaling is wrong -- figure out the right rescaling
+      # T = np.sqrt(self.fitVar) / np.sqrt(np.diag(BB))
+      # TT = T @ T.T
+      # self.fitCov = BB * TT
 
     # Fit results.
     self.pOpt = None
@@ -104,6 +145,8 @@ class BackgroundFit:
     self.fitResult = np.zeros(len(self.frequency))
 
     # Fit result details.
+    self.chi2 = None
+    self.dof = None
     self.chi2dof = None
     self.fitResiduals = None
     self.fullResiduals = None
@@ -118,7 +161,7 @@ class BackgroundFit:
 
   # Parabolic fit function.
   def parabola(self, f, a, b, c):
-    return a * (f - b)**2 + c
+    return (f - b)**2 / a + c
 
   # ============================================================================
 
@@ -135,8 +178,17 @@ class BackgroundFit:
 
   # ============================================================================
 
+  # Frequency oversampling wiggle.
+  def wiggle(self, f, a):
+    return a / (2*np.pi*f*1E-3) * np.sin(2*np.pi*f*(self.end - self.t0)*1E-3)
+
+  # ============================================================================
+
   # Perform the background fit.
   def fit(self):
+
+    if self.fitCov is not None:
+      print(np.linalg.eigvals(self.fitCov))
 
     # Perform the fit.
     self.pOpt, self.pCov = opt.curve_fit(
@@ -145,6 +197,9 @@ class BackgroundFit:
       self.fitY,
       p0 = self.pSeeds,
       bounds = self.pBounds,
+      # sigma = np.sqrt(np.diag(self.fitCov)) if self.fitCov is not None else None,
+      sigma = self.fitCov,
+      absolute_sigma = True if self.fitCov is not None else False,
       maxfev = 10_000
     )
 
@@ -153,27 +208,37 @@ class BackgroundFit:
 
     # Calculate the residuals in the fit region, and everywhere.
     self.fitResiduals = self.fitY - self.function(self.fitX, *self.pOpt)
-    self.fullResiduals = self.transform - self.fitResult
+    self.fullResiduals = self.signal - self.fitResult
 
     # Calculate the one-sigma spread in fit residuals.
     self.spread = np.std(self.fitResiduals)
+    self.dof = len(self.fitX) - len(self.pOpt)
 
-    # Calculate the chi-squared, using the supplied uncertainty.
-    chi2 = self.fitResiduals.T @ self.fitResiduals / self.fitUncertainty**2
-    self.chi2dof = chi2 / (len(self.fitX) - len(self.pOpt))
+    # Calculate the chi-squared.
+    if self.fitCov is not None:
+      # inv = np.linalg.pinv(self.fitCov)
+      # print(inv)
+      self.chi2 = self.fitResiduals.T @ np.linalg.pinv(self.fitCov) @ self.fitResiduals
+      print(self.fitResiduals.T @ self.fitResiduals / np.mean(np.sqrt(np.diag(self.fitCov)))**2 / self.dof)
+    else:
+      self.chi2 = self.fitResiduals.T @ self.fitResiduals / self.fitUncertainty**2
+
+    # Calculate the chi-squared per degree of freedom.
+    self.chi2dof = self.chi2 / self.dof
 
     # Predict the new fit boundaries, using the fit uncertainty.
     self.update(self.fitUncertainty)
 
-    # print([f"{x:.4f}" for x in self.pOpt])
+    print([f"{x:.4f}" for x in self.pOpt])
 
   # ============================================================================
 
   # Update the fit uncertainty and chi-squared, then re-estimate the new bounds.
   def update(self, uncertainty):
 
-    # Update the chi-squared with the new uncertainty.
-    self.chi2dof *= self.fitUncertainty**2 / uncertainty**2
+    if self.fitCov is None:
+      # Update the chi-squared with the new uncertainty.
+      self.chi2dof *= self.fitUncertainty**2 / uncertainty**2
     self.fitUncertainty = uncertainty
 
     # Step inward from the low edge to find the new predicted boundary.
@@ -222,12 +287,12 @@ class BackgroundFit:
     if not update:
 
       # Plot the transform, background points, and background fit.
-      plt.plot(self.frequency, self.transform, 'o-', label = "Cosine Transform")
+      plt.plot(self.frequency, self.signal, 'o-', label = "Cosine Transform")
       plt.plot(self.fitX, self.fitY, 'ko', label = "Background")
       plt.plot(self.frequency, self.fitResult, 'g', label = "Background Fit")
 
       # Display the t0 label.
-      plt.text(self.frequency[0], 1, label, ha = "left", va = "top")
+      plt.text(0.04, 0.95, label, ha = "left", va = "top", transform = plt.gca().transAxes)
 
       # Make the axis labels and legend.
       style.xlabel("Frequency (kHz)")
@@ -243,7 +308,7 @@ class BackgroundFit:
     else:
 
       # Update the transform, background points, and background fit.
-      plt.gca().lines[0].set_ydata(self.transform)
+      plt.gca().lines[0].set_ydata(self.signal)
       plt.gca().lines[1].set_ydata(self.fitY)
       plt.gca().lines[2].set_ydata(self.fitResult)
 
@@ -262,7 +327,7 @@ class BackgroundFit:
         np.savez(
           output,
           frequency = self.frequency,
-          transform = self.transform,
+          transform = self.signal,
           fitResult = self.fitResult,
           bounds = np.array([self.fitBounds[0], self.fitBounds[1]])
         )

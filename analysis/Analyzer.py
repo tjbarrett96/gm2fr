@@ -167,8 +167,12 @@ class Analyzer:
         h = Histogram.load(input)
         self.fastRotation = fr.FastRotation(h.xCenters, h.heights, h.errors, self.units)
 
+      if (self.fastRotation.error == 0).any():
+        print("bad")
+
       # Plot the fast rotation signal.
-      self.fastRotation.plot(self.output)
+      if plots >= 2:
+        self.fastRotation.plot(self.output)
 
       # Evaluate the frequency distribution.
       self.transform = tr.Transform(
@@ -224,11 +228,3 @@ class Analyzer:
         # Save the results array.
         np.save(f"{self.output}/results.npy", self.results)
         np.savetxt(f"{self.output}/results.txt", self.results, fmt = "%.4f", header = ",".join(columns), delimiter = ",")
-
-      # If this input is part of a group, keep track of what files finished.
-      if self.group is not None:
-        with open(f"{self.parent}/{self.group}/finished.txt", "a") as finished:
-          if type(input) is tuple:
-            finished.write(f"{input[0]}\n")
-          else:
-            finished.write(f"{input}\n")

@@ -62,7 +62,7 @@ def setStyle():
   # Default subplot spacing.
   plt.rcParams["figure.subplot.wspace"] = 0.3
   plt.rcParams["figure.subplot.hspace"] = 0.3
-  plt.rcParams["figure.subplot.top"] = 0.93
+  plt.rcParams["figure.subplot.top"] = 0.96
   plt.rcParams["figure.subplot.right"] = 0.93
 
 # ==============================================================================

@@ -264,7 +264,7 @@ def spectrum(time, data):
 
   # Fold the negative-frequency bins onto the positive-frequency bins.
   for i in range(1, int(np.ceil(n / 2 - 1)) + 1):
-      transform[i] += transform[n - i]
+    transform[i] += transform[n - i]
 
   # Discard the negative-frequency bins.
   transform = transform[0:(int(n / 2) + 1)]

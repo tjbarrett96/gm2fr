@@ -7,21 +7,21 @@ import gm2fr.utilities as util
 # Two-parameter wiggle fit function, only modeling exponential decay.
 def two(t, N, tau):
   return N * np.exp(-t / tau)
-  
+
 # ==============================================================================
 
 # Five-parameter wiggle fit function, adding precession wiggle on top of decay.
 def five(t, N, tau, A, f, phi):
   return two(t, N, tau) \
          * (1 + A * np.cos(2 * np.pi * f * t + phi))
-  
+
 # ==============================================================================
 
 # Nine-parameter wiggle fit function, adding CBO wiggle on top of the above.
 def nine(t, N, tau, A, f, phi, tau_cbo, A_cbo, f_cbo, phi_cbo):
   return five(t, N, tau, A, f, phi) \
          * (1 + np.exp(-t / tau_cbo) * A_cbo * np.cos(2 * np.pi * f_cbo * t + phi_cbo))
-  
+
 # ==============================================================================
 
 # Mapping function names (i.e. strings) to the actual functions.
@@ -52,6 +52,21 @@ modelLabels["nine"] = modelLabels["five"] + [
   ("CBO asymmetry", ""),
   ("CBO frequency", "1/us"),
   ("CBO phase", "rad")
+]
+
+# ==============================================================================
+
+# Parameter symbols, for saving results.
+modelLabels = [
+  {"printing": "normalization", "output": "N", "units": ""},
+  {"printing": "lifetime", "output": "tau", "units": "us"},
+  {"printing": "asymmetry", "output": "A", "units": ""},
+  {"printing": "frequency", "output": "f_a", "units": "1/us"},
+  {"printing": "phase", "output": "phi_a", "units": "rad"},
+  {"printing": "CBO lifetime", "output": "tau_cbo", "units": "us"},
+  {"printing": "CBO asymmetry", "output": "A_cbo", "units": ""},
+  {"printing": "CBO frequency", "output": "f_cbo", "units": "1/us"},
+  {"printing": "CBO phase", "output": "phi_cbo", "units": "rad"}
 ]
 
 # ==============================================================================
@@ -100,9 +115,9 @@ modelBounds["nine"] = (
 # ==============================================================================
 
 class WiggleFit:
- 
+
   # ============================================================================
- 
+
   def __init__(
     self,
     time,           # time bin centers
@@ -112,15 +127,15 @@ class WiggleFit:
     end = 650,      # fit end time (us)
     n = None        # the n-value, if known, helps inform CBO frequency seed
   ):
-  
+
     # Signal data.
     self.time = time
     self.signal = signal
     self.error = np.sqrt(signal)
-    
+
     # Ensure the errors are all non-zero.
     self.error[self.error == 0] = 1
-    
+
     # Select the sequence of fits to perform, based on the supplied model.
     self.models = ["two", "five", "nine"]
     if model in self.models:
@@ -128,46 +143,53 @@ class WiggleFit:
       self.models = self.models[:(self.models.index(self.model) + 1)]
     else:
       raise ValueError(f"Wiggle fit model '{model}' not recognized.")
-      
+
     # Fit options.
     self.start = start
     self.end = end
     self.n = n
     self.function = None
-    
+
     # Fit portion of the data, with start/end mask applied.
     mask = (self.time >= self.start) & (self.time <= self.end)
     self.fitTime = self.time[mask]
     self.fitSignal = self.signal[mask]
     self.fitError = self.error[mask]
-    
+
     # Fit results.
     self.pOpt = None
     self.pCov = None
     self.pErr = None
     self.fitResult = None
     self.chi2dof = None
-    
+
+    # Initialize the structured array of results, with column headers.
+    # TODO: add uncertainties, chi2/dof, and n-value
+    self.results = np.zeros(
+      1,
+      dtype = [(label["output"], np.float32) for label in modelLabels]
+    )
+
   # ============================================================================
 
   def fit(self):
-    
+
     # Iterate through the models, updating fit seeds each time.
     for model in self.models:
-      
+
       # Get the function, parameter seeds, and parameter bounds for this model.
       self.function = modelFunctions[model]
       seeds = modelSeeds[model]
       bounds = modelBounds[model]
-      
+
       # Update the seeds with the previous fit's results.
       if self.pOpt is not None:
         seeds[:len(self.pOpt)] = self.pOpt
-      
+
       # Set the CBO frequency seed based on the expected n-value.
       if model == "nine":
         seeds[7] = (1 - np.sqrt(1 - self.n)) * util.magicFrequency * 1E-3
-      
+
       # Perform the fit.
       self.pOpt, self.pCov = opt.curve_fit(
         self.function,
@@ -177,33 +199,36 @@ class WiggleFit:
         p0 = seeds,
         bounds = bounds
       )
-      
+
       # Get each parameter's uncertainty from the covariance matrix diagonal.
       self.pErr = np.sqrt(np.diag(self.pCov))
-      
+
       # Calculate the best fit and residuals.
       self.fitResult = self.function(self.fitTime, *self.pOpt)
       fitResiduals = self.fitSignal - self.fitResult
-      
+
       # Calculate the chi-squared, and reduced chi-squared.
       chi2 = np.sum((fitResiduals / self.fitError)**2)
       self.chi2dof = chi2 / (len(self.fitTime) - len(self.pOpt))
-      
+
       # Status update.
       print(f"\nCompleted {model}-parameter wiggle fit.")
       print(f"{'chi2/dof':>16} = {self.chi2dof:.4f}")
-      
-      # Print parameter values.
-      for i in range(len(modelLabels[model])):
-      
+
+      # Print and save parameter values.
+      for i in range(len(self.pOpt)):
+
         # Don't reveal omega_a.
-        if modelLabels[model][i][0] == "frequency":
+        if modelLabels[i]["printing"] == "frequency":
           continue
-        
+
         print((
-          f"{modelLabels[model][i][0]:>16} = "
+          f"{modelLabels[i]['printing']:>16} = "
           f"{self.pOpt[i]:.4f} +/- {self.pErr[i]:.4f} "
-          f"{modelLabels[model][i][1]}"
+          f"{modelLabels[i]['units']}"
         ))
+
+        # Copy the parameters into the results array.
+        self.results[modelLabels[i]["output"]][0] = self.pOpt[i]
 
 # ==============================================================================
