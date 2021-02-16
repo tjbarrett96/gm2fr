@@ -415,13 +415,6 @@ class Transform:
       if self.output is not None:
         self.bgFit.plot(output = f"{self.output}/background/BestFit_Opt{index}.pdf")
 
-      # # In coarse mode, just take t0 from the optimal scan index.
-      # if mode == "coarse":
-      #   self.t0 = times[optIndex]
-      #
-      # # In fine mode, estimate t0 using the parabolic chi-squared minimum.
-      # else:
-
       # Fit a parabola to the 2 neighbors on either side of the minimum.
       popt = np.polyfit(
         times[(optIndex - 2):(optIndex + 3)],
