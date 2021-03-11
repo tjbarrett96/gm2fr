@@ -44,8 +44,9 @@ class FastRotation:
   # ============================================================================
 
   # TODO: add wiggle plots
+  # TODO: add optional pileup histogram
   @classmethod
-  def produce(cls, input, label, fit = "nine", n = 0.108):
+  def produce(cls, input, label, pileup = None, fit = "nine", n = 0.108, units = "us"):
 
     # Create the fast rotation signal using a wiggle fit.
     if fit is not None:
@@ -56,9 +57,18 @@ class FastRotation:
       # Get the histograms from the file.
       rootFile = root.TFile(input)
       fineWiggle = rootFile.Get(label)
-      coarseWiggle = fineWiggle.Rebin(149, "coarse")
+
+      # Quit if the histogram is empty, or statistics are too low.
+      if fineWiggle.GetEntries() < 5E5:
+        return None
+
+      # Subtract pileup, if provided.
+      if pileup is not None:
+        finePileup = rootFile.Get(pileup)
+        fineWiggle.Add(finePileup, -1)
 
       # Pull the coarsely-binned wiggle plot data.
+      coarseWiggle = fineWiggle.Rebin(149, "coarse")
       coarseSignal, coarseEdges = rnp.hist2array(coarseWiggle, return_edges = True)
       coarseTime = (coarseEdges[0][1:] + coarseEdges[0][:-1]) / 2
 #      coarseError = np.sqrt(coarseSignal)
@@ -67,11 +77,19 @@ class FastRotation:
       # Pull the finely-binned wiggle plot data.
       fineSignal, fineEdges = rnp.hist2array(fineWiggle, return_edges = True)
       fineTime = (fineEdges[0][1:] + fineEdges[0][:-1]) / 2
-      fineError = np.sqrt(fineSignal)
+      fineError = np.sqrt(np.abs(fineSignal))
       fineError[fineError == 0] = 1
 
       # Close the input file.
       rootFile.Close()
+
+      if units == "ns":
+        coarseTime *= 1E-3
+        fineTime *= 1E-3
+      elif units == "us":
+        pass
+      else:
+        raise ValueError(f"Time units '{units}' not recognized.")
 
       # Perform the fit, using the coarsely-binned data.
       wgFit = wg.WiggleFit(
@@ -114,6 +132,7 @@ class FastRotation:
   # ============================================================================
 
   # Plot the fast rotation signal.
+  # TODO: add percent error plot over same windows.
   def plot(self, output = None):
 
     if output is not None:

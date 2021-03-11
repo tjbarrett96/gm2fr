@@ -11,11 +11,11 @@ import gm2fr.utilities as utilities
 import matplotlib.pyplot as plt
 import gm2fr.style as style
 
-# ==================================================================================================
+# ==============================================================================
 
 class Simulator:
 
-  # ================================================================================================
+  # ============================================================================
 
   def __init__(self, name, overwrite = False):
 
@@ -32,7 +32,7 @@ class Simulator:
 
     self.directory = name
 
-  # ================================================================================================
+  # ============================================================================
 
   # Specify Gaussian mixtures for the frequency and time distributions, with optional correlation.
   def useMixture(
@@ -51,7 +51,7 @@ class Simulator:
     self.sourceTimeUnits = timeUnits
     self.sourceCorrelation = correlation
 
-  # ================================================================================================
+  # ============================================================================
 
   # Specify a TH1 for the "kinetic" and time distributions, with optional correlation.
   # The "kinetic" distribution can be cyclotron frequency, momentum, etc. (see below).
@@ -73,7 +73,7 @@ class Simulator:
     self.sourceTimeUnits = timeUnits
     self.sourceCorrelation = correlation
 
-  # ================================================================================================
+  # ============================================================================
 
   # Specify a TH2 for the joint (i.e. correlated) "kinetic" and time distribution.
   # The "kinetic" variable can be cyclotron frequency, momentum, etc. (see below).
@@ -90,7 +90,7 @@ class Simulator:
     self.sourceKinematicsVariable = kinematicsVariable
     self.sourceTimeUnits = timeUnits
 
-  # ================================================================================================
+  # ============================================================================
 
   # (For internal use.) Draw injection times and cyclotron frequencies for each muon.
   def __populate(self, muons):
@@ -136,9 +136,12 @@ class Simulator:
     else:
       raise ValueError(f"Kinematics variable '{self.sourceKinematicsVariable}' not recognized.")
 
-    return offsets, frequencies
+    # Mask unphysical frequencies.
+    mask = (frequencies >= utilities.min["f"]) & (frequencies <= utilities.max["f"])
 
-  # ================================================================================================
+    return offsets[mask], frequencies[mask]
+
+  # ============================================================================
 
   def __normalize(self):
 
@@ -161,37 +164,12 @@ class Simulator:
       # Normalize the debunched current (muons per one nanosecond) to 1.
       self.signal *= 1 / (self.muons * (self.frequencies.mean() * 1E3) * 1E-9)
 
-  # ================================================================================================
-
-#  def __transform(self):
-#
-#    periods = utilities.frequencyToPeriod(self.joint.yCenters)
-#    offsets = self.joint.xCenters
-
-#    heights_T = np.sum(self.joint.heights, axis = 0)
-#    heights_tau = np.sum(self.joint.heights, axis = 1)
-
-#    mean_T = np.average(periods, weights = heights_T)
-#    mean_tau = np.average(offsets, weights = heights_tau)
-
-#    sigma_T = np.sqrt(np.average((periods - mean_T)**2, weights = heights_T))
-#    sigma_tau = np.sqrt(np.average((offsets - mean_tau)**2, weights = heights_tau))
-
-#    rho = np.average(np.outer(offsets - mean_tau, periods - mean_T), weights = self.joint.heights)
-#    rho /= sigma_T * sigma_tau
-
-#    n0 = - sigma_tau / sigma_T * rho
-#    t0 = round(n0 + self.detector) * mean_T + mean_tau
-
-#    _, transform = utilities.cosineTransform(self.signal.xCenters, self.signal.heights, t0)
-#    weights = utilities.weights(self.joint.xCenters, self.joint.yCenters, self.joint.heights)
-
-  # ================================================================================================
+  # ============================================================================
 
   def simulate(
     self,
     muons,                  # number of muons
-    end = 150_000,          # end time (nanoseconds)
+    end = 200_000,          # end time (nanoseconds)
     detector = 0.74,        # position of reference detector, as a fraction of turns
     decay = "none",         # muon decay option: "exponential", "uniform", or "none"
     backward = False,       # turn on/off backward signal
@@ -222,7 +200,7 @@ class Simulator:
     )
 
     # Maximum number of turns up to the chosen end time.
-    self.maxTurns = self.end // (1 / utilities.collimatorHigh * 1E6) + 1
+    self.maxTurns = self.end // (1 / utilities.max["f"] * 1E6) + 1
     self.minTurns = -self.maxTurns if self.backward else 0
 
     # Break up the total number of muons into batches, for memory efficiency.
@@ -237,6 +215,9 @@ class Simulator:
     if self.decay == "exponential":
       self.meanLifetime = 0
 
+    # Reset the total number, to be updated below. (Some muons may be vetoed.)
+    self.muons = 0
+
     # Process each batch of muons.
     for i in range(len(batches)):
 
@@ -244,6 +225,7 @@ class Simulator:
 
       # Draw injection times and cyclotron frequencies for each muon in the batch.
       offsets, frequencies = self.__populate(batches[i])
+      self.muons += len(frequencies)
 
       # Update the truth-level histograms.
       self.profile.fill(offsets)
@@ -276,7 +258,7 @@ class Simulator:
       elif decay == "uniform":
 
         # Select a random turn number for each muon.
-        turns = np.random.randint(self.minTurns, self.maxTurns + 1, batches[i])
+        turns = np.random.randint(self.minTurns, self.maxTurns + 1, len(frequencies))
 
         # Calculate the time of detection for each muon, using its decay turn number.
         detections = (detector + turns) * periods + offsets
@@ -310,11 +292,9 @@ class Simulator:
     if self.normalize:
       self.__normalize()
 
-#    self.__transform()
-
     print("Finished!")
 
-  # ================================================================================================
+  # ============================================================================
 
   def save(self):
 
@@ -376,7 +356,7 @@ class Simulator:
     radial.Write()
     rootFile.Close()
 
-  # ================================================================================================
+  # ============================================================================
 
   def plot(self, times = []):
 

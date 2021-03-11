@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import scipy.stats
 
 # ==============================================================================
 
@@ -13,7 +14,7 @@ a_mu = 11659208.9E-10
 q_mu = 1.602176565E-19
 
 # Mean muon lifetime at rest (ns).
-# TODO: convert this to micronseconds. probably also requires making the simulation code all in terms of microseconds... should be done anyway.
+# TODO: convert this to microseconds. probably also requires making the simulation code all in terms of microseconds... should be done anyway.
 lifetime = 2.1969811E3
 
 # Mass conversion factor from GeV to kg.
@@ -28,76 +29,78 @@ m_mu_kg = m_mu_GeV * GeV_to_kg
 # Nominal dipole magnetic field (T).
 b = 1.4513
 
-# Magic gamma factor.
-magicGamma = np.sqrt(1 / a_mu + 1)
+# ==============================================================================
 
-# Magic beta factor.
-magicBeta = np.sqrt(1 - 1 / magicGamma**2)
+magic = {
+  "x": 0,
+  "dp/p0": 0,
+  "c_e": 0,
+  "gamma": np.sqrt(1 / a_mu + 1)
+}
 
-# Magic momentum (GeV).
-magicMomentum = magicGamma * m_mu_GeV * magicBeta
-
-# Magic radius (mm). (Note: this formula only works at magic momentum!)
-magicRadius = (magicMomentum * GeV_to_kg * c) / (q_mu * b) * 1E3
+magic["beta"] = np.sqrt(1 - 1 / magic["gamma"]**2)
+magic["p"] = magic["gamma"] * m_mu_GeV * magic["beta"]
+magic["r"] = (magic["p"] * GeV_to_kg * c) / (q_mu * b) * 1E3
+magic["tau"] = magic["gamma"] * lifetime * 1E-3
 
 # ==============================================================================
 
 # Cyclotron radius (mm) to cyclotron frequency (kHz).
-def radiusToFrequency(radius):
-  return (magicBeta * c / radius) / (2 * np.pi)
+def radiusToFrequency(r):
+  return (magic["beta"] * c / r) / (2 * np.pi)
 
 # Cyclotron frequency (kHz) to cyclotron radius (mm).
-def frequencyToRadius(frequency):
-  return magicBeta * c / (2 * np.pi * frequency)
+def frequencyToRadius(f):
+  return magic["beta"] * c / (2 * np.pi * f)
 
 # Magic cyclotron frequency (kHz).
-magicFrequency = radiusToFrequency(magicRadius)
+magic["f"] = radiusToFrequency(magic["r"])
 
 # Conversion from cyclotron frequency (kHz) to cyclotron period (ns).
-def frequencyToPeriod(frequency):
-  return 1 / (frequency * 1E3) * 1E9
+def frequencyToPeriod(f):
+  return 1 / (f * 1E3) * 1E9
 
 # Magic cyclotron period (ns).
-magicPeriod = frequencyToPeriod(magicFrequency)
+magic["T"] = frequencyToPeriod(magic["f"])
 
 # Momentum (GeV) to radius (mm).
-def momentumToRadius(momentum, n = 0.108):
-  return magicRadius * (1 + 1 / (1 - n) * (momentum - magicMomentum) / magicMomentum)
+def momentumToRadius(p, n = 0.108):
+  return magic["r"] * (1 + 1 / (1 - n) * (p - magic["p"]) / magic["p"])
 
 # Radius (mm) to momentum (GeV).
-def radiusToMomentum(radius, n = 0.108):
-  return magicMomentum * (1 + (1 - n) * (radius - magicRadius) / magicRadius)
+def radiusToMomentum(r, n = 0.108):
+  return magic["p"] * (1 + (1 - n) * (r - magic["r"]) / magic["r"])
 
 # Momentum (GeV) to cyclotron frequency (kHz).
-def momentumToFrequency(momentum, n = 0.108):
-  return magicFrequency * (1 - 1 / (1 - n) * (momentum - magicMomentum) . magicMomentum)
+def momentumToFrequency(p, n = 0.108):
+  return magic["f"] * (1 - 1 / (1 - n) * (p - magic["p"]) / magic["p"])
 
 # Cyclotron frequency (kHz) to momentum (GeV).
-def frequencyToMomentum(frequency, n = 0.108):
-  return magicMomentum * (1 + (1 - n) * (1 - frequency / magicFrequency))
+def frequencyToMomentum(f, n = 0.108):
+  return magic["p"] * (1 + (1 - n) * (1 - f / magic["f"]))
 
 # Cyclotron frequency (kHz) to gamma.
-def frequencyToGamma(frequency, n = 0.108):
-  return frequencyToMomentum(frequency, n) / (m_mu_GeV * magicBeta)
+def frequencyToGamma(f, n = 0.108):
+  return frequencyToMomentum(f, n) / (m_mu_GeV * magic["beta"])
 
 # Conversion from fractional momentum offset to momentum (GeV).
-def offsetToMomentum(offset):
-  return (1 + offset) * magicMomentum
+def offsetToMomentum(dpp0):
+  return (1 + dpp0) * magic["p"]
 
 # Conversion from momentum (GeV) to fractional momentum offset.
-def momentumToOffset(momentum):
-  return (momentum - magicMomentum) / magicMomentum
+def momentumToOffset(p):
+  return (p - magic["p"]) / magic["p"]
 
 # Conversion from fractional momentum offset to cyclotron frequency (kHz).
-def offsetToFrequency(offset):
-  return momentumToFrequency(offsetToMomentum(offset))
+def offsetToFrequency(dpp0):
+  return momentumToFrequency(offsetToMomentum(dpp0))
 
 # Conversion from cyclotron frequency (kHz) to cyclotron radial offset (mm).
-def frequencyToRadialOffset(frequency):
-  return frequencyToRadius(frequency) - magicRadius
+def frequencyToRadialOffset(f):
+  return frequencyToRadius(f) - magic["r"]
 
 def correction(mean, width, n = 0.108):
-  return 2 * n * (1 - n) * magicBeta**2 * (mean**2 + width**2) / magicRadius**2 * 1E9
+  return 2 * n * (1 - n) * magic["beta"]**2 * (mean**2 + width**2) / magic["r"]**2 * 1E9
 
 # Conversion from cyclotron radial offsets (mm) to electric field correction (ppb).
 def radialOffsetToCorrection(radii, heights, n = 0.108):
@@ -111,55 +114,111 @@ def frequencyToCorrection(frequencies, heights, n = 0.108):
 
 # ==============================================================================
 
-minimum = {
-  "radius": -45
+min = {
+  "x": -45
 }
 
-maximum = {
-  "radius": +45
+max = {
+  "x": +45
 }
 
-minimum["frequency"] = radiusToFrequency(maximum["radius"] + magicRadius)
-maximum["frequency"] = radiusToFrequency(minimum["radius"] + magicRadius)
+min["r"] = min["x"] + magic["r"]
+max["r"] = max["x"] + magic["r"]
 
-minimum["period"] = frequencyToPeriod(maximum["frequency"])
-maximum["period"] = frequencyToPeriod(minimum["frequency"])
+min["f"] = radiusToFrequency(max["r"])
+max["f"] = radiusToFrequency(min["r"])
 
-minimum["gamma"] = frequencyToGamma(maximum["frequency"])
-maximum["gamma"] = frequencyToGamma(minimum["frequency"])
+min["T"] = frequencyToPeriod(max["f"])
+max["T"] = frequencyToPeriod(min["f"])
 
-minimum["momentum"] = radiusToMomentum(minimum["radius"] + magicRadius)
-maximum["momentum"] = radiusToMomentum(maximum["radius"] + magicRadius)
+min["gamma"] = frequencyToGamma(max["f"])
+max["gamma"] = frequencyToGamma(min["f"])
 
-minimum["offset"] = momentumToOffset(minimum["momentum"]) * 100
-maximum["offset"] = momentumToOffset(maximum["momentum"]) * 100
+min["p"] = radiusToMomentum(min["r"])
+max["p"] = radiusToMomentum(max["r"])
 
-minimum["lifetime"] = minimum["gamma"] * lifetime * 1E-3
-maximum["lifetime"] = maximum["gamma"] * lifetime * 1E-3
+min["dp/p0"] = momentumToOffset(min["p"]) * 100
+max["dp/p0"] = momentumToOffset(max["p"]) * 100
 
-minRadialOffset = -45
-maxRadialOffset = +45
+min["tau"] = min["gamma"] * lifetime * 1E-3
+max["tau"] = max["gamma"] * lifetime * 1E-3
 
-minRadius = magicRadius + minRadialOffset
-maxRadius = magicRadius + maxRadialOffset
+# ==============================================================================
 
-minFrequency = radiusToFrequency(maxRadius)
-maxFrequency = radiusToFrequency(minRadius)
+# String labels for each variable: math mode, units, plot axes, and filename.
+labels = {
 
-# old names for backward compatibility
-collimatorLow = minFrequency
-collimatorHigh = maxFrequency
+  "f": {
+    "math": "f",
+    "units": "kHz",
+    "plot": "Revolution Frequency",
+    "file": "frequency"
+  },
 
-minPeriod = frequencyToPeriod(maxFrequency)
-maxPeriod = frequencyToPeriod(minFrequency)
+  "T": {
+    "math": "T",
+    "units": "ns",
+    "plot": "Revolution Period",
+    "file": "period"
+  },
 
-# assuming n = 0.108
-minGamma = frequencyToGamma(maxFrequency)
-maxGamma = frequencyToGamma(minFrequency)
+  "x": {
+    "math": "x_e",
+    "units": "mm",
+    "plot": "Equilibrium Radius",
+    "file": "radius"
+  },
 
-# assuming n = 0.108
-minMomentum = radiusToMomentum(minRadius)
-maxMomentum = radiusToMomentum(maxRadius)
+  "p": {
+    "math": "p",
+    "units": "GeV",
+    "plot": "Momentum",
+    "file": "momentum"
+  },
+
+  "gamma": {
+    "math": r"\gamma",
+    "units": "",
+    "plot": "Gamma Factor",
+    "file": "gamma"
+  },
+
+  "tau": {
+    "math": r"\tau",
+    "units": r"$\mu$s",
+    "plot": "Muon Lifetime",
+    "file": "lifetime"
+  },
+
+  "dp/p0": {
+    "math": r"\delta p/p_0",
+    "units": r"\%",
+    "plot": "Fractional Momentum Offset",
+    "file": "offset"
+  },
+
+  "c_e": {
+    "math": "C_E",
+    "units": "ppb",
+    "plot": "Electric Field Correction",
+    "file": "correction"
+  },
+
+  "t0": {
+    "math": "t_0",
+    "units": "ns",
+    "plot": "$t_0$",
+    "file": "t0"
+  },
+
+  "sig_x": {
+    "math": r"\sigma_{x_e}",
+    "units": "mm",
+    "plot": "Equilibrium Radial Width",
+    "file": "width"
+  }
+
+}
 
 # ==============================================================================
 
@@ -183,7 +242,7 @@ units = {
   "tM": r"$\mu$s"
 }
 
-# ==================================================================================================
+# ==============================================================================
 
 # Load Antoine's output parameter format into a Python dictionary.
 def loadResults(filename):
@@ -207,45 +266,45 @@ def loadResults(filename):
 
 # ==============================================================================
 
-# Calculate the kth harmonic of the cosine transform, with symmetry time "t0".
-def cosineTransform(time, signal, t0, full = False, k = 1):
+# Invert the matrix A, checking for success.
+def invert(A, atol = 1e-2):
 
-  f = np.arange(6630.5, 6780, 1)
-  result = np.zeros(len(f))
+  # Check if the matrix is safely invertible.
+  if np.linalg.cond(A) * np.finfo(A.dtype).eps > 0.1:
+    raise RuntimeError("Matrix ill-conditioned for inversion.")
 
-  if not full:
-    mask = (time > t0)
-    time = time[mask]
-    signal = signal[mask]
+  # Evaluate the inverse.
+  result = np.linalg.inv(A)
 
-  for i in range(len(f)):
-    result[i] = np.sum(
-      signal * np.cos(2 * np.pi * (k * f[i] * 1E3) * (time - t0) * 1E-9)
-    )
+  # Furthermore, check that the result is sensible: inv(A) * A ~ A * inv(A) ~ I.
+  id = np.eye(A.shape[0])
+  firstCheck = np.allclose(result @ A, id, atol = atol)
+  secondCheck = np.allclose(A @ result, id, atol = atol)
+  if not firstCheck or not secondCheck:
+    print("Determinant:", np.linalg.det(A))
+    raise RuntimeError("Matrix inversion unsuccessful.")
 
-  return f, result
+  return result
 
 # ==============================================================================
 
-# Calculate the kth harmonic of the sine transform, with symmetry time "t0".
-def sineTransform(time, signal, t0, full = False, k = 1):
+# Calculate the two-sided p-value from the specified chi-squared distribution.
+def pval(chi2, ndf):
 
-  f = np.arange(6630.5, 6780, 1)
-  result = np.zeros(len(f))
+  # Difference between the observed chi-squared and expectation value.
+  diff = abs(chi2 - ndf)
 
-  if not full:
-    mask = (time > t0)
-    time = time[mask]
-    signal = signal[mask]
+  # Probability of a more extreme value on the left side of the mean.
+  left = scipy.stats.chi2.cdf(ndf - diff, ndf)
 
-  for i in range(len(f)):
-    result[i] = np.sum(
-      signal * np.sin(2 * np.pi * (k * f[i] * 1E3) * (time - t0) * 1E-9)
-    )
+  # Probability of a more extreme value on the right side of the mean.
+  # (sf = 1 - cdf)
+  right = scipy.stats.chi2.sf(ndf + diff, ndf)
 
-  return f, result
+  # Total probability of a more extreme value than what was observed.
+  return left + right
 
-# ==================================================================================================
+# ==============================================================================
 
 # One-sided FFT magnitude and frequencies.
 def spectrum(time, data):
@@ -274,7 +333,7 @@ def spectrum(time, data):
 
   return frequencies, transform
 
-# ==================================================================================================
+# ==============================================================================
 
 # Correlation weight factors from a joint distribution of injection time and cyclotron frequency.
 def weights(times, frequencies, heights):

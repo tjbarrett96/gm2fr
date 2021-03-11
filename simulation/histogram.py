@@ -133,9 +133,9 @@ class Histogram:
 
       # Replace empty bins with np.nan, which draws them blank.
       return style.imshow(
-        self.xEdges,
-        self.yEdges,
         np.where(heights == 0, np.nan, heights),
+        x = self.xCenters,
+        y = self.yCenters,
         **kwargs
       )
 

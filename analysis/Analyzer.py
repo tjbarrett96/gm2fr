@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.lib.recfunctions as rec
 
 import gm2fr.utilities as util
 import gm2fr.analysis.FastRotation as fr
@@ -9,6 +10,9 @@ from gm2fr.simulation.histogram import Histogram
 import os
 import shutil
 import gm2fr.analysis
+import time
+import itertools
+import re
 
 # ==============================================================================
 
@@ -41,11 +45,15 @@ class Analyzer:
     # Validate the input, copying one-by-one to the validated list.
     for i in range(len(input)):
 
-      if type(input[i]) is tuple and len(input[i]) == 2 and type(input[i][0]) is str and type(input[i][1]) in [list, str]:
-        filename = input[i][0]
-        histograms = input[i][1] if type(input[i][1]) is list else [input[i][1]]
-        for histogram in histograms:
-          self.input.append((filename, histogram))
+      if type(input[i]) is tuple and len(input[i]) in [2, 3]:
+
+        if len(input[i]) == 2:
+          filename, histogram = input[i]
+          pileup = None
+        else:
+          filename, histogram, pileup = input[i]
+
+        self.input.append((filename, histogram, pileup))
 
       elif type(input[i]) is str:
         self.input.append(input[i])
@@ -59,7 +67,16 @@ class Analyzer:
 
     # Validate the output tags.
     if len(tags) == len(self.input):
+
       self.tags = tags
+
+      # Look for integers in each tag to serve as numerical indices for output.
+      # e.g. tag "Calo24" -> index 24
+      self.groupLabels = np.zeros(len(self.tags))
+      for i, tag in enumerate(self.tags):
+        match = re.search(r"(\d+)$", tag)
+        self.groupLabels[i] = match.group(1) if match else np.nan
+
     else:
       raise ValueError(f"\nOutput tags do not match input format.")
 
@@ -74,6 +91,7 @@ class Analyzer:
 
     # The current (structured) NumPy array of results.
     self.results = None
+    self.groupResults = None
 
     # Get the path to the gm2fr/analysis/results directory.
     self.parent = os.path.dirname(gm2fr.analysis.__file__) + "/results"
@@ -94,7 +112,7 @@ class Analyzer:
   # Setup the output directory 'gm2fr/analysis/results/{group}/{tag}'.
   def setup(self, tag):
 
-    # Check if the group directory exists.
+    # If the group directory doesn't already exist, create it.
     if self.group is not None and not os.path.isdir(f"{self.parent}/{self.group}"):
       os.mkdir(f"{self.parent}/{self.group}")
 
@@ -106,15 +124,26 @@ class Analyzer:
       else:
         self.output = f"{self.parent}/{tag}"
 
-      # If it already exists, clear its contents.
+      # If the output directory already exists, clear its contents.
       if os.path.isdir(self.output):
+
+        # Make sure the contents are consistent with an analysis directory.
+        subdirectories = [f.name for f in os.scandir(self.output) if f.is_dir()]
+        for subdir in subdirectories:
+          if subdir not in ["background", "signal"]:
+            raise RuntimeError((
+              "\nExisting output directory has unexpected structure."
+              "\nFor safety, will not delete/overwrite."
+            ))
+
+        # If the contents are normal, clear everything inside.
         shutil.rmtree(self.output)
 
       # Make the output directory.
       print(f"\nCreating output directory '{tag}'.")
       os.mkdir(self.output)
 
-      # Make the background and signal directories.
+      # Make the background and signal subdirectories.
       os.mkdir(f"{self.output}/background")
       os.mkdir(f"{self.output}/signal")
 
@@ -136,12 +165,8 @@ class Analyzer:
     optimize = True,
     # Background fit model. Options: "parabola" / "sinc" / "error".
     model = "parabola",
-    # Background fit bounds (kHz), fixed if supplied. Format: (lower, upper).
-    bounds = None,
     # Frequency interval (kHz) for the cosine transform.
     df = 2,
-    # Cutoff (in units of fit pulls) for inclusion in the background definition.
-    cutoff = 2,
     # +/- range (in us) for the initial coarse t0 scan range.
     coarseRange = 0.020,
     # Step size (in us) for the initial coarse t0 scan range.
@@ -150,81 +175,183 @@ class Analyzer:
     fineRange = 0.0005,
     # Step size (in us) for the subsequent fine t0 scan ranges.
     fineStep = 0.000025,
-    # Plotting option. 0 = nothing, 1 = main results, 2 = t0 scan too.
-    plots = 2
+    # Plotting option. 0 = nothing, 1 = main results, 2 = more details (slower).
+    plots = 1
   ):
 
-    # Loop over all specified inputs.
-    for input, tag in zip(self.input, self.tags):
+    begin = time.time()
 
-      # Setup the output directory.
-      self.setup(tag)
+    # Force scannable parameters into lists.
+    if type(start) not in [list, np.ndarray]:
+      start = np.array([start])
+    if type(end) not in [list, np.ndarray]:
+      end = np.array([end])
+
+    # Loop over all specified inputs.
+    groupIndex = 0
+    for input, tag in zip(self.input, self.tags):
 
       # Produce the fast rotation signal.
       if type(input) is tuple:
-        self.fastRotation = fr.FastRotation.produce(input[0], input[1], fit, n)
+        self.fastRotation = fr.FastRotation.produce(input[0], input[1], input[2], fit, n, self.units)
       else:
         h = Histogram.load(input)
         self.fastRotation = fr.FastRotation(h.xCenters, h.heights, h.errors, self.units)
 
-      if (self.fastRotation.error == 0).any():
-        print("bad")
+      # If the fast rotation signal couldn't be produced, skip this input.
+      if self.fastRotation is None:
+        continue
+
+      # Setup the output directory.
+      self.setup(tag)
 
       # Plot the fast rotation signal.
-      if plots >= 2:
+      if plots >= 1:
         self.fastRotation.plot(self.output)
 
-      # Evaluate the frequency distribution.
-      self.transform = tr.Transform(
-        self.fastRotation,
-        start,
-        end,
-        df,
-        cutoff,
-        model,
-        coarseRange,
-        coarseStep,
-        fineRange,
-        fineStep,
-        self.output,
-        optimize,
-        bounds,
-        t0,
-        plots
-      )
+      # Zip together each parameter in the scans.
+      iterations = list(itertools.product(start, end))
 
-      self.transform.process()
+      # Turn off plotting if we're doing a scan.
+      if len(iterations) > 1:
+        plots = 0
+
+      i = 0
+      for iStart, iEnd in iterations:
+
+        # Evaluate the frequency distribution.
+        self.transform = tr.Transform(
+          self.fastRotation,
+          iStart,
+          iEnd,
+          df,
+          model,
+          coarseRange,
+          coarseStep,
+          fineRange,
+          fineStep,
+          self.output,
+          optimize,
+          t0 if type(t0) != list else t0[groupIndex],
+          plots,
+          n
+        )
+
+        self.transform.process()
+
+        axesToPlot = []
+        if plots > 0:
+          axesToPlot = ["f", "x"]
+          if plots > 1:
+            axesToPlot = self.transform.axes.keys()
+        for axis in axesToPlot:
+          self.transform.plot(
+            f"{self.output}/{util.labels[axis]['file']}.pdf",
+            axis
+          )
+
+        if plots > 0:
+
+          if optimize:
+
+            # Plot the coarse background optimization scan.
+            self.transform.plotOptimization(
+              outDir = f"{self.output}/background",
+              mode = "coarse",
+              all = True if plots > 1 else False
+            )
+
+            # Plot the fine background optimization scan.
+            self.transform.plotOptimization(
+              outDir = f"{self.output}/background",
+              mode = "fine"
+            )
+
+            # Plot the background fit with a one-sigma t0 perturbation to the left.
+            self.transform.leftFit.plot(
+              f"{self.output}/background/LeftFit.pdf"
+            )
+
+            # Plot the background fit with a one-sigma t0 perturbation to the right.
+            self.transform.rightFit.plot(
+              f"{self.output}/background/RightFit.pdf"
+            )
+
+          # Plot the final background fit.
+          self.transform.bgFit.plot(f"{self.output}/BackgroundFit.pdf")
+
+          # Plot the correlation matrix among frequency bins in the background fit.
+          self.transform.bgFit.plotCorrelation(
+            f"{self.output}/background/correlation.pdf"
+          )
+
+        self.transform.save(f"{self.output}/transform.npz")
+        self.transform.bgFit.save(f"{self.output}/background.npz")
+
+        # Compile the results list of (name, value) pairs from each object.
+        resultsList = self.transform.results
+        if self.transform.bgFit is not None:
+          resultsList += self.transform.bgFit.results
+        if self.fastRotation.wgFit is not None:
+          resultsList += self.fastRotation.wgFit.results
+
+        # Initialize the results arrays, if not already done.
+        if self.results is None:
+
+          header = [name for name, value in resultsList]
+          self.results = np.zeros(
+            len(iterations),
+            dtype = [(name, np.float32) for name in header]
+          )
+
+          if self.group is not None:
+            self.groupResults = np.zeros(
+              len(self.input) * len(iterations),
+              dtype = [("index", np.float32)] + [(name, np.float32) for name in header]
+            )
+
+        # Fill the results array.
+        for name, value in resultsList:
+
+          self.results[name][i] = value
+
+          if self.groupResults is not None:
+            self.groupResults["index"][groupIndex * len(iterations) + i] = self.groupLabels[groupIndex] if not np.isnan(self.groupLabels[groupIndex]) else groupIndex
+            self.groupResults[name][groupIndex * len(iterations) + i] = value
+
+        i += 1
 
       # Save the results to disk.
       if self.output is not None:
 
-        # Define the quantities to go in the results array.
-        columns = [
-          "t0",
-          "start",
-          "end",
-          "<f>",
-          "sigma_f",
-          "<x_e>",
-          "sigma_x"
-        ]
-
-        # Initialize the results array with zeros.
-        self.results = np.zeros(1, dtype = [(col, np.float32) for col in columns])
-
-        # Fill the results array.
-        # TODO: consider asking each object (i.e. FastRotation, Transform, BackgroundFit, WiggleFit)
-        # TODO: to consolidate its own save results, for clarity and simplicity
-        # TODO: can use numpy.lib.recfunctions.merge_arrays(...)
-        # TODO: also want to save resulting distributions, plot them overlaid, etc.
-        self.results["t0"][0] = self.transform.t0
-        self.results["start"][0] = self.transform.start
-        self.results["end"][0] = self.transform.end
-        self.results["<f>"][0] = self.transform.getMean("frequency")
-        self.results["sigma_f"][0] = self.transform.getWidth("frequency")
-        self.results["<x_e>"][0] = self.transform.getMean("radius")
-        self.results["sigma_x"][0] = self.transform.getWidth("radius")
-
-        # Save the results array.
+        # Save the results array in NumPy format.
         np.save(f"{self.output}/results.npy", self.results)
-        np.savetxt(f"{self.output}/results.txt", self.results, fmt = "%.4f", header = ",".join(columns), delimiter = ",")
+
+        # Save the results array as a CSV.
+        np.savetxt(
+          f"{self.output}/results.txt",
+          self.results,
+          fmt = "%16.5f",
+          header = "  ".join(f"{name:>16}" for name in self.results.dtype.names),
+          delimiter = "  ",
+          comments = ""
+        )
+
+      groupIndex += 1
+
+    if self.group is not None:
+
+      # Save the results array in NumPy format.
+      np.save(f"{self.parent}/{self.group}/results.npy", self.groupResults)
+
+      # Save the results array as a CSV.
+      np.savetxt(
+        f"{self.parent}/{self.group}/results.txt",
+        self.groupResults,
+        fmt = "%16.5f",
+        header = "  ".join(f"{name:>16}" for name in self.groupResults.dtype.names),
+        delimiter = "  ",
+        comments = ""
+      )
+
+    print(f"\nCompleted in {time.time() - begin:.2f} seconds.")

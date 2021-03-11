@@ -33,29 +33,6 @@ modelFunctions = {
 
 # ==============================================================================
 
-# Parameter names and units, for printing.
-modelLabels = {}
-
-modelLabels["two"] = [
-  ("normalization", ""),
-  ("lifetime", "us")
-]
-
-modelLabels["five"] = modelLabels["two"] + [
-  ("asymmetry", ""),
-  ("frequency", "1/us"),
-  ("phase", "rad")
-]
-
-modelLabels["nine"] = modelLabels["five"] + [
-  ("CBO lifetime", "us"),
-  ("CBO asymmetry", ""),
-  ("CBO frequency", "1/us"),
-  ("CBO phase", "rad")
-]
-
-# ==============================================================================
-
 # Parameter symbols, for saving results.
 modelLabels = [
   {"printing": "normalization", "output": "N", "units": ""},
@@ -98,7 +75,7 @@ modelSeeds["nine"] = modelSeeds["five"] + [
 modelBounds = {}
 
 modelBounds["two"] = (
-    [0,             64.1    ],
+    [0,             00.0    ],
     [np.inf,        64.9    ]
 ) # [normalization, lifetime]
 
@@ -108,8 +85,8 @@ modelBounds["five"] = (
 ) #          (precession) [asymmetry, frequency, phase  ]
 
 modelBounds["nine"] = (
-  modelBounds["five"][0] + [100,      0   ,      0.350,     0      ],
-  modelBounds["five"][1] + [400,      0.01,      0.430,     2*np.pi]
+  modelBounds["five"][0] + [0,        0   ,      0.350,     0      ],
+  modelBounds["five"][1] + [500,      0.01,      0.430,     2*np.pi]
 ) #                  (CBO) [lifetime, asymmetry, frequency, phase  ]
 
 # ==============================================================================
@@ -121,7 +98,7 @@ class WiggleFit:
   def __init__(
     self,
     time,           # time bin centers
-    signal   ,      # positron counts per time bin
+    signal,         # positron counts per time bin
     model = "five", # wiggle fit model ("two" / "five" / "nine")
     start = 30,     # fit start time (us)
     end = 650,      # fit end time (us)
@@ -131,7 +108,7 @@ class WiggleFit:
     # Signal data.
     self.time = time
     self.signal = signal
-    self.error = np.sqrt(signal)
+    self.error = np.sqrt(np.abs(signal))
 
     # Ensure the errors are all non-zero.
     self.error[self.error == 0] = 1
@@ -161,14 +138,15 @@ class WiggleFit:
     self.pCov = None
     self.pErr = None
     self.fitResult = None
-    self.chi2dof = None
+
+    self.chi2 = None
+    self.ndf = None
+    self.chi2ndf = None
+    self.pval = None
 
     # Initialize the structured array of results, with column headers.
     # TODO: add uncertainties, chi2/dof, and n-value
-    self.results = np.zeros(
-      1,
-      dtype = [(label["output"], np.float32) for label in modelLabels]
-    )
+    self.results = []
 
   # ============================================================================
 
@@ -188,7 +166,7 @@ class WiggleFit:
 
       # Set the CBO frequency seed based on the expected n-value.
       if model == "nine":
-        seeds[7] = (1 - np.sqrt(1 - self.n)) * util.magicFrequency * 1E-3
+        seeds[7] = (1 - np.sqrt(1 - self.n)) * util.magic["f"] * 1E-3
 
       # Perform the fit.
       self.pOpt, self.pCov = opt.curve_fit(
@@ -208,12 +186,15 @@ class WiggleFit:
       fitResiduals = self.fitSignal - self.fitResult
 
       # Calculate the chi-squared, and reduced chi-squared.
-      chi2 = np.sum((fitResiduals / self.fitError)**2)
-      self.chi2dof = chi2 / (len(self.fitTime) - len(self.pOpt))
+      self.chi2 = np.sum((fitResiduals / self.fitError)**2)
+      self.ndf = len(self.fitTime) - len(self.pOpt)
+      self.chi2ndf = self.chi2 / self.ndf
+      self.pval = util.pval(self.chi2, self.ndf)
 
       # Status update.
       print(f"\nCompleted {model}-parameter wiggle fit.")
-      print(f"{'chi2/dof':>16} = {self.chi2dof:.4f}")
+      print(f"{'chi2/ndf':>16} = {self.chi2ndf:.4f}")
+      print(f"{'p-value':>16} = {self.pval:.4f}")
 
       # Print and save parameter values.
       for i in range(len(self.pOpt)):
@@ -228,7 +209,14 @@ class WiggleFit:
           f"{modelLabels[i]['units']}"
         ))
 
-        # Copy the parameters into the results array.
-        self.results[modelLabels[i]["output"]][0] = self.pOpt[i]
+    # Copy the parameters into the results array.
+    for i in range(len(self.pOpt)):
+      if modelLabels[i]["printing"] == "frequency":
+        continue
+      self.results.append((f"wg_{modelLabels[i]['output']}", self.pOpt[i]))
+    self.results.append(("wg_chi2", self.chi2))
+    self.results.append(("wg_ndf", self.ndf))
+    self.results.append(("wg_chi2ndf", self.chi2ndf))
+    self.results.append(("wg_pval", self.pval))
 
 # ==============================================================================

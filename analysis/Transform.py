@@ -1,10 +1,14 @@
 import numpy as np
 import scipy.signal as sgn
+import scipy.linalg
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 import time
+
+import ROOT as root
+import root_numpy as rnp
 
 import gm2fr.analysis.FastRotation
 from gm2fr.analysis.BackgroundFit import BackgroundFit
@@ -32,8 +36,6 @@ class Transform:
     end = 200,
     # Cosine transform frequency spacing (kHz).
     df = 2,
-    # Cutoff (in std. dev. of residuals) for inclusion of new background points.
-    cutoff = 2,
     # Background fit model. Options: "parabola" / "sinc" / "error".
     model = "parabola",
     # Half-width of t0 window (in us) for initial coarse optimization scan.
@@ -48,54 +50,55 @@ class Transform:
     output = None,
     # Boolean switch to enable or disable t0 optimization.
     optimize = True,
-    # If not None, fix the background fit bounds to these provided.
-    bounds = None,
     # Initial t0 guess (in us), optimized or fixed based on "optimize" option.
     t0 = 0.060,
     # Which plots to include. 0 = nothing, 1 = main results, 2 = t0 scans too
-    plots = 2
+    plots = 2,
+    # Quad n-value.
+    n = 0.108
   ):
 
     # The fast rotation signal.
     self.fr = fastRotation
 
-    # The start and end times.
+    # The start and end times for the cosine transform.
     self.start = max(start, self.fr.time[0])
     self.end = min(end, self.fr.time[-1])
 
-    # Apply the start/end mask to the fast rotation data.
-    self.tMask = (self.fr.time >= self.start) & (self.fr.time <= self.end)
-    self.frTime = self.fr.time[self.tMask]
-    self.frSignal = self.fr.signal[self.tMask]
-    self.frError = self.fr.error[self.tMask]
-
-    # Plotting option.
-    self.plots = plots
+    # Apply the selected time mask to the fast rotation data.
+    self.frMask = (self.fr.time >= self.start) & (self.fr.time <= self.end)
+    self.frTime = self.fr.time[self.frMask]
+    self.frSignal = self.fr.signal[self.frMask]
+    self.frError = self.fr.error[self.frMask]
 
     # Define the frequency values for evaluating the cosine transform.
+    self.df = df
     self.frequency = np.arange(6631, 6780, df)
-    #self.frequency = np.arange(6601, 6810, df)
 
-    # Mask selecting only physical frequencies determined by the collimators.
-    self.fMask = (self.frequency >= util.minimum["frequency"]) & (self.frequency <= util.maximum["frequency"])
+    # Masks which select the physical and unphysical regions of frequency space.
+    self.physical = (self.frequency >= util.min["f"]) & (self.frequency <= util.max["f"])
+    self.unphysical = np.logical_not(self.physical)
 
     # Initialize the transform bin heights.
     self.signal = np.zeros(len(self.frequency))
 
-    # Keep track of the normalization factor used.
-    self.normalization = 1
-
     # Initialize the covariance matrix among the transform bins.
     self.cov = np.zeros((len(self.frequency), len(self.frequency)))
+
+    # Whether or not to run t0 optimization.
+    self.optimization = optimize
+
+    # t0 value (or initial guess), and optimization uncertainty.
+    self.t0 = t0
+    self.err_t0 = np.nan
 
     # The background fit model.
     self.bgModel = model
 
-    # The cutoff (in sigma) for inclusion of background points in the fit.
-    self.bgCutoff = cutoff
-
-    # The BackgroundFit object (to be processed later).
+    # The nominal BackgroundFit object, and one-sigma t0 variations.
     self.bgFit = None
+    self.leftFit = None
+    self.rightFit = None
 
     # t0 optimization parameters defining the scan windows.
     self.coarseRange = coarseRange
@@ -103,82 +106,66 @@ class Transform:
     self.fineRange = fineRange
     self.fineStep = fineStep
 
+    # Lists of the BackgroundFit objects over the coarse and fine t0 scans.
+    self.coarseScan = []
+    self.fineScan = []
+
     # Output directory.
     self.output = output
 
-    # Whether or not to run t0 optimization.
-    self.optimization = optimize
-
-    # Fit bounds.
-    self.bounds = bounds
-
-    # Initial t0 guess (in us).
-    self.t0 = t0
-
     # Convert frequency to other units.
     self.axes = {
-      "frequency": self.frequency,
-      "period": util.frequencyToPeriod(self.frequency),
-      "radius": util.frequencyToRadialOffset(self.frequency),
-      "momentum": util.frequencyToMomentum(self.frequency),
+      "f": self.frequency,
+      "T": util.frequencyToPeriod(self.frequency),
+      "x": util.frequencyToRadialOffset(self.frequency),
+      "p": util.frequencyToMomentum(self.frequency),
       "gamma": util.frequencyToGamma(self.frequency)
     }
+    self.axes["tau"] = self.axes["gamma"] * util.lifetime * 1E-3
+    self.axes["dp/p0"] = util.momentumToOffset(self.axes["p"]) * 100
+    self.axes["c_e"] = 1E9 * 2 * n * (1 - n) * (util.magic["beta"] / util.magic["r"] * self.axes["x"])**2
 
-    # Add a couple more, using what's been initialized above.
-    self.axes["lifetime"] = self.axes["gamma"] * util.lifetime * 1E-3
-    self.axes["offset"] = util.momentumToOffset(self.axes["momentum"]) * 100
+    # Initialize a dictionary of means and statistical uncertainties.
+    self.mean = {axis: None for axis in self.axes.keys()}
+    self.meanError = {axis: None for axis in self.axes.keys()}
 
-    # TODO: these dictionaries perhaps could go in utilities.py?
+    # Initialize a dictionary of widths and statistical uncertainties.
+    self.width = {axis: None for axis in self.axes.keys()}
+    self.widthError = {axis: None for axis in self.axes.keys()}
 
-    self.labels = {
-      "frequency": {"math": "f", "simple": "f", "units": "kHz", "plot": "Revolution Frequency"},
-      "period": {"math": "T", "simple": "T", "units": "ns", "plot": "Revolution Period"},
-      "radius": {"math": "x_e", "simple": "x", "units": "mm", "plot": "Equilibrium Radius"},
-      "momentum": {"math": "p", "simple": "p", "units": "GeV", "plot": "Momentum"},
-      "gamma": {"math": r"\gamma", "simple": "gamma", "units": None, "plot": "Gamma Factor"},
-      "lifetime": {"math": r"\tau", "simple": "tau", "units": r"$\mu$s", "plot": "Muon Lifetime"},
-      "offset": {"math": r"\delta p/p_0", "simple": "dp/p0", "units": r"\%", "plot": "Fractional Momentum Offset"}
-    }
+    # Initialize a list of (name, value) pairs of key results.
+    self.results = []
 
-    # Initialize the structured array of results, with column headers.
-    self.results = np.zeros(
-      1,
-      dtype =   [(f"<{self.labels[axis]['simple']}>", np.float32) for axis in self.labels.keys()] \
-              + [(f"sigma_{self.labels[axis]['simple']}", np.float32) for axis in self.labels.keys()]
-    )
+    # Plotting option.
+    self.plots = plots
 
-    # # Unit strings for each axis.
-    # self.units = {
-    #   "frequency": "kHz",
-    #   "period": "ns",
-    #   "radius": "mm",
-    #   "momentum": "GeV",
-    #   "gamma": None,
-    #   "lifetime": r"$\mu$s",
-    #   "offset": r"\%"
-    # }
-    #
-    # # Symbols for each axis.
-    # self.symbols = {
-    #   "frequency": "f",
-    #   "period": "T",
-    #   "radius": "x_e",
-    #   "momentum": "p",
-    #   "gamma": r"\gamma",
-    #   "lifetime": r"\tau",
-    #   "offset": r"\delta p / p_0"
-    # }
-    #
-    # # Labels for each axis.
-    # self.labels = {
-    #   "frequency": "Revolution Frequency",
-    #   "period": "Revolution Period",
-    #   "radius": "Equilibrium Radius",
-    #   "momentum": "Momentum",
-    #   "gamma": "Gamma Factor",
-    #   "lifetime": "Muon Lifetime",
-    #   "offset": "Momentum Offset"
-    # }
+  # ============================================================================
+
+  # Calculate the covariance matrix among frequency bins.
+  # TODO: the neglected term is also Toeplitz, but sort of rotated/transposed. could include it efficiently to be sure approx. is okay
+  def covariance(self, t0, mask = False, fix = True):
+
+    # Conversion from (kHz * us) to the standard (Hz * s).
+    kHz_us = 1E-3
+
+    # Initialize the covariance for each frequency difference.
+    column = np.zeros(len(self.frequency))
+
+    # Calculate the covariance for each frequency difference.
+    for i in range(len(self.frequency)):
+      df = self.frequency[i] - self.frequency[0]
+      column[i] = 0.5 * np.sum(
+        np.cos(2 * np.pi * df * (self.frTime - t0) * kHz_us) * self.frError**2
+      )
+
+    # Extrapolate each difference's covariance to the full covariance matrix.
+    result = scipy.linalg.toeplitz(column)
+
+    # Return the full matrix, or only the unphysical frequency regions.
+    if mask:
+      return result[self.unphysical][:, self.unphysical]
+    else:
+      return result
 
   # ============================================================================
 
@@ -186,10 +173,13 @@ class Transform:
   # For speed, need to take everything as arguments; no "self" references.
   @staticmethod
   @nb.njit(fastmath = True, parallel = True)
-  def fastTransform(t, S, S_err, f, t0, result):
+  def __transform(t, S, f, t0):
 
     # Conversion from (kHz * us) to the standard (Hz * s).
     kHz_us = 1E-3
+
+    # Initialize the cosine transform.
+    result = np.zeros(len(f))
 
     # Calculate the transform, parallelizing the (smaller) frequency loop.
     for i in nb.prange(len(f)):
@@ -197,213 +187,74 @@ class Transform:
       for j in range(len(t)):
         result[i] += S[j] * np.cos(2 * np.pi * f[i] * (t[j] - t0) * kHz_us)
 
-  # ============================================================================
+    return result
 
-  # Calculate the covariance matrix of the cosine transform using Numba.
-  # For speed, need to take everything as arguments; no "self" references.
-  @staticmethod
-  @nb.njit(fastmath = True, parallel = True)
-  def fastCovariance(t, S_err, f, t0, cov, mask):
-
-    # Conversion from (kHz * us) to the standard (Hz * s).
-    kHz_us = 1E-3
-
-    # Ensure everything is reset to zero first.
-    cov.fill(0)
-
-    # Calculate the covariance matrix, parallelizing the first frequency loop.
-    for i in nb.prange(len(f)):
-      if mask[i]:
-        for j in range(i, len(f)):
-          if mask[j]:
-            for k in range(len(t)):
-              cov[i, j] += np.cos(2*np.pi*f[i]*(t[k]-t0)*kHz_us) \
-                           * np.cos(2*np.pi*f[j]*(t[k]-t0)*kHz_us) * S_err[k]**2
-            cov[j, i] = cov[i, j]
-
-  # ============================================================================
-
-  # Update this object's covariance matrix using the current transform.
+  # Calculate the cosine transform using the supplied t0.
   # This is a wrapper for the Numba implementation, which can't use "self".
-  def covariance(self, bounds = None):
-
-    if bounds is None:
-      mask = np.ones(len(self.frequency))
-    else:
-      mask = (self.frequency < bounds[0]) | (self.frequency > bounds[1])
+  def transform(self, t0):
 
     # Pass this object's instance variables to the Numba implementation.
-    Transform.fastCovariance(
-      self.frTime,
-      self.frError,
-      self.frequency,
-      self.t0,
-      self.cov,
-      mask = mask
-    )
-
-    # self.cov /= self.normalization**2
-
-  # ============================================================================
-
-  # Update this object's cosine transform using the current self.t0.
-  # This is a wrapper for the Numba implementation, which can't use "self".
-  def transform(self, reset = True):
-
-    # Pass this object's instance variables to the Numba implementation.
-    Transform.fastTransform(
+    return Transform.__transform(
       self.frTime,
       self.frSignal,
-      self.frError,
       self.frequency,
-      self.t0,
-      self.signal
+      t0
     )
-
-    # Normalize the maximum value to 1.
-    # self.normalization = np.max(self.signal)
-    # self.signal /= self.normalization
-
-    # Ensure the covariance matrix is reset.
-    if reset:
-      self.cov.fill(0)
 
   # ============================================================================
 
-  # Find the "best" background fit over range of candidate t0 times.
-  # TODO: save only ~10 representative sample plots from the scan to speed things up
-  def optimize(
-    self,
-    bounds,
-    index = 0,  # iteration index
-    subindex = 0,   # sub-iteration index, if minimum not found
-    cov = False # use covariance matrix for chi-squared
-  ):
+  # Find the best background fit over a range of candidate t0 times.
+  def optimize(self, t0, index = 0):
 
     # Make the list of t0 for the scan.
     if index > 0:
-      times = np.arange(self.t0 - self.fineRange, self.t0 + self.fineRange, self.fineStep)
+      times = np.arange(t0 - self.fineRange, t0 + self.fineRange, self.fineStep)
+      scanResults = self.fineScan
     elif index == 0:
-      times = np.arange(self.t0 - self.coarseRange, self.t0 + self.coarseRange, self.coarseStep)
+      times = np.arange(t0 - self.coarseRange, t0 + self.coarseRange, self.coarseStep)
+      scanResults = self.coarseScan
     else:
       raise ValueError(f"Optimization index '{index}' not recognized.")
 
-    # Initialize the list of BackgroundFit objects for each time in the scan.
-    scanResults = [None] * len(times)
+    # Ensure the results list is reset.
+    scanResults.clear()
 
-    # Over a small t0 window, the covariance doesn't change much.
-    # Just calculate it once at the start.
-    if index > 0 and cov:
-      self.covariance(bounds)
+    # Estimate the covariance matrix at the central t0.
+    cov = self.covariance(t0, mask = True)
 
     # For each symmetry time...
     for i in range(len(times)):
 
-      # Set the current t0, and update the cosine transform.
-      self.t0 = times[i]
-      self.transform(reset = False if index > 0 and cov else True)
+      # Calculate the cosine transform.
+      signal = self.transform(times[i])
 
       # Create the BackgroundFit object and perform the fit.
-      scanResults[i] = BackgroundFit(self, bounds = bounds)
+      scanResults.append(BackgroundFit(self, signal, times[i], cov))
       scanResults[i].fit()
 
-    # Find the fit with the smallest (not-yet-normalized) chi-squared.
-    minimum = min(scanResults, key = lambda fit: fit.chi2dof)
+    # Find the fit with the smallest chi2/ndf.
+    minimum = min(scanResults, key = lambda fit: fit.chi2ndf)
+    scanMetric = np.array([fit.chi2ndf for fit in scanResults])
 
-    # Update each fit object's uncertainties using the optimal residual spread.
-    for i in range(len(times)):
-      scanResults[i].update(minimum.spread)
-
-    # Define how to determine if BackgroundFit "a" is better than "b".
-    def better(a, b):
-      # if mode == "coarse" and a.newBounds != b.newBounds:
-      #   return a.betterBounds(b)
-      return (a.chi2dof <= b.chi2dof)
-
-    # Find the best fit within the scan.
-    optIndex = 0
-    for i in range(len(times)):
-      if better(scanResults[i], scanResults[optIndex]):
-        optIndex = i
-
-    # Extract the lists of chi-squareds and bounds for plotting.
-    scanChiSquared = np.array([fit.chi2dof for fit in scanResults])
-    scanLeftBound = np.array([fit.newBounds[0] for fit in scanResults])
-    scanRightBound = np.array([fit.newBounds[1] for fit in scanResults])
-
-    # ==========================================================================
-
-    # Plot the scan results.
-    if self.output is not None:
-
-      # Special label when repeating after a failed optimization.
-      substring = f"-{subindex}" if subindex > 0 else ""
-
-      # Only plot each background fit during the coarse scan.
-      if index == 0 and self.plots >= 2:
-
-        # Temporarily turn off LaTeX rendering for faster plots.
-        latex = plt.rcParams["text.usetex"]
-        plt.rcParams["text.usetex"] = False
-
-        # Initialize the multi-page PDF file for scan plots.
-        pdf = PdfPages(f"{self.output}/background/AllFits_Opt{index}{substring}.pdf")
-
-        # Initialize a plot of the background fit, using a dummy default object.
-        BackgroundFit(self, bounds).plot()
-
-        # Plot each background fit, updating the initialized plot each time.
-        for i in range(len(times)):
-          scanResults[i].plot(update = True)
-          pdf.savefig()
-
-        # Close the multi-page PDF, and clear the current figure.
-        pdf.close()
-        plt.clf()
-
-        # Resume LaTeX rendering, if it was enabled before.
-        if latex:
-          plt.rcParams["text.usetex"] = True
-
-      # Plot the chi-squared on the primary y-axis.
-      line1, = plt.plot(times * 1000, scanChiSquared, 'o-', label = r"$\chi^2$/dof")
-      line2 = plt.axvline(times[optIndex]*1000, c = "k", ls = "--", label = "Optimum")
-      style.xlabel("$t_0$ (ns)")
-      style.ylabel(r"$\chi^2$/dof")
-
-      # Plot the fit bounds on a secondary y-axis.
-      plt.twinx()
-      plt.subplots_adjust(right = 0.88)
-      line3, = plt.plot(times * 1000, scanLeftBound, 'v-', c = "C1", label = "Lower Bound")
-      line4, = plt.plot(times * 1000, scanRightBound, '^-', c = "C2", label = "Upper Bound")
-      style.ylabel("Frequency (kHz)")
-
-      # Draw the legend, forcing handles from both axes into a single box.
-      lines = [line1, line2, line3, line4]
-      plt.legend(lines, [line.get_label() for line in lines], loc = "best")
-
-      # Save the result to disk.
-      if self.output is not None:
-        plt.savefig(f"{self.output}/background/ChiSquared_Opt{index}{substring}.pdf")
-
-      # Fully close (instead of clear) to reset the adjusted padding.
-      plt.close()
-
-    # ==========================================================================
+    # Get the scan index corresponding to the best fit.
+    optIndex = scanResults.index(minimum)
 
     # If there's no minimum sufficiently inside the scan window, try again.
     if optIndex < 2 or optIndex > len(times) - 3:
 
       # Fit a parabola to the whole distribution, and estimate the minimum.
-      popt = np.polyfit(times, scanChiSquared, 2)
-      self.t0 = -popt[1] / (2 * popt[0]) # -b/2a (quadratic formula)
+      popt = np.polyfit(times, scanMetric, 2)
+      est_t0 = -popt[1] / (2 * popt[0]) # -b/2a (quadratic formula)
 
       # Print an update.
       print("\nOptimal t0 not found within time window.")
-      print(f"Trying again with re-estimated t0 seed: {self.t0*1000:.4f} ns.")
+      print(f"Trying again with re-estimated t0 seed: {est_t0 * 1000:.4f} ns.")
 
       # Make a recursive call to optimize again using the new estimate.
-      self.optimize(bounds, index, subindex + 1)
+      if index < 5:
+        self.optimize(est_t0, index + 1)
+      else:
+        self.t0 = est_t0
 
     # Otherwise, if there is a minimum sufficiently inside the scan window...
     else:
@@ -411,24 +262,32 @@ class Transform:
       # Remember the optimal fit from the scan.
       self.bgFit = scanResults[optIndex]
 
-      # Plot the optimal fit result.
-      if self.output is not None:
-        self.bgFit.plot(output = f"{self.output}/background/BestFit_Opt{index}.pdf")
-
       # Fit a parabola to the 2 neighbors on either side of the minimum.
       popt = np.polyfit(
         times[(optIndex - 2):(optIndex + 3)],
-        scanChiSquared[(optIndex - 2):(optIndex + 3)],
+        scanMetric[(optIndex - 2):(optIndex + 3)],
         2
       )
 
       # Estimate t0 using the minimum of the parabolic fit.
       self.t0 = -popt[1] / (2 * popt[0]) # -b/2a (quadratic formula)
 
+
+      # Get the value of the minimum chi2/ndf from the fit.
+      min_chi2 = np.polyval(popt, self.t0) * self.bgFit.ndf
+
+      # Fit a parabola to the entire window, and extrapolate chi2/ndf_min + 1.
+      a, b, c = popt * self.bgFit.ndf
+      c -= min_chi2 + 1
+      leftTime = (-b - np.sqrt(b**2 - 4*a*c)) / (2*a) # quadratic formula
+      rightTime = (-b + np.sqrt(b**2 - 4*a*c)) / (2*a) # quadratic formula
+      leftMargin = self.t0 - leftTime
+      rightMargin = rightTime - self.t0
+      self.err_t0 = ((leftMargin + rightMargin) / 2)
+
       # Print an update, completing this round of optimization.
-      print(f"\nCompleted background optimization {index}.")
-      print(f"{'chi2/dof':>16} = {self.bgFit.chi2dof:.4f}")
-      print(f"{'bounds':>16} = {self.bgFit.newBounds} kHz")
+      print(f"\nCompleted background optimization.")
+      print(f"{'chi2/ndf':>16} = {self.bgFit.chi2ndf:.4f}")
       print(f"{'spread':>16} = {self.bgFit.spread:.4f}")
       print(f"{'new t0':>16} = {self.t0*1000:.4f} ns")
 
@@ -441,196 +300,299 @@ class Transform:
     print("\nProcessing frequency distribution...")
     begin = time.time()
 
-    # Set the fit bounds, and determine if they're fixed or should float.
-    if self.bounds is not None:
-      fixed = True
-      bounds = self.bounds
-    else:
-      fixed = False
-      bounds = (util.minFrequency, util.maxFrequency)
-
-    # Remember the previous iteration's fit bounds, to check if they've changed.
-    oldBounds = (None, None)
-    counter = 0
-
     # Scan over symmetry times to find the best background fit.
     if self.optimization:
 
+      # TODO: just have self.optimize return the newly-constructed list of BGFits
+      # then can do self.coarseScan = self.optimize(...)
+
+      # TODO: handle the repetitions after failure here.
+      # have self.optimize return [scanResults], opt_t0, and if opt_t0 is None try again
+      # up to some maximum number of attempts
+
       # Run the coarse optimization routine.
-      self.optimize(bounds, index = 0)
+      self.optimize(self.t0, index = 0)
 
-      # Countinue iterating the bounds until they don't change anymore.
-      while self.bgFit.newBounds != oldBounds:
+      # Run the fine optimization routine.
+      self.optimize(self.t0, index = 1)
 
-        # Update the previous bounds used, and the number of iterations.
-        oldBounds = self.bgFit.newBounds
-        counter += 1
+    # Calculate the final transform and full covariance matrix.
+    self.signal = self.transform(self.t0)
+    self.cov = self.covariance(self.t0)
 
-        # Run the fine optimization routine.
-        self.optimize(
-          self.bgFit.newBounds if not fixed else bounds,
-          index = counter
-        )
-
-        # If the bounds are fixed, stop here; the optimized t0 won't change.
-        if fixed:
-          break
-
-      self.optimize(bounds = self.bgFit.newBounds if not fixed else bounds, index = counter + 1, cov = True)
-
-      # Do the final transform and fit, using the optimized t0.
-      # self.transform()
-      # self.bgFit = BackgroundFit(
-      #   self,
-      #   self.bgFit.newBounds if not fixed else bounds,
-      #   self.bgFit.spread
-      # )
-      # self.bgFit.fit()
-
-    # Fix the supplied t0, and simply find the optimal bounds.
-    # TODO: if the fixed t0 is bad, bound optimization will fail; find a way to catch and handle this elegantly
-    else:
-
-      # Calculate the cosine transform at the fixed t0.
-      self.transform()
-
-      # Perform an initial background fit.
-      self.bgFit = BackgroundFit(self, bounds = bounds, uncertainty = 1)
-      self.bgFit.fit()
-      self.bgFit.update(self.bgFit.spread)
-
-      # Countinue iterating the bounds until they don't change anymore.
-      while not fixed and self.bgFit.newBounds != oldBounds:
-
-        # Update the previous bounds used.
-        oldBounds = self.bgFit.newBounds
-
-        # Perform the background fit.
-        self.bgFit = BackgroundFit(
-          self,
-          bounds = self.bgFit.newBounds if not fixed else bounds,
-          uncertainty = self.bgFit.spread
-        )
-        self.bgFit.fit()
-
-    # Calculate a final transform and covariance.
-    self.transform()
-    self.covariance()
-
-    # Perform the final background fit.
+    # Perform the final background fit using the covariance information.
     self.bgFit = BackgroundFit(
-      self,
-      bounds = self.bgFit.newBounds if not fixed else bounds,
-      uncertainty = self.bgFit.spread
+      transform = self,
+      signal = self.signal,
+      t0 = self.t0,
+      cov = self.cov[self.unphysical][:, self.unphysical]
     )
     self.bgFit.fit()
 
-    print("\nCompleted final background fit.")
-    print(f"{'chi2/dof':>16} = {self.bgFit.chi2:.4f} / {self.bgFit.dof} = {self.bgFit.chi2dof:.4f}")
+    # Subtract the background.
+    self.signal = self.bgFit.subtract()
 
-    # Plot final background fit result.
-    if self.output is not None:
-      self.bgFit.plot(output = f"{self.output}/BackgroundFit.pdf")
+    # Calculate means, widths, and statistical uncertainties.
+    for axis in self.axes.keys():
+      self.mean[axis] = self.getMean(axis)
+      self.width[axis] = self.getWidth(axis)
+      self.meanError[axis] = self.getMeanError(axis)
+      self.widthError[axis] = self.getWidthError(axis)
 
-    # Subtract the background and re-normalize.
-    self.signal -= self.bgFit.fitResult
-    self.signal /= np.max(np.abs(self.signal))
+    # Propagate the uncertainty from t0 optimization, if performed.
+    if self.optimization:
 
-    # Plot the background-subtracted result.
-    if self.plots >= 2:
+      # Perform a background fit with a one-sigma shift in t_0 to the left.
+      left_t0 = self.t0 - self.err_t0
+      self.leftFit = BackgroundFit(
+        transform = self,
+        signal = self.transform(left_t0),
+        t0 = left_t0,
+        cov = self.covariance(left_t0, mask = True)
+      )
+      self.leftFit.fit()
+
+      # Perform a background fit with a one-sigma shift in t_0 to the right.
+      right_t0 = self.t0 + self.err_t0
+      self.rightFit = BackgroundFit(
+        transform = self,
+        signal = self.transform(right_t0),
+        t0 = right_t0,
+        cov = self.covariance(right_t0, mask = True)
+      )
+      self.rightFit.fit()
+
+      # Propagate the uncertainty in t0 to the distribution mean and width.
       for axis in self.axes.keys():
-        self.plot(axis)
-    elif self.plots >= 1:
-      self.plot("frequency")
-      self.plot("radius")
 
-    # Save the resulting distributions, and optimal background fit.
-    if self.output is not None:
-      self.save()
-      self.bgFit.save(f"{self.output}/background.npz")
+        # Find the change in the mean after +/- one-sigma shifts in t0.
+        left_mean_err = abs(self.mean[axis] - self.getMean(axis, self.leftFit.subtract()))
+        right_mean_err = abs(self.mean[axis] - self.getMean(axis, self.rightFit.subtract()))
 
-    # Save key results.
-    for i in self.labels.keys():
-      self.results[f"<{self.labels[i]['simple']}>"] = self.getMean(i)
-      self.results[f"sigma_{self.labels[i]['simple']}"] = self.getWidth(i)
+        # Find the change in the width after +/- one-sigma shifts in t0.
+        left_width_err = abs(self.width[axis] - self.getWidth(axis, self.leftFit.subtract()))
+        right_width_err = abs(self.width[axis] - self.getWidth(axis, self.rightFit.subtract()))
+
+        # Average the changes on either side of the optimal t0.
+        mean_err_t0 = (left_mean_err + right_mean_err) / 2
+        width_err_t0 = (left_width_err + right_width_err) / 2
+
+        # Add these in quadrature with the basic statistical uncertainties.
+        self.meanError[axis] = np.sqrt(self.meanError[axis]**2 + mean_err_t0**2)
+        self.widthError[axis] = np.sqrt(self.widthError[axis]**2 + width_err_t0**2)
+
+    # ==========================================================================
+
+    # Append (name, value) pairs of key results to the results list.
+    self.results.append(("start", self.start))
+    self.results.append(("end", self.end))
+    self.results.append(("df", self.df))
+    self.results.append(("t0", self.t0 * 1E3))
+    self.results.append(("err_t0", self.err_t0 * 1E3))
+
+    for axis in self.axes.keys():
+      self.results.append((axis, self.mean[axis]))
+      self.results.append((f"err_{axis}", self.meanError[axis]))
+      self.results.append((f"sig_{axis}", self.width[axis]))
+      self.results.append((f"err_sig_{axis}", self.widthError[axis]))
+
+    # ==========================================================================
+
+    print("\nCompleted final background fit.")
+    print(f"{'chi2/ndf':>16} = {self.bgFit.chi2:.4f} / {self.bgFit.ndf} = {self.bgFit.chi2ndf:.4f}")
+    print(f"{'p-value':>16} = {self.bgFit.pval:.4f}")
+
+    # Normalize the maximum of the distribution to 1.
+    # norm = np.max(np.abs(self.signal))
+    # self.signal /= norm
+    # self.cov /= norm**2
 
     print(f"\nFinished background removal, in {(time.time() - begin):.2f} seconds.")
 
   # ============================================================================
 
   # Plot the result.
-  def plot(self, axis = "frequency"):
+  def plot(self, output, axis = "f"):
 
-    # Don't bother if there's no output destination.
-    if self.output is not None:
+    # Plot the specified distribution.
+    plt.plot(self.axes[axis][self.physical], self.signal[self.physical], 'o-')
 
-      # Plot the specified distribution.
-      plt.plot(self.axes[axis], self.signal, 'o-')
+    # Plot the magic quantity as a vertical line.
+    plt.axvline(util.magic[axis], ls = ":", c = "k", label = "Magic")
 
-      # Limit the viewing range to collimator constraints.
-      plt.xlim(util.minimum[axis], util.maximum[axis])
+    # Axis labels.
+    label, units = util.labels[axis]['plot'], util.labels[axis]['units']
+    style.xlabel(f"{label}" + (f" ({units})" if units != "" else ""))
+    style.ylabel("Arbitrary Units")
 
-      # Axis labels.
-      style.ylabel("Arbitrary Units")
-      style.xlabel(
-        f"{self.labels[axis]['plot']}" \
-        + (f" ({self.labels[axis]['units']})" if self.labels[axis]["units"] is not None else "")
-      )
+    # Infobox containing mean and standard deviation.
+    style.databox(
+      (fr"\langle {util.labels[axis]['math']} \rangle",
+        self.getMean(axis),
+        self.getMeanError(axis),
+        util.labels[axis]["units"]),
+      (fr"\sigma_{{{util.labels[axis]['math']}}}",
+        self.getWidth(axis),
+        self.getWidthError(axis),
+        util.labels[axis]["units"]),
+      left = False if axis == "c_e" else True
+    )
 
-      # Infobox containing mean and standard deviation.
-      style.databox(
-        (fr"\langle {self.labels[axis]['math']} \rangle",
-          self.getMean(axis),
-          self.labels[axis]["units"]),
-        (fr"\sigma_{{{self.labels[axis]['math']}}}",
-          self.getWidth(axis),
-          self.labels[axis]["units"])
-      )
+    # Add the legend.
+    plt.legend(loc = "upper right" if axis != "c_e" else "center right")
 
-      # Save to disk.
-      plt.savefig(f"{self.output}/{axis}.pdf")
+    # Save to disk.
+    plt.savefig(output)
 
-      # Clear the figure.
-      plt.clf()
+    # Clear the figure.
+    plt.clf()
 
   # ============================================================================
 
-  # Save the transform and all axis units in NumPy format.
-  def save(self):
-    if self.output is not None:
-      np.savez(
-        f"{self.output}/transform.npz",
-        transform = self.signal[self.fMask],
-        **{axis: self.axes[axis][self.fMask] for axis in self.axes.keys()}
+  def plotOptimization(self, outDir, mode = "coarse", all = False):
+
+    if mode == "coarse":
+      scanResults = self.coarseScan
+    elif mode == "fine":
+      scanResults = self.fineScan
+    else:
+      raise ValueError(f"Optimization mode '{mode}' not recognized.")
+
+    scanMetric = np.array([result.chi2ndf for result in scanResults])
+    label = r"$\chi^2$/ndf"
+
+    # Extract the t0 times.
+    times = np.array([result.t0 for result in scanResults])
+
+    # Plot the SSE or chi2/ndf.
+    plt.plot(times * 1000, scanMetric, 'o-')
+
+    # For a chi2/ndf plot...
+    if mode == "fine":
+      # Show the one-sigma t0 bounds as a shaded rectangle.
+      plt.axvspan(
+        (self.t0 - self.err_t0) * 1000,
+        (self.t0 + self.err_t0) * 1000,
+        alpha = 0.2,
+        fc = "k",
+        ec = None
       )
+      # Plot the optimized t0 as a vertical line.
+      plt.axvline(self.t0 * 1000, c = "k", ls = "--")
+      # Show the horizontal reference line where chi2/ndf = 1.
+      plt.axhline(1, c = "k", ls = ":")
+
+    # Axis labels.
+    style.xlabel("$t_0$ (ns)")
+    style.ylabel(label)
+    plt.ylim(0, None)
+
+    # Save the result to disk, and clear the figure.
+    plt.savefig(f"{outDir}/{mode}_scan.pdf")
+    plt.clf()
+
+    # Plot every background fit from the scan, in a multi-page PDF.
+    if all:
+
+      # Temporarily turn off LaTeX rendering for faster plots.
+      latex = plt.rcParams["text.usetex"]
+      plt.rcParams["text.usetex"] = False
+
+      # Initialize the multi-page PDF file for scan plots.
+      pdf = PdfPages(f"{outDir}/AllFits_{mode}.pdf")
+
+      # Initialize a plot of the background fit.
+      scanResults[0].plot()
+
+      # Plot each background fit, updating the initialized plot each time.
+      for i in range(len(times)):
+        scanResults[i].plot(update = True)
+        pdf.savefig()
+
+      # Close the multi-page PDF, and clear the current figure.
+      pdf.close()
+      plt.clf()
+
+      # Resume LaTeX rendering, if it was enabled before.
+      if latex:
+        plt.rcParams["text.usetex"] = True
+
+  # ============================================================================
+
+  # Save the transform results.
+  def save(self, output):
+
+      # Save the transform and all axis units in NumPy format.
+      np.savez(
+        output,
+        transform = self.signal[self.physical],
+        **{axis: self.axes[axis][self.physical] for axis in self.axes.keys()}
+      )
+
+      # Create a ROOT histogram for the frequency distribution.
+      histogram = root.TH1F(
+        "transform",
+        ";Frequency (kHz);Arbitrary Units",
+        len(self.frequency),
+        self.frequency[0] - self.df/2,
+        self.frequency[-1] + self.df/2
+      )
+
+      # Copy the signal into the histogram.
+      rnp.array2hist(self.signal, histogram)
+
+      # Save the histogram.
+      name = output.split(".")[0]
+      outFile = root.TFile(f"{name}.root", "RECREATE")
+      histogram.Write()
+      outFile.Close()
 
   # ============================================================================
 
   # Calculate the mean of the specified axis within physical limits.
-  def getMean(self, axis = "frequency"):
+  def getMean(self, axis = "f", signal = None):
+
+    if signal is None:
+      signal = self.signal
+
     return np.average(
-      self.axes[axis][self.fMask],
-      weights = self.signal[self.fMask]
+      self.axes[axis][self.physical],
+      weights = signal[self.physical]
     )
+
+  # ============================================================================
+
+  # Calculate the statistical uncertainty in the mean.
+  def getMeanError(self, axis = "f"):
+    x = self.axes[axis][self.physical]
+    mean = self.getMean(axis)
+    total = np.sum(self.signal[self.physical])
+    cov = self.cov[self.physical][:, self.physical]
+    return 1 / total * np.sqrt((x - mean).T @ cov @ (x - mean))
 
   # ============================================================================
 
   # Calculate the std. dev. of the specified axis within physical limits.
-  def getWidth(self, axis = "frequency"):
-    mean = self.getMean(axis)
+  def getWidth(self, axis = "f", signal = None):
+
+    if signal is None:
+      signal = self.signal
+
+    mean = self.getMean(axis, signal)
     return np.sqrt(np.average(
-      (self.axes[axis][self.fMask] - mean)**2,
-      weights = self.signal[self.fMask]
+      (self.axes[axis][self.physical] - mean)**2,
+      weights = signal[self.physical]
     ))
 
   # ============================================================================
 
-  # Calculate the electric field correction.
-  def getCorrection(self, n = 0.108):
-    return util.radialOffsetToCorrection(
-      self.axes["radius"][self.fMask],
-      self.signal[self.fMask],
-      n
+  # Calculate the statistical uncertainty in the std. dev.
+  def getWidthError(self, axis = "f"):
+    x = self.axes[axis][self.physical]
+    mean = self.getMean(axis)
+    width = self.getWidth(axis)
+    total = np.sum(self.signal[self.physical])
+    cov = self.cov[self.physical][:, self.physical]
+    return 1 / (2 * width * total) * np.sqrt(
+      ((x - mean)**2 - width**2).T @ cov @ ((x - mean)**2 - width**2)
     )
-
-  # ============================================================================

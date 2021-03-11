@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.colors
 import numpy as np
 
 # ==============================================================================
@@ -6,19 +7,19 @@ import numpy as np
 # Set the default plotting options.
 def setStyle():
 
-  # TODO: if LaTeX is turned off, make the font a bit smaller
-  # Font options.
-  plt.rcParams["font.size"] = 16
-  plt.rcParams["font.family"] = "serif"
-  plt.rcParams["axes.labelsize"] = 16
-  plt.rcParams["axes.titlesize"] = 16
-  plt.rcParams["xtick.labelsize"] = 16
-  plt.rcParams["ytick.labelsize"] = 16
-  plt.rcParams["legend.fontsize"] = 14
-
   # LaTeX options.
-  plt.rcParams["text.usetex"] = True
-  plt.rcParams['text.latex.preamble'] = r"\usepackage{amsmath}"
+  # plt.rcParams["text.usetex"] = True
+  # plt.rcParams['text.latex.preamble'] = r"\usepackage{amsmath}"
+
+  # Font options.
+  if plt.rcParams["text.usetex"]:
+    plt.rcParams["font.family"] = "serif"
+    plt.rcParams["font.size"] = 16
+    plt.rcParams["axes.labelsize"] = 16
+    plt.rcParams["axes.titlesize"] = 16
+    plt.rcParams["xtick.labelsize"] = 16
+    plt.rcParams["ytick.labelsize"] = 16
+    plt.rcParams["legend.fontsize"] = 14
 
   # Marker and line options.
   plt.rcParams["lines.markersize"] = 4
@@ -62,7 +63,7 @@ def setStyle():
   # Default subplot spacing.
   plt.rcParams["figure.subplot.wspace"] = 0.3
   plt.rcParams["figure.subplot.hspace"] = 0.3
-  plt.rcParams["figure.subplot.top"] = 0.96
+  plt.rcParams["figure.subplot.top"] = 0.93
   plt.rcParams["figure.subplot.right"] = 0.93
 
 # ==============================================================================
@@ -77,31 +78,29 @@ def ylabel(label):
 
 # ==============================================================================
 
-# Keyword arguments for colorbar formatting.
-# colorbarStyle = {"pad": 0.01, "fraction": 0.04, "aspect": 18}
-
 # Override plt.colorbar with automatic formatting.
 def colorbar(
-  cLabel = None,
+  label = None,
   pad = 0.01,
-  fraction = 0.06,
+  fraction = 0.08,
   aspect = 18,
   **kwargs
 ):
   cbar = plt.colorbar(pad = pad, fraction = fraction, aspect = aspect, **kwargs)
-  if cLabel is not None:
-    cbar.set_label(cLabel, ha = "right", y = 1)
+  if label is not None:
+    cbar.set_label(label, ha = "right", y = 1)
   return cbar
 
 # ==============================================================================
 
 # Override plt.errorbar with automatic formatting.
-# TODO: what was "obj" for? I don't even remember... is it still necessary?
-def errorbar(x, y, err, obj = plt, fmt = "o", ms = 4, **kwargs):
-  return obj.errorbar(
+def errorbar(x, y, yErr, xErr = None, fmt = "o", ms = 4, **kwargs):
+
+  return plt.errorbar(
     x,
     y,
-    err,
+    yErr,
+    xErr,
     fmt = fmt,
     ms = ms,
     capsize = 2,
@@ -112,14 +111,15 @@ def errorbar(x, y, err, obj = plt, fmt = "o", ms = 4, **kwargs):
 # ==============================================================================
 
 # TODO: add a non-latex option, without alignment; check rcParams[latex] to switch
-def databox(*args):
+def databox(*args, left = True):
 
   if plt.rcParams["text.usetex"]:
 
     string = r"\begin{align*}"
     for arg in args:
       string += f"{arg[0]} &= {arg[1]:.4f}"
-      string += fr" \; \text{{{arg[2]}}}" if arg[2] is not None else ""
+      string += fr" \pm {arg[2]:.4f}" if arg[2] is not None else ""
+      string += fr" \; \text{{{arg[3]}}}" if arg[3] is not None else ""
       string += r" \\[-0.5ex]"
     string += r"\end{align*}"
 
@@ -128,32 +128,48 @@ def databox(*args):
     string = ""
     for arg in args:
       string += f"${arg[0]}$ = {arg[1]:.4f}"
-      string += f" {arg[2]}" if arg[2] is not None else ""
+      string += f" +/- {arg[2]:.4f}" if arg[2] is not None else ""
+      string += f" {arg[3]}" if arg[3] is not None else ""
       string += "\n"
 
   plt.text(
-    0.03,
+    0.03 if left else 0.97,
     0.96,
     string,
-    ha = "left",
+    ha = "left" if left else "right",
     va = "top",
     transform = plt.gca().transAxes
   )
 
 # ==============================================================================
 
-# Keyword arguments for image formatting.
-imageStyle = {"cmap": "jet", "origin": "lower", "aspect": "auto"}
-
 # Override plt.imshow with automatic formatting and colorbar.
-def imshow(x, y, heights, cLabel = None, **kwargs):
+def imshow(
+  heights,
+  x = None,
+  y = None,
+  label = None,
+  cmap = "jet",
+  origin = "upper",
+  aspect = "auto",
+  extent = "auto",
+  **kwargs
+):
+
+  if x is not None and y is not None:
+    dx, dy = x[1] - x[0], y[1] - y[0]
+    extent = (x[0] - dx/2, x[-1] + dx/2, y[0] - dy/2, y[-1] + dy/2)
+    origin = "lower"
+
   result = plt.imshow(
     heights.T,
-    extent = (x[0], x[-1], y[0], y[-1]),
-    **imageStyle,
+    extent = extent,
+    cmap = cmap,
+    origin = origin,
+    aspect = aspect,
     **kwargs
   )
-  cbar = colorbar(cLabel)
+  cbar = colorbar(label)
   return result, cbar
 
 # ==============================================================================
