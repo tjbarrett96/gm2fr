@@ -25,7 +25,6 @@ class Transform:
   # ============================================================================
 
   # Constructor for the Transform object.
-  # TODO: list and initialize all instance variables here, for clarity and robustness.
   def __init__(
     self,
     # gm2fr.analysis.FastRotation object containing the signal.
@@ -37,7 +36,7 @@ class Transform:
     # Cosine transform frequency spacing (kHz).
     df = 2,
     # Background fit model. Options: "parabola" / "sinc" / "error".
-    model = "parabola",
+    model = "sinc",
     # Half-width of t0 window (in us) for initial coarse optimization scan.
     coarseRange = 0.015,
     # Step size of t0 window (in us) for initial coarse optimization scan.
@@ -46,14 +45,10 @@ class Transform:
     fineRange = 0.0005,
     # Step size of t0 window (in us) for subsequent fine optimization scans.
     fineStep = 0.000025,
-    # Output directory.
-    output = None,
     # Boolean switch to enable or disable t0 optimization.
     optimize = True,
     # Initial t0 guess (in us), optimized or fixed based on "optimize" option.
     t0 = 0.060,
-    # Which plots to include. 0 = nothing, 1 = main results, 2 = t0 scans too
-    plots = 2,
     # Quad n-value.
     n = 0.108
   ):
@@ -66,10 +61,10 @@ class Transform:
     self.end = min(end, self.fr.time[-1])
 
     # Apply the selected time mask to the fast rotation data.
-    self.frMask = (self.fr.time >= self.start) & (self.fr.time <= self.end)
-    self.frTime = self.fr.time[self.frMask]
-    self.frSignal = self.fr.signal[self.frMask]
-    self.frError = self.fr.error[self.frMask]
+    frMask = (self.fr.time >= self.start) & (self.fr.time <= self.end)
+    self.frTime = self.fr.time[frMask]
+    self.frSignal = self.fr.signal[frMask]
+    self.frError = self.fr.error[frMask]
 
     # Define the frequency values for evaluating the cosine transform.
     self.df = df
@@ -110,9 +105,6 @@ class Transform:
     self.coarseScan = []
     self.fineScan = []
 
-    # Output directory.
-    self.output = output
-
     # Convert frequency to other units.
     self.axes = {
       "f": self.frequency,
@@ -135,9 +127,6 @@ class Transform:
 
     # Initialize a list of (name, value) pairs of key results.
     self.results = []
-
-    # Plotting option.
-    self.plots = plots
 
   # ============================================================================
 

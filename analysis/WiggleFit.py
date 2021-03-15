@@ -2,6 +2,10 @@ import numpy as np
 import scipy.optimize as opt
 import gm2fr.utilities as util
 
+import matplotlib.pyplot as plt
+import gm2fr.style as style
+style.setStyle()
+
 # ==============================================================================
 
 # Two-parameter wiggle fit function, only modeling exponential decay.
@@ -34,6 +38,8 @@ modelFunctions = {
 # ==============================================================================
 
 # Parameter symbols, for saving results.
+# TODO: move to utilities, like transform labels
+# TODO: maybe make small class for holding each label's data
 modelLabels = [
   {"printing": "normalization", "output": "N", "units": ""},
   {"printing": "lifetime", "output": "tau", "units": "us"},
@@ -105,12 +111,19 @@ class WiggleFit:
     n = None        # the n-value, if known, helps inform CBO frequency seed
   ):
 
-    # Signal data.
-    self.time = time
-    self.signal = signal
-    self.error = np.sqrt(np.abs(signal))
+    # Finely-binned signal data for the fast rotation signal.
+    self.fineTime = time
+    self.fineSignal = signal
+    self.fineError = np.sqrt(np.abs(self.fineSignal))
+
+    # Coarsely-binned signal data for the wiggle fit.
+    groups = len(self.fineTime) // 149
+    self.time = self.fineTime[:(groups * 149)].reshape((groups, 149)).mean(axis = 1)
+    self.signal = self.fineSignal[:(groups * 149)].reshape((groups, 149)).sum(axis = 1)
+    self.error = np.sqrt(np.abs(self.signal))
 
     # Ensure the errors are all non-zero.
+    self.fineError[self.fineError == 0] = 1
     self.error[self.error == 0] = 1
 
     # Select the sequence of fits to perform, based on the supplied model.
@@ -138,6 +151,7 @@ class WiggleFit:
     self.pCov = None
     self.pErr = None
     self.fitResult = None
+    self.fineResult = None
 
     self.chi2 = None
     self.ndf = None
@@ -185,7 +199,7 @@ class WiggleFit:
       self.fitResult = self.function(self.fitTime, *self.pOpt)
       fitResiduals = self.fitSignal - self.fitResult
 
-      # Calculate the chi-squared, and reduced chi-squared.
+      # Calculate the chi-squared, reduced chi-squared, and p-value.
       self.chi2 = np.sum((fitResiduals / self.fitError)**2)
       self.ndf = len(self.fitTime) - len(self.pOpt)
       self.chi2ndf = self.chi2 / self.ndf
@@ -209,6 +223,9 @@ class WiggleFit:
           f"{modelLabels[i]['units']}"
         ))
 
+    # Evaluate the finely-binned fit result.
+    self.fineResult = self.function(self.fineTime, *self.pOpt) / 149
+
     # Copy the parameters into the results array.
     for i in range(len(self.pOpt)):
       if modelLabels[i]["printing"] == "frequency":
@@ -220,3 +237,68 @@ class WiggleFit:
     self.results.append(("wg_pval", self.pval))
 
 # ==============================================================================
+
+  # Plot the wiggle fit.
+  def plot(self, output, endTimes):
+
+    if output is not None:
+
+      # Plot the signal.
+      plt.plot(self.time, self.signal, label = "Signal")
+      plt.plot(self.fitTime, self.fitResult, 'r', label = "Fit")
+
+      # Label the axes.
+      style.xlabel(r"Time ($\mu$s)")
+      style.ylabel("Intensity")
+      plt.legend()
+
+      # Save the figure over a range of time axis limits (in us).
+      for end in endTimes:
+
+        # Set the time limits.
+        plt.xlim(4, end)
+
+        # Update the intensity limits.
+        view = self.signal[(self.time >= 4) & (self.time <= end)]
+        plt.ylim(np.min(view), np.max(view))
+
+        # Save the figure.
+        plt.savefig(f"{output}/signal/WiggleFit_{end}us.pdf")
+
+      # Clear the figure.
+      plt.clf()
+
+# ==============================================================================
+
+  # Plot the raw positron signal.
+  def plotFine(self, output, endTimes):
+
+    if output is not None:
+
+      # Plot the signal.
+      plt.plot(self.fineTime, self.fineSignal)
+
+      # Label the axes.
+      style.xlabel(r"Time ($\mu$s)")
+      style.ylabel("Intensity")
+      plt.legend()
+
+      # Plot the early-time contamination.
+      plt.xlim(0, 5)
+      plt.savefig(f"{output}/signal/EarlyTime.pdf")
+
+      # Save the figure over a range of time axis limits (in us).
+      for end in endTimes:
+
+        # Set the time limits.
+        plt.xlim(4, end)
+
+        # Update the intensity limits.
+        view = self.fineSignal[(self.fineTime >= 4) & (self.fineTime <= end)]
+        plt.ylim(np.min(view), np.max(view))
+
+        # Save the figure.
+        plt.savefig(f"{output}/signal/RawSignal_{end}us.pdf")
+
+      # Clear the figure.
+      plt.clf()

@@ -150,8 +150,18 @@ class BackgroundFit:
 
   # Error fit function.
   def error(self, f, a, fc, s):#, b):
+
     b = np.pi * (self.start - self.t0) * 1E-3
-    return a * np.exp(-(s*b)**2) * np.imag(np.exp(-2j*(f-fc)*b) * sp.dawsn(-(f-fc)/s+1j*s*b))
+    result =  a * np.exp(-(s*b)**2) * np.imag(np.exp(-2j*(f-fc)*b) * sp.dawsn(-(f-fc)/s+1j*s*b))
+
+    # This function often misbehaves while exploring parameter space.
+    # Specifically, both np.exp(...) and np.imag(...) can blow up, but are supposed to (partially) cancel.
+    # But it doesn't work out numerically, and we just get np.inf or np.nan.
+    # I'd like an elegant solution to this problem, but for now just catch these errors.
+    if (np.isinf(result)).any() or (np.isnan(result)).any():
+      return a
+
+    return result
 
   # ============================================================================
 
@@ -194,7 +204,7 @@ class BackgroundFit:
     self.pval = util.pval(self.chi2, self.ndf)
 
     # TODO: add debug print statements here, displaying everything
-    # print([f"{p:.4f}" for p in self.pOpt])
+    print([f"{p:.4f}" for p in self.pOpt])
 
     # Append each key result as a (name, value) pair to the results list.
     self.results.append(("bg_chi2", self.chi2))
@@ -267,15 +277,13 @@ class BackgroundFit:
 
     style.imshow(
       self.corr,
-      x = self.frequency,
-      y = self.frequency,
       label = "Correlation",
       vmin = -1,
       vmax = 1
     )
 
-    style.xlabel("Frequency (kHz)")
-    style.ylabel("Frequency (kHz)")
+    style.xlabel(f"Frequency Bin ($\Delta f = {self.transform.df}$ kHz)")
+    style.ylabel(f"Frequency Bin ($\Delta f = {self.transform.df}$ kHz)")
 
     plt.savefig(output)
     plt.clf()

@@ -56,36 +56,28 @@ class FastRotation:
 
       # Get the histograms from the file.
       rootFile = root.TFile(input)
-      fineWiggle = rootFile.Get(label)
+      wiggle = rootFile.Get(label)
 
       # Quit if the histogram is empty, or statistics are too low.
-      if fineWiggle.GetEntries() < 5E5:
+      if wiggle.GetEntries() < 5E5:
         return None
 
       # Subtract pileup, if provided.
       if pileup is not None:
-        finePileup = rootFile.Get(pileup)
-        fineWiggle.Add(finePileup, -1)
-
-      # Pull the coarsely-binned wiggle plot data.
-      coarseWiggle = fineWiggle.Rebin(149, "coarse")
-      coarseSignal, coarseEdges = rnp.hist2array(coarseWiggle, return_edges = True)
-      coarseTime = (coarseEdges[0][1:] + coarseEdges[0][:-1]) / 2
-#      coarseError = np.sqrt(coarseSignal)
-#      coarseError[coarseError == 0] = 1
+        pileup = rootFile.Get(pileup)
+        wiggle.Add(pileup, -1)
 
       # Pull the finely-binned wiggle plot data.
-      fineSignal, fineEdges = rnp.hist2array(fineWiggle, return_edges = True)
-      fineTime = (fineEdges[0][1:] + fineEdges[0][:-1]) / 2
-      fineError = np.sqrt(np.abs(fineSignal))
-      fineError[fineError == 0] = 1
+      wgSignal, wgEdges = rnp.hist2array(wiggle, return_edges = True)
+      wgTime = (wgEdges[0][1:] + wgEdges[0][:-1]) / 2
+      wgError = np.sqrt(np.abs(wgSignal))
+      wgError[wgError == 0] = 1
 
       # Close the input file.
       rootFile.Close()
 
       if units == "ns":
-        coarseTime *= 1E-3
-        fineTime *= 1E-3
+        wgTime *= 1E-3
       elif units == "us":
         pass
       else:
@@ -93,22 +85,22 @@ class FastRotation:
 
       # Perform the fit, using the coarsely-binned data.
       wgFit = wg.WiggleFit(
-        coarseTime,
-        coarseSignal,
+        wgTime,
+        wgSignal,
         model = fit,
         n = n
       )
       wgFit.fit()
 
       # Divide out the wiggle fit from the fine binning, rescaled for rebinning.
-      normalization = wgFit.function(fineTime, *wgFit.pOpt) / 149
-      fineSignal /= normalization
-      fineError /= normalization
+      normalization = wgFit.fineResult
+      frSignal = wgSignal / normalization
+      frError = wgError / normalization
 
       print(f"\nFinished preparing fast rotation signal, in {(time.time() - begin):.2f} seconds.")
 
       # Construct the fast rotation object
-      fr = cls(fineTime, fineSignal, fineError)
+      fr = cls(wgTime, frSignal, frError)
       fr.wgFit = wgFit
       return fr
 
@@ -132,8 +124,7 @@ class FastRotation:
   # ============================================================================
 
   # Plot the fast rotation signal.
-  # TODO: add percent error plot over same windows.
-  def plot(self, output = None):
+  def plot(self, output, endTimes):
 
     if output is not None:
 
@@ -145,7 +136,7 @@ class FastRotation:
       style.ylabel("Intensity")
 
       # Save the figure over a range of time axis limits (in us).
-      for end in [5, 10, 30, 50, 100, 150, 200, 300]:
+      for end in endTimes:
 
         # Set the time limits.
         plt.xlim(4, end)

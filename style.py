@@ -150,16 +150,15 @@ def imshow(
   y = None,
   label = None,
   cmap = "jet",
-  origin = "upper",
+  origin = "lower",
   aspect = "auto",
-  extent = "auto",
+  extent = None,
   **kwargs
 ):
 
   if x is not None and y is not None:
     dx, dy = x[1] - x[0], y[1] - y[0]
     extent = (x[0] - dx/2, x[-1] + dx/2, y[0] - dy/2, y[-1] + dy/2)
-    origin = "lower"
 
   result = plt.imshow(
     heights.T,

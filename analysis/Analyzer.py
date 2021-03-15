@@ -205,9 +205,13 @@ class Analyzer:
       # Setup the output directory.
       self.setup(tag)
 
-      # Plot the fast rotation signal.
+      # Plot the fast rotation signal, and wiggle fit (if present).
       if plots >= 1:
-        self.fastRotation.plot(self.output)
+        endTimes = [5, 10, 30, 50, 100, 150, 200, 300]
+        self.fastRotation.plot(self.output, endTimes)
+        if self.fastRotation.wgFit is not None:
+          self.fastRotation.wgFit.plot(self.output, endTimes)
+          self.fastRotation.wgFit.plotFine(self.output, endTimes)
 
       # Zip together each parameter in the scans.
       iterations = list(itertools.product(start, end))
@@ -230,10 +234,8 @@ class Analyzer:
           coarseStep,
           fineRange,
           fineStep,
-          self.output,
           optimize,
           t0 if type(t0) != list else t0[groupIndex],
-          plots,
           n
         )
 
