@@ -306,9 +306,10 @@ class Analyzer:
           resultsList += self.fastRotation.wgFit.results
 
         if truth is not None:
-          difference = truth - self.transform.signal
+          normalization = self.transform.df * np.sum(self.transform.signal)
+          difference = truth - (self.transform.signal / normalization)
           truth_metric = difference.T @ difference
-          truth_chi2 = truth_metric / self.transform.cov[0, 0]
+          truth_chi2 = truth_metric / (self.transform.cov[0, 0] / normalization**2)
           truth_chi2ndf = truth_chi2 / len(self.transform.signal)
           resultsList += [("truth_chi2ndf", truth_chi2ndf)]
           resultsList += [("truth_metric", truth_metric)]
