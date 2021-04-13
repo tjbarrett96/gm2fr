@@ -24,9 +24,12 @@ frequency = GaussianMixture(
 # Reference: generally centered near zero, with spread about ~30 ns.
 # Realistic profiles often contain 3+ peaks, with 2 on either side of zero.
 injection = GaussianMixture(
-  weights = [1, 0.5, 0.3],
-  means = [0, 30, -20],
-  widths = [25, 15, 15]
+  # weights = [1, 0.5, 0.3],
+  # means = [0, 30, -20],
+  # widths = [25, 15, 15]
+  weights = [1],
+  means = [0],
+  widths = [25]
 )
 
 # To model a toy correlation between frequency and injection time, we can define a function which
@@ -38,7 +41,7 @@ correlation = [0]
 
 # Create the simulation object, specifying the output directory name.
 # The specified folder will be created in your current directory.
-simulation = Simulator("data/testing", overwrite = True)
+simulation = Simulator("data/exponential", overwrite = True)
 
 # Tell the simulation object to use the input Gaussian mixture distributions we defined above.
 # (I wrote this step separate from the creation of the simulation object above,
@@ -52,7 +55,7 @@ simulation.useMixture(
 )
 
 # Run the simulation, using the specified number of muons.
-simulation.simulate(muons = 1E9, decay = "uniform")
+simulation.simulate(muons = 1E9, decay = "exponential", normalize = False)
 
 # Save and plot the results.
 simulation.save()

@@ -143,6 +143,9 @@ max["dp/p0"] = momentumToOffset(max["p"]) * 100
 min["tau"] = min["gamma"] * lifetime * 1E-3
 max["tau"] = max["gamma"] * lifetime * 1E-3
 
+min["beta"] = np.sqrt(1 - 1/min["gamma"]**2)
+max["beta"] = np.sqrt(1 - 1/max["gamma"]**2)
+
 # ==============================================================================
 
 # String labels for each variable: math mode, units, plot axes, and filename.
@@ -330,6 +333,19 @@ def spectrum(time, data):
 
   # Get the frequencies corresponding to the DFT bins.
   frequencies = np.arange(len(transform)) * samplingFrequency / n
+
+  return frequencies, transform
+
+# ==============================================================================
+
+# One-sided FFT and frequencies (kHz), assuming time in microseconds.
+def fft(time, data):
+
+  # Calculate the FFT.
+  transform = np.fft.rfft(data)
+
+  # Calculate the frequencies corresponding to the FFT bins, in kHz.
+  frequencies = np.fft.rfftfreq(len(time), d = 1E-9) * 1E-3
 
   return frequencies, transform
 

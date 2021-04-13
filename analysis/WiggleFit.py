@@ -281,7 +281,6 @@ class WiggleFit:
       # Label the axes.
       style.xlabel(r"Time ($\mu$s)")
       style.ylabel("Intensity")
-      plt.legend()
 
       # Plot the early-time contamination.
       plt.xlim(0, 5)
@@ -302,3 +301,32 @@ class WiggleFit:
 
       # Clear the figure.
       plt.clf()
+
+# ==============================================================================
+
+  # Plot an FFT of the raw positron signal.
+  def plotFFT(self, output):
+
+    # Calculate the FFT magnitude.
+    f, fft = util.fft(self.fineTime, self.fineSignal)
+    mag = np.abs(fft)
+
+    # Plot the FFT magnitude.
+    plt.plot(f, mag)
+
+    # Axis limits.
+    plt.xlim(0, 8000)
+    plt.ylim(0, np.max(mag[(f > 1000)]) * 1.05)
+
+    style.xlabel("Frequency (kHz)")
+    style.ylabel("Arbitrary Units")
+
+    plt.savefig(f"{output}/fft_raw.pdf")
+
+    # Save with a log scale.
+    plt.yscale("log")
+    plt.ylim(np.min(mag[(f < 8000)]), None)
+    plt.savefig(f"{output}/fft_raw_log.pdf")
+
+    # Clear the figure.
+    plt.clf()

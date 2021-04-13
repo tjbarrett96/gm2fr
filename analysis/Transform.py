@@ -128,6 +128,9 @@ class Transform:
     # Initialize a list of (name, value) pairs of key results.
     self.results = []
 
+    # FFT results.
+    self.fft = None
+
   # ============================================================================
 
   # Calculate the covariance matrix among frequency bins.
@@ -162,7 +165,7 @@ class Transform:
   # For speed, need to take everything as arguments; no "self" references.
   @staticmethod
   @nb.njit(fastmath = True, parallel = True)
-  def __transform(t, S, f, t0):
+  def __transform(t, S, f, t0, sine = False):
 
     # Conversion from (kHz * us) to the standard (Hz * s).
     kHz_us = 1E-3
@@ -174,20 +177,26 @@ class Transform:
     for i in nb.prange(len(f)):
       result[i] = 0
       for j in range(len(t)):
-        result[i] += S[j] * np.cos(2 * np.pi * f[i] * (t[j] - t0) * kHz_us)
+        if not sine:
+          # Cosine gets + sign, from exp(-i omega t) convention.
+          result[i] += S[j] * np.cos(2 * np.pi * f[i] * (t[j] - t0) * kHz_us)
+        else:
+          # Sine gets - sign, from exp(-i omega t) convention.
+          result[i] -= S[j] * np.sin(2 * np.pi * f[i] * (t[j] - t0) * kHz_us)
 
     return result
 
   # Calculate the cosine transform using the supplied t0.
   # This is a wrapper for the Numba implementation, which can't use "self".
-  def transform(self, t0):
+  def transform(self, t0, sine = False):
 
     # Pass this object's instance variables to the Numba implementation.
     return Transform.__transform(
       self.frTime,
       self.frSignal,
       self.frequency,
-      t0
+      t0,
+      sine
     )
 
   # ============================================================================
@@ -505,6 +514,64 @@ class Transform:
       # Resume LaTeX rendering, if it was enabled before.
       if latex:
         plt.rcParams["text.usetex"] = True
+
+  # ============================================================================
+
+  def plotMagnitude(self, output):
+
+    # Calculate the cosine, sine, and Fourier (magnitude) transforms.
+    real = self.transform(self.t0)
+    imag = self.transform(self.t0, sine = True)
+    mag = np.sqrt(real**2 + imag**2)
+
+    # Plot the magnitude, real, and imaginary parts.
+    plt.plot(self.frequency, mag, 'o-', label = "Fourier Magnitude")
+    plt.plot(self.frequency, real, 'o-', label = "Real Part (Cosine)")
+    plt.plot(self.frequency, imag, 'o-', label = "Imag. Part (Sine)")
+    plt.axhline(0, ls = ':', c = "k")
+    plt.legend()
+
+    # Axis labels.
+    style.xlabel("Frequency (kHz)")
+    style.ylabel("Arbitrary Units")
+
+    plt.savefig(f"{output}/magnitude.pdf")
+    plt.clf()
+
+    # Plot the phase.
+    plt.plot(self.frequency, np.arctan2(imag, real), 'o-')
+    style.xlabel("Frequency (kHz)")
+    style.ylabel("Phase (rad)")
+    plt.savefig(f"{output}/phase.pdf")
+    plt.clf()
+
+  # ============================================================================
+
+  def plotFFT(self, output):
+
+    # Calculate the FFT magnitude.
+    f, fft = util.fft(self.frTime, self.frSignal)
+    mag = np.abs(fft)
+
+    # Plot the FFT magnitude.
+    plt.plot(f, mag)
+
+    # Axis limits.
+    plt.xlim(0, 8000)
+    plt.ylim(0, np.max(mag[(f > 1000)]) * 1.05)
+
+    style.xlabel("Frequency (kHz)")
+    style.ylabel("Arbitrary Units")
+
+    plt.savefig(f"{output}/fft.pdf")
+
+    # Save with a log scale.
+    plt.yscale("log")
+    plt.ylim(np.min(mag[(f < 8000)]), None)
+    plt.savefig(f"{output}/fft_log.pdf")
+
+    # Clear the figure.
+    plt.clf()
 
   # ============================================================================
 

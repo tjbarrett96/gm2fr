@@ -84,6 +84,7 @@ class BackgroundFit:
 
     # Map from model names to functions.
     self.modelFunctions = {
+      "constant": self.constant,
       "parabola": self.parabola,
       "sinc": self.sinc,
       "error": self.error
@@ -91,6 +92,7 @@ class BackgroundFit:
 
     # Map from model names to initial parameter guesses.
     self.modelSeeds = {
+      "constant": [np.min(self.signal)],
       "parabola": [1, 6703, np.min(self.signal)],
       "sinc": [np.min(self.signal), 6703, None],
       "error": [np.min(self.signal), 6703, 12]#, None]
@@ -98,6 +100,10 @@ class BackgroundFit:
 
     # Map from model names to parameter bounds of the form ([lower], [upper]).
     self.modelBounds = {
+      "constant": (
+        [-np.inf],
+        [0]
+      ),
       "parabola": (
         [0,      util.min["f"], -np.inf],
         [np.inf, util.max["f"], 0 ]
@@ -132,6 +138,12 @@ class BackgroundFit:
       self.pBounds[1][2] = 1.10 * self.pSeeds[2]
 
     self.results = []
+
+  # ============================================================================
+
+  # Constant fit function.
+  def constant(self, f, a):
+    return a
 
   # ============================================================================
 

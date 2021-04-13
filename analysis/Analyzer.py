@@ -176,7 +176,9 @@ class Analyzer:
     # Step size (in us) for the subsequent fine t0 scan ranges.
     fineStep = 0.000025,
     # Plotting option. 0 = nothing, 1 = main results, 2 = more details (slower).
-    plots = 1
+    plots = 1,
+    # Optional true frequency distribution heights.
+    truth = None
   ):
 
     begin = time.time()
@@ -196,7 +198,7 @@ class Analyzer:
         self.fastRotation = fr.FastRotation.produce(input[0], input[1], input[2], fit, n, self.units)
       else:
         h = Histogram.load(input)
-        self.fastRotation = fr.FastRotation(h.xCenters, h.heights, h.errors, self.units)
+        self.fastRotation = fr.FastRotation(h.xCenters, h.heights, h.errors, fit, self.units, n)
 
       # If the fast rotation signal couldn't be produced, skip this input.
       if self.fastRotation is None:
@@ -207,11 +209,14 @@ class Analyzer:
 
       # Plot the fast rotation signal, and wiggle fit (if present).
       if plots >= 1:
+
         endTimes = [5, 10, 30, 50, 100, 150, 200, 300]
         self.fastRotation.plot(self.output, endTimes)
+
         if self.fastRotation.wgFit is not None:
-          self.fastRotation.wgFit.plot(self.output, endTimes)
+          self.fastRotation.wgFit.plot(self.output, endTimes[3:])
           self.fastRotation.wgFit.plotFine(self.output, endTimes)
+          self.fastRotation.wgFit.plotFFT(self.output)
 
       # Zip together each parameter in the scans.
       iterations = list(itertools.product(start, end))
@@ -254,6 +259,9 @@ class Analyzer:
 
         if plots > 0:
 
+          self.transform.plotFFT(self.output)
+          self.transform.plotMagnitude(self.output)
+
           if optimize:
 
             # Plot the coarse background optimization scan.
@@ -287,8 +295,8 @@ class Analyzer:
             f"{self.output}/background/correlation.pdf"
           )
 
-        self.transform.save(f"{self.output}/transform.npz")
-        self.transform.bgFit.save(f"{self.output}/background.npz")
+          self.transform.save(f"{self.output}/transform.npz")
+          self.transform.bgFit.save(f"{self.output}/background.npz")
 
         # Compile the results list of (name, value) pairs from each object.
         resultsList = self.transform.results
@@ -297,7 +305,16 @@ class Analyzer:
         if self.fastRotation.wgFit is not None:
           resultsList += self.fastRotation.wgFit.results
 
+        if truth is not None:
+          difference = truth - self.transform.signal
+          truth_metric = difference.T @ difference
+          truth_chi2 = truth_metric / self.transform.cov[0, 0]
+          truth_chi2ndf = truth_chi2 / len(self.transform.signal)
+          resultsList += [("truth_chi2ndf", truth_chi2ndf)]
+          resultsList += [("truth_metric", truth_metric)]
+
         # Initialize the results arrays, if not already done.
+        # TODO: make Results class which holds key-value list and has toArray()?
         if self.results is None:
 
           header = [name for name, value in resultsList]

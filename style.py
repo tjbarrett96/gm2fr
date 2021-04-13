@@ -1,29 +1,35 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors
 import numpy as np
+import gm2fr.utilities as util
 
 # ==============================================================================
 
 # Set the default plotting options.
-def setStyle():
+def setStyle(latex = False):
 
   # LaTeX options.
-  # plt.rcParams["text.usetex"] = True
-  # plt.rcParams['text.latex.preamble'] = r"\usepackage{amsmath}"
+  if latex:
+    plt.rcParams["text.usetex"] = True
+    plt.rcParams['text.latex.preamble'] = r"\usepackage{amsmath}"
+    plt.rcParams["font.family"] = "serif"
 
   # Font options.
-  if plt.rcParams["text.usetex"]:
-    plt.rcParams["font.family"] = "serif"
-    plt.rcParams["font.size"] = 16
-    plt.rcParams["axes.labelsize"] = 16
-    plt.rcParams["axes.titlesize"] = 16
-    plt.rcParams["xtick.labelsize"] = 16
-    plt.rcParams["ytick.labelsize"] = 16
-    plt.rcParams["legend.fontsize"] = 14
+  size = 16 if latex else 14
+  plt.rcParams["font.size"] = size * 0.85
+  plt.rcParams["axes.labelsize"] = size
+  plt.rcParams["axes.titlesize"] = size
+  plt.rcParams["xtick.labelsize"] = size
+  plt.rcParams["ytick.labelsize"] = size
+  plt.rcParams["legend.fontsize"] = size * 0.85
+
+  # Rules for switching to scientific notation in axis tick labels.
+  plt.rcParams["axes.formatter.limits"] = (-4, 4)
+  plt.rcParams["axes.formatter.use_mathtext"] = True
 
   # Marker and line options.
-  plt.rcParams["lines.markersize"] = 4
-  plt.rcParams["lines.linewidth"] = 2
+  plt.rcParams["lines.markersize"] = 3
+  plt.rcParams["lines.linewidth"] = 1
 
   # Draw grid.
   plt.rcParams["axes.grid"] = True
@@ -82,7 +88,7 @@ def ylabel(label):
 def colorbar(
   label = None,
   pad = 0.01,
-  fraction = 0.08,
+  fraction = 0.10,
   aspect = 18,
   **kwargs
 ):
@@ -149,7 +155,7 @@ def imshow(
   x = None,
   y = None,
   label = None,
-  cmap = "jet",
+  cmap = "coolwarm",
   origin = "lower",
   aspect = "auto",
   extent = None,
@@ -170,6 +176,13 @@ def imshow(
   )
   cbar = colorbar(label)
   return result, cbar
+
+# ==============================================================================
+
+# TODO
+def collimators(axis = "f"):
+  plt.axvspan(plt.xlim()[0], util.min[axis])
+  plt.axvspan(util.max[axis], plt.xlim()[-1])
 
 # ==============================================================================
 

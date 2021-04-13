@@ -18,12 +18,13 @@ import root_numpy as rnp
 
 # ==============================================================================
 
+# TODO: serious cleaning up
 class FastRotation:
 
   # ============================================================================
 
   # Constructor.
-  def __init__(self, time, signal, error, units = "us"):
+  def __init__(self, time, signal, error, fit = None, units = "us", n = 0.108):
 
     # Fast rotation data.
     self.time = time
@@ -38,8 +39,22 @@ class FastRotation:
     else:
       raise ValueError(f"Time units '{units}' not recognized.")
 
-    # Wiggle fit object.
+    # Perform a wiggle fit.
     self.wgFit = None
+    if fit is not None:
+
+      self.wgFit = wg.WiggleFit(
+        self.time.copy(),
+        self.signal.copy(),
+        model = fit,
+        n = n
+      )
+      self.wgFit.fit()
+
+      # Divide out the wiggle fit from the fine binning, rescaled for rebinning.
+      normalization = self.wgFit.fineResult
+      self.signal /= normalization
+      self.error /= normalization
 
   # ============================================================================
 
