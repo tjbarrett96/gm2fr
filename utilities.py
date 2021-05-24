@@ -29,6 +29,9 @@ m_mu_kg = m_mu_GeV * GeV_to_kg
 # Nominal dipole magnetic field (T).
 b = 1.4513
 
+# Conversion from (kHz * us) to standard units (Hz * s = 1).
+kHz_us = 1E-3
+
 # ==============================================================================
 
 magic = {

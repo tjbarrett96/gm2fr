@@ -1,10 +1,14 @@
 from gm2fr.analysis.Analyzer import Analyzer
 
 # Create the analyzer object.
-# Specify the input fast rotation signal file, and desired output directory name.
-# (Output will be placed inside gm2fr/analysis/results/{yourFolderName}).
+# Specify the input fast rotation signal file:
+#   for ROOT, this is a tuple (filename, histogram).
+#   for NumPy, this is just a filename.
+# Also specify the name of the desired analysis output folder.
+#   This folder will be placed at gm2fr/analysis/results/{yourFolderName}).
 analyzer = Analyzer(
-  "../../simulation/testing/numpy/signal.npz",
+  # "../../simulation/testing/numpy/signal.npz",
+  ("../../simulation/data/testing/simulation.root", "signal"),
   "testing",
   units = "ns" # analyzer works in units of microseconds, but simulation was in nanoseconds -- I'll fix this soon
 )

@@ -556,12 +556,16 @@ class Transform:
     # Plot the FFT magnitude.
     plt.plot(f, mag)
 
+    # Show the frequency region used for nominal fast rotation analysis.
+    plt.axvspan(util.min["f"], util.max["f"], alpha = 0.2, fc = "k", ec = None, label = "Cyclotron Region")
+
     # Axis limits.
     plt.xlim(0, 8000)
     plt.ylim(0, np.max(mag[(f > 1000)]) * 1.05)
 
     style.xlabel("Frequency (kHz)")
     style.ylabel("Arbitrary Units")
+    plt.legend()
 
     plt.savefig(f"{output}/fft.pdf")
 
