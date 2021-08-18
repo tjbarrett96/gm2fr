@@ -5,6 +5,7 @@
 *.pyc  # compiled Python files
 *.npz  # NumPy output files
 *.npy  # NumPy output files
+*.sh   # bash scripts
 
 # Include the documentation PDF.
 !gm2fr.pdf

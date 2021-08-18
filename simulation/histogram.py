@@ -175,47 +175,50 @@ class Histogram:
 
   # Save this histogram to disk in NumPy format.
   def save(self, filename):
+    np.savez(filename, **self.collect())
 
+  # Collect this histogram's data into a dictionary with keyword labels.
+  def collect(self, path = None):
+
+    prefix = "" if path is None else f"{path}/"
+
+    # For a default one-dimensional histogram.
+    result = {
+      f"{prefix}xRange": (self.xEdges[0], self.xEdges[-1], self.xWidth),
+      f"{prefix}xCenters": self.xCenters,
+      f"{prefix}heights": self.heights,
+      f"{prefix}errors": self.errors
+    }
+
+    # If there's a second dimension, add the bin data.
     if self.heights.ndim == 2:
+      result[f"{prefix}yRange"] = (self.yEdges[0], self.yEdges[-1], self.yWidth)
+      result[f"{prefix}yCenters"] = self.yCenters
 
-      np.savez(
-        filename,
-        xRange = (self.xEdges[0], self.xEdges[-1], self.xWidth),
-        yRange = (self.yEdges[0], self.yEdges[-1], self.yWidth),
-        heights = self.heights,
-        errors = self.errors
-      )
-
-    else:
-
-      np.savez(
-        filename,
-        xRange = (self.xEdges[0], self.xEdges[-1], self.xWidth),
-        heights = self.heights,
-        errors = self.errors
-      )
+    return result
 
   # ============================================================================
 
   # Load a histogram previously saved to disk in NumPy format.
   @classmethod
-  def load(cls, filename):
+  def load(cls, filename, path = None):
 
+    prefix = "" if path is None else f"{path}/"
     data = np.load(filename)
 
-    if 'yRange' in data.keys():
+    if f'{prefix}yRange' in data.keys():
 
       # Recreate the 2D histogram object.
-      obj = cls(data['xRange'], data['yRange'])
+      obj = cls(data[f'{prefix}xRange'], data[f'{prefix}yRange'])
 
     else:
 
       # Recreate the 1D histogram object.
-      obj = cls(data['xRange'])
+      obj = cls(data[f'{prefix}xRange'])
 
     # Set the bin heights and errors.
-    obj.heights = data['heights']
-    obj.errors = data['errors']
+    obj.heights = data[f'{prefix}heights']
+    obj.errors = data[f'{prefix}errors']
 
     return obj
 

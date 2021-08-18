@@ -47,7 +47,7 @@ simulation.useMixture(
 )
 
 # Run, save, and plot the simulation.
-simulation.simulate(muons = 1E6)
+simulation.simulate(muons = 1E6, decay = "uniform")
 simulation.save()
 simulation.plot()
 
@@ -88,7 +88,7 @@ simulation.useHistogram1D(
 )
 
 # Run, save, and plot the simulation.
-simulation.simulate(muons = 1E6)
+simulation.simulate(muons = 1E6, decay = "uniform")
 simulation.save()
 simulation.plot()
 
@@ -116,6 +116,6 @@ simulation.useHistogram2D(
 )
 
 # Run, save, and plot the simulation.
-simulation.simulate(muons = 1E6)
+simulation.simulate(muons = 1E6, decay = "uniform")
 simulation.save()
 simulation.plot()

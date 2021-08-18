@@ -17,7 +17,27 @@ class Simulator:
 
   # ============================================================================
 
-  def __init__(self, name, overwrite = False):
+  def __init__(
+    self,
+    name,
+    overwrite = False,
+    kinematicsDistribution = None,
+    timeDistribution = None,
+    jointDistribution = None,
+    correlation = [0],
+    kinematicsUnits = "frequency",
+    timeUnits = "nanoseconds"
+  ):
+
+    self.kinematicsDistribution = kinematicsDistribution
+    self.timeDistribution = timeDistribution
+    self.jointDistribution = jointDistribution
+    self.correlation = correlation
+    self.kinematicsUnits = kinematicsUnits
+    self.timeUnits = timeUnits
+
+    if jointDistribution is None and (kinematicsDistribution is None or timeDistribution is None):
+      raise ValueError("Invalid input distributions.")
 
     if not os.path.isdir(name):
       os.mkdir(name)
@@ -95,46 +115,62 @@ class Simulator:
   # (For internal use.) Draw injection times and cyclotron frequencies for each muon.
   def __populate(self, muons):
 
-    # For each muon in the batch, draw injection times and kinematics variables.
-    if self.sourceMode == "Mixture":
-      offsets = self.sourceTimeDistribution.draw(choices = muons)
-      kinematics = self.sourceKinematicsDistribution.draw(choices = muons)
-    elif self.sourceMode == "Histogram1D":
-      offsets = rnp.random_sample(self.sourceTimeHistogram, muons)
-      kinematics = rnp.random_sample(self.sourceKinematicsHistogram, muons)
-    elif self.sourceMode == "Histogram2D":
-      samples = rnp.random_sample(self.sourceJointHistogram, muons)
+    def draw(distribution, choices = 1):
+      if isinstance(distribution, GaussianMixture):
+        return distribution.draw(choices)
+      elif isinstance(distribution, (root.TH1, root.TH2)):
+        return rnp.random_sample(distribution, choices)
+
+    if self.jointDistribution is not None:
+      samples = draw(self.jointDistribution, muons)
       offsets = samples[:, 0]
       kinematics = samples[:, 1]
     else:
-      raise ValueError(f"Input mode '{self.sourceMode}' not recognized.")
+      offsets = draw(self.timeDistribution, muons)
+      kinematics = draw(self.kinematicsDistribution, muons)
+      # Apply the correlation polynomial to the kinematics variables.
+      kinematics += np.polyval(self.correlation, offsets)
+
+    # For each muon in the batch, draw injection times and kinematics variables.
+    # if self.sourceMode == "Mixture":
+    #   offsets = self.sourceTimeDistribution.draw(choices = muons)
+    #   kinematics = self.sourceKinematicsDistribution.draw(choices = muons)
+    # elif self.sourceMode == "Histogram1D":
+    #   offsets = rnp.random_sample(self.sourceTimeHistogram, muons)
+    #   kinematics = rnp.random_sample(self.sourceKinematicsHistogram, muons)
+    # elif self.sourceMode == "Histogram2D":
+    #   samples = rnp.random_sample(self.sourceJointHistogram, muons)
+    #   offsets = samples[:, 0]
+    #   kinematics = samples[:, 1]
+    # else:
+    #   raise ValueError(f"Input mode '{self.sourceMode}' not recognized.")
 
     # Apply the correlation polynomial to the kinematics variables.
-    if self.sourceMode in ["Mixture", "Histogram1D"]:
-      kinematics += np.polyval(self.sourceCorrelation, offsets)
+    # if self.sourceMode in ["Mixture", "Histogram1D"]:
+    #   kinematics += np.polyval(self.sourceCorrelation, offsets)
 
-    # Convert injection times to nanoseconds.
-    if self.sourceTimeUnits == "nanoseconds":
+    # Convert injection times to microseconds.
+    if self.timeUnits == "nanoseconds":
+      offsets *= 1E-3
+    elif self.timeUnits == "microseconds":
       pass
-    elif self.sourceTimeUnits == "microseconds":
-      offsets *= 1E3
-    elif self.sourceTimeUnits == "seconds":
-      offsets *= 1E9
+    elif self.timeUnits == "seconds":
+      offsets *= 1E6
     else:
-      raise ValueError(f"Time unit '{self.sourceTimeUnits}' not recognized.")
+      raise ValueError(f"Time unit '{self.timeUnits}' not recognized.")
 
     # Center the mean injection time to zero (as a definition).
     offsets -= np.average(offsets)
 
     # Convert kinematics parameters to cyclotron frequencies.
-    if self.sourceKinematicsVariable == "frequency":
+    if self.kinematicsUnits == "frequency":
       frequencies = kinematics
-    elif self.sourceKinematicsVariable == "momentum":
+    elif self.kinematicsUnits == "momentum":
       frequencies = utilities.momentumToFrequency(kinematics)
-    elif self.sourceKinematicsVariable == "offset":
+    elif self.kinematicsUnits == "offset":
       frequencies = utilities.offsetToFrequency(kinematics)
     else:
-      raise ValueError(f"Kinematics variable '{self.sourceKinematicsVariable}' not recognized.")
+      raise ValueError(f"Kinematics variable '{self.kinematicsUnits}' not recognized.")
 
     # Mask unphysical frequencies.
     mask = (frequencies >= utilities.min["f"]) & (frequencies <= utilities.max["f"])
@@ -169,9 +205,9 @@ class Simulator:
   def simulate(
     self,
     muons,                  # number of muons
-    end = 200_000,          # end time (nanoseconds)
-    detector = 0.74,        # position of reference detector, as a fraction of turns
-    decay = "none",         # muon decay option: "exponential", "uniform", or "none"
+    end = 200,          # end time (nanoseconds)
+    detector = 0,        # position of reference detector, as a fraction of turns
+    decay = "uniform",         # muon decay option: "exponential", "uniform", or "none"
     backward = False,       # turn on/off backward signal
     normalize = True,       # turn on/off signal normalization
     batchSize = 10_000_000  # split the total number of muons into batches of this size
@@ -179,7 +215,7 @@ class Simulator:
 
     # Store simulation parameters.
     self.muons = int(muons)
-    self.end = int(end)
+    self.end = end
     self.start = 0 if not backward else -self.end
     self.detector = detector
     self.decay = decay
@@ -187,10 +223,10 @@ class Simulator:
     self.normalize = normalize
 
     # Prepare the fast rotation histogram.
-    self.signal = Histogram((self.start, self.end, 1))
+    self.signal = Histogram((self.start, self.end, 0.001))
 
     # Prepare the cyclotron frequency and injection time histograms.
-    self.frequencies = Histogram((6630, 6780, 1))
+    self.frequencies = Histogram((6630, 6780, 2))
     self.profile = Histogram((-80, 80, 1))
 
     # Prepare the joint histogram of cyclotron frequency vs. injection time.
@@ -200,7 +236,7 @@ class Simulator:
     )
 
     # Maximum number of turns up to the chosen end time.
-    self.maxTurns = self.end // (1 / utilities.max["f"] * 1E6) + 1
+    self.maxTurns = self.end // (1 / utilities.max["f"] * 1E3) + 1
     self.minTurns = -self.maxTurns if self.backward else 0
 
     # Break up the total number of muons into batches, for memory efficiency.
@@ -227,13 +263,13 @@ class Simulator:
       offsets, frequencies = self.__populate(batches[i])
       self.muons += len(frequencies)
 
-      # Update the truth-level histograms.
-      self.profile.fill(offsets)
+      # Update the truth-level histograms (injection times in nanoseconds).
+      self.profile.fill(offsets * 1E3)
       self.frequencies.fill(frequencies)
-      self.joint.fill(offsets, frequencies)
+      self.joint.fill(offsets * 1E3, frequencies)
 
-      # Calculate the cyclotron periods, in nanoseconds.
-      periods = utilities.frequencyToPeriod(frequencies)
+      # Calculate the cyclotron periods, in microseconds.
+      periods = utilities.frequencyToPeriod(frequencies) * 1E-3
 
       if decay == "exponential":
 
@@ -299,42 +335,45 @@ class Simulator:
   def save(self):
 
     # Save the toy-model source distributions in custom NumPy-oriented format.
-    if self.sourceMode == "Mixture":
+    # if self.sourceMode == "Mixture":
+    #
+    #   self.sourceKinematicsDistribution.save(f"{self.directory}/numpy/sourceKinematicsDistribution")
+    #   self.sourceTimeDistribution.save(f"{self.directory}/numpy/sourceTimeDistribution")
+    #   np.savez(f"{self.directory}/numpy/sourceCorrelation", sourceCorrelation = self.sourceCorrelation)
+    #
+    # # Save the source distributions in ROOT format.
+    # else:
+    #
+    #   # Open a ROOT file to contain the source information.
+    #   sourceFile = root.TFile(f"{self.directory}/source.root", "RECREATE")
+    #
+    #   if self.sourceMode == "Histogram1D":
+    #
+    #     # Write the kinematics and injection time histograms.
+    #     self.sourceKinematicsHistogram.Write()
+    #     self.sourceTimeHistogram.Write()
+    #
+    #     # Write the correlation polynomial coefficients as entries in a single-branched TTree.
+    #     rnp.array2tree(
+    #       np.array(self.sourceCorrelation, dtype = [("sourceCorrelation", np.float32)]),
+    #       name = "sourceCorrelation"
+    #     ).Write()
+    #
+    #   else:
+    #
+    #     # Write the joint kinematics and injection time histogram.
+    #     self.sourceJointHistogram.Write()
+    #
+    #   sourceFile.Close()
 
-      self.sourceKinematicsDistribution.save(f"{self.directory}/numpy/sourceKinematicsDistribution")
-      self.sourceTimeDistribution.save(f"{self.directory}/numpy/sourceTimeDistribution")
-      np.savez(f"{self.directory}/numpy/sourceCorrelation", sourceCorrelation = self.sourceCorrelation)
-
-    # Save the source distributions in ROOT format.
-    else:
-
-      # Open a ROOT file to contain the source information.
-      sourceFile = root.TFile(f"{self.directory}/source.root", "RECREATE")
-
-      if self.sourceMode == "Histogram1D":
-
-        # Write the kinematics and injection time histograms.
-        self.sourceKinematicsHistogram.Write()
-        self.sourceTimeHistogram.Write()
-
-        # Write the correlation polynomial coefficients as entries in a single-branched TTree.
-        rnp.array2tree(
-          np.array(self.sourceCorrelation, dtype = [("sourceCorrelation", np.float32)]),
-          name = "sourceCorrelation"
-        ).Write()
-
-      else:
-
-        # Write the joint kinematics and injection time histogram.
-        self.sourceJointHistogram.Write()
-
-      sourceFile.Close()
-
-    # Save simulation histograms in NumPy formats.
-    self.frequencies.save(f"{self.directory}/numpy/frequencies")
-    self.profile.save(f"{self.directory}/numpy/profile")
-    self.joint.save(f"{self.directory}/numpy/joint")
-    self.signal.save(f"{self.directory}/numpy/signal")
+    # Save simulation histograms in NumPy format.
+    np.savez(
+      f"{self.directory}/data.npz",
+      **self.frequencies.collect("frequencies"),
+      **self.profile.collect("profile"),
+      **self.joint.collect("joint"),
+      **self.signal.collect("signal")
+    )
 
     # Prepare the truth-level radial TGraph.
     radial = root.TGraph()
@@ -352,7 +391,7 @@ class Simulator:
     self.frequencies.toRoot("frequencies", ";Cyclotron Frequency (kHz);Entries").Write()
     self.profile.toRoot("profile", ";Injection Time (ns);Entries").Write()
     self.joint.toRoot("joint", ";Injection Time (ns);Cyclotron Frequency (kHz)").Write()
-    self.signal.toRoot("signal", ";Time (us);Arbitrary Units", xRescale = 1E-3).Write()
+    self.signal.toRoot("signal", ";Time (us);Arbitrary Units").Write()
     radial.Write()
     rootFile.Close()
 

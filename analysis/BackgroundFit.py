@@ -6,6 +6,7 @@ import scipy.linalg
 import matplotlib.pyplot as plt
 import matplotlib.text
 
+from gm2fr.analysis.BackgroundModels import *
 import gm2fr.utilities as util
 import gm2fr.style as style
 style.setStyle()
@@ -18,7 +19,6 @@ class BackgroundFit:
   # ============================================================================
 
   # Constructor.
-  # TODO: accept specific arguments, including cov and invCov.
   def __init__(
     self,
     # The Transform object whose background will be fit.
@@ -49,31 +49,10 @@ class BackgroundFit:
     self.x = self.frequency[transform.unphysical]
     self.y = self.signal[transform.unphysical]
 
-    # Fit results.
-    self.model = transform.bgModel
-    self.pOpt = None
-    self.pCov = None
-    self.result = np.zeros(len(self.frequency))
-
-    # Fit result details.
-    self.sse = None
-    self.chi2 = None
-    self.ndf = None
-    self.chi2ndf = None
-    self.residuals = None
-    self.spread = None
-    self.pval = None
-
     # The covariance matrix, its inverse, the variance, and correlation matrix.
     self.cov = cov
     if self.cov is None:
       self.cov = np.diag(np.ones(len(self.frequency)))
-
-    # eigenvalues, eigenvectors = np.linalg.eig(self.cov)
-    # if (eigenvalues < 0).any():
-    #   print("Fixing...")
-    #   eigenvalues = np.real(np.maximum(eigenvalues, 1E-10))
-    #   self.cov = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
 
     # Extract the variance.
     self.var = np.diag(self.cov)
@@ -82,209 +61,88 @@ class BackgroundFit:
     norm = np.diag(1 / np.sqrt(self.var))
     self.corr = norm @ self.cov @ norm
 
-    # Map from model names to functions.
-    self.modelFunctions = {
-      "constant": self.constant,
-      "parabola": self.parabola,
-      "sinc": self.sinc,
-      "error": self.error
-    }
+    if transform.bgModel == "constant":
+      self.model = Polynomial(0)
+    elif transform.bgModel == "parabola":
+      self.model = Polynomial(2)
+    elif transform.bgModel == "sinc":
+      self.model = Sinc(np.min(self.signal), self.start - self.t0)
+    elif transform.bgModel == "error":
+      self.model = Error(np.min(self.signal), self.start - self.t0)
+    else:
+      self.model = None
 
-    # Map from model names to initial parameter guesses.
-    self.modelSeeds = {
-      "constant": [np.min(self.signal)],
-      "parabola": [1, 6703, np.min(self.signal)],
-      "sinc": [np.min(self.signal), 6703, None],
-      "error": [np.min(self.signal), 6703, 12]#, None]
-    }
-
-    # Map from model names to parameter bounds of the form ([lower], [upper]).
-    self.modelBounds = {
-      "constant": (
-        [-np.inf],
-        [0]
-      ),
-      "parabola": (
-        [0,      util.min["f"], -np.inf],
-        [np.inf, util.max["f"], 0 ]
-      ),
-      "sinc": (
-        [-np.inf, util.min["f"], 0     ],
-        [0,       util.max["f"], np.inf]
-      ),
-      "error": (
-        [-np.inf, util.min["f"], 0     ],#,  0  ],
-        [0,       util.max["f"], np.inf]#, 0.2]
-      )
-    }
-
-    # The chosen fit function, parameter seeds, and parameter bounds.
-    self.function = self.modelFunctions[self.model]
-    self.pSeeds = self.modelSeeds[self.model]
-    self.pBounds = self.modelBounds[self.model]
-
-    # Add the end-time wiggle function to the background model.
     if wiggle:
-      self.function = lambda f, *p: self.modelFunctions[self.model](f, *p) + self.wiggle(f)
+      self.y -= self.wiggle(self.x)
 
-    # Get the start time gap size, for help setting initial seeds.
-    kHz_us = 1E-3
-    gap = (transform.start - transform.t0) * kHz_us
-
-    # Update some of the initial seeds based on the mathematical expectation.
-    if self.model == "sinc":
-      self.pSeeds[2] = 1 / (2 * np.pi * gap)
-      self.pBounds[0][2] = 0.90 * self.pSeeds[2]
-      self.pBounds[1][2] = 1.10 * self.pSeeds[2]
-
-    self.results = []
-
-  # ============================================================================
-
-  # Constant fit function.
-  def constant(self, f, a):
-    return a
-
-  # ============================================================================
-
-  # Parabolic fit function.
-  def parabola(self, f, a, b, c):
-    return (f - b)**2 / a + c
-
-  # ============================================================================
-
-  # Sinc fit function.
-  def sinc(self, f, a, fc, s):
-    # np.sinc == sin(pi*x)/(pi*x), so remove the factor of pi first.
-    return a * np.sinc(1/np.pi * (f-fc)/s)
-
-  # ============================================================================
-
-  # Error fit function.
-  def error(self, f, a, fc, s):#, b):
-
-    b = np.pi * (self.start - self.t0) * 1E-3
-    result =  a * np.exp(-(s*b)**2) * np.imag(np.exp(-2j*(f-fc)*b) * sp.dawsn(-(f-fc)/s+1j*s*b))
-
-    # This function often misbehaves while exploring parameter space.
-    # Specifically, both np.exp(...) and np.imag(...) can blow up, but are supposed to (partially) cancel.
-    # But it doesn't work out numerically, and we just get np.inf or np.nan.
-    # I'd like an elegant solution to this problem, but for now just catch these errors.
-    if (np.isinf(result)).any() or (np.isnan(result)).any():
-      return a
-
-    return result
+  def results(self):
+    return self.model.results(prefix = "bg")
 
   # ============================================================================
 
   # Frequency oversampling wiggle.
   def wiggle(self, f):#, a):
-    return 1E3 / (2*np.pi*f*1E-3) * np.sin(2*np.pi*f*(self.end - self.t0)*1E-3)
+    # return 1E3 / (2*np.pi*f*1E-3) * np.sin(2*np.pi*f*(self.end - self.t0)*1E-3)
+    return 1E3 / (2*np.pi*f*1E-3) * (np.sin(2*np.pi*f*(self.end-self.t0)*1E-3) - np.sin(2*np.pi*f*(self.start-self.t0)*1E-3))
 
   # ============================================================================
 
   # Perform the background fit.
   def fit(self):
 
-    # Perform the fit.
-    self.pOpt, self.pCov = opt.curve_fit(
-      self.function,
-      self.x,
-      self.y,
-      p0 = self.pSeeds,
-      # bounds = self.pBounds,
-      sigma = self.cov,
-      absolute_sigma = True,
-      maxfev = 100_000
-    )
-
-    # Evaluate the background curve over the full transform.
-    self.result = self.function(self.frequency, *self.pOpt)
-
-    # Calculate the residuals in the fit region, and everywhere.
-    self.residuals = self.y - self.function(self.x, *self.pOpt)
-
-    # Calculate the one-sigma spread in fit residuals.
-    self.spread = np.std(self.residuals)
-
-    # Calculate the chi-squared.
-    self.ndf = len(self.x) - len(self.pOpt)
-    self.chi2 = self.residuals.T @ np.linalg.solve(self.cov, self.residuals)
-    self.chi2ndf = self.chi2 / self.ndf
-
-    # Calculate the two-sided p-value for this chi2 & ndf.
-    self.pval = util.pval(self.chi2, self.ndf)
-
-    # TODO: add debug print statements here, displaying everything
-    print([f"{p:.4f}" for p in self.pOpt])
-
-    # Append each key result as a (name, value) pair to the results list.
-    self.results.append(("bg_chi2", self.chi2))
-    self.results.append(("bg_ndf", self.ndf))
-    self.results.append(("bg_chi2ndf", self.chi2ndf))
-    self.results.append(("bg_pval", self.pval))
-    for i, parameter in enumerate(self.pOpt):
-      self.results.append((f"bg_p{i}", parameter))
+    # self.model.fit(self.x, self.y - self.wiggle(self.x), self.cov)
+    self.model.fit(self.x, self.y, self.cov)
+    self.result = self.model.eval(self.frequency)
+    # self.results = self.model.results(prefix = "bg")
+    # print(self.model.pOpt)
 
   # ============================================================================
 
   # Return the background-subtracted transform.
   def subtract(self):
-    return self.signal - self.result
+    return self.signal - self.result - self.wiggle(self.frequency)
 
   # ============================================================================
 
   # Plot this background fit.
-  # TODO: add text label annotation (incl. list of lines) to style file
-  def plot(
-    self,
-    # Path to desired output file.
-    output = None,
-    # Assume plot objects exist already in plt.gca(), and update them for speed.
-    update = False
-  ):
+  def plot(self, output = None):
 
-    # Make a text label for t0.
-    label = f"$t_0 = {self.t0*1000:.4f}$ ns"
+    # Plot the background and fit.
+    self.model.plot(
+      x = self.frequency,
+      dataLabel = "Background",
+      fitLabel = "Background Fit"
+    )
 
-    # Make a plot from scratch.
-    if not update:
+    # Plot the central (non-background) region of the transform.
+    style.errorbar(
+      self.frequency[self.transform.physical],
+      self.signal[self.transform.physical] - self.wiggle(self.frequency[self.transform.physical]),
+      None,
+      fmt = "o-",
+      label = "Cosine Transform"
+    )
 
-      # Plot the transform, background points, and background fit.
-      plt.plot(self.frequency, self.signal, 'o-', label = "Cosine Transform")
-      plt.plot(self.x, self.y, 'ko', label = "Background")
-      plt.plot(self.frequency, self.result, 'g', label = "Background Fit")
+    # Annotate the t_0 value and fit quality.
+    style.databox(
+      ("t_0", self.t0*1000, None, "ns"),
+      (r"\chi^2/\mathrm{ndf}", self.model.chi2ndf, None, None),
+      ("p", self.model.pval, None, None)
+    )
 
-      # Display the t0 label.
-      plt.text(0.04, 0.95, label, ha = "left", va = "top", transform = plt.gca().transAxes)
+    # Make the axis labels and legend.
+    style.xlabel("Frequency (kHz)")
+    style.ylabel("Arbitrary Units")
+    plt.legend()
 
-      # Make the axis labels and legend.
-      style.xlabel("Frequency (kHz)")
-      style.ylabel("Arbitrary Units")
-      plt.legend()
-
-      # Save to disk and clear the figure, if specified.
-      if output is not None:
-        plt.savefig(output)
-        plt.clf()
-
-    # Update the existing plot objects for speed, assuming the above order.
-    else:
-
-      # Update the transform, background points, and background fit.
-      plt.gca().lines[0].set_ydata(self.signal)
-      plt.gca().lines[1].set_ydata(self.y)
-      plt.gca().lines[2].set_ydata(self.result)
-
-      # Update the t0 label.
-      plt.gca().findobj(matplotlib.text.Text)[0].set_text(label)
-
-      # Rescale the y-axis.
-      plt.gca().relim()
-      plt.gca().autoscale()
+    # Save to disk and clear the figure, if specified.
+    if output is not None:
+      plt.savefig(output)
+      plt.clf()
 
   # ============================================================================
 
+  # Plot the correlation matrix for the background fit.
   def plotCorrelation(self, output):
 
     style.imshow(

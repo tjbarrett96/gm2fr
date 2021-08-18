@@ -2,6 +2,15 @@ import numpy as np
 import pandas as pd
 import scipy.stats
 
+import os
+import gm2fr
+import matplotlib.pyplot as plt
+import gm2fr.style as style
+
+# ==============================================================================
+
+path = os.path.dirname(gm2fr.__file__)
+
 # ==============================================================================
 
 # Speed of light (m/s).
@@ -13,9 +22,8 @@ a_mu = 11659208.9E-10
 # Muon charge (C).
 q_mu = 1.602176565E-19
 
-# Mean muon lifetime at rest (ns).
-# TODO: convert this to microseconds. probably also requires making the simulation code all in terms of microseconds... should be done anyway.
-lifetime = 2.1969811E3
+# Mean muon lifetime at rest (us).
+lifetime = 2.1969811
 
 # Mass conversion factor from GeV to kg.
 GeV_to_kg = 1E9 * q_mu / c**2
@@ -29,11 +37,13 @@ m_mu_kg = m_mu_GeV * GeV_to_kg
 # Nominal dipole magnetic field (T).
 b = 1.4513
 
+kHz_us = 1E-3
+
 # ==============================================================================
 
 magic = {
   "x": 0,
-  "dp/p0": 0,
+  "dp_p0": 0,
   "c_e": 0,
   "gamma": np.sqrt(1 / a_mu + 1)
 }
@@ -137,8 +147,8 @@ max["gamma"] = frequencyToGamma(min["f"])
 min["p"] = radiusToMomentum(min["r"])
 max["p"] = radiusToMomentum(max["r"])
 
-min["dp/p0"] = momentumToOffset(min["p"]) * 100
-max["dp/p0"] = momentumToOffset(max["p"]) * 100
+min["dp_p0"] = momentumToOffset(min["p"]) * 100
+max["dp_p0"] = momentumToOffset(max["p"]) * 100
 
 min["tau"] = min["gamma"] * lifetime * 1E-3
 max["tau"] = max["gamma"] * lifetime * 1E-3
@@ -193,7 +203,7 @@ labels = {
     "file": "lifetime"
   },
 
-  "dp/p0": {
+  "dp_p0": {
     "math": r"\delta p/p_0",
     "units": r"\%",
     "plot": "Fractional Momentum Offset",
@@ -351,18 +361,63 @@ def fft(time, data):
 
 # ==============================================================================
 
-# Correlation weight factors from a joint distribution of injection time and cyclotron frequency.
-def weights(times, frequencies, heights):
+# Plot an FFT of the raw positron signal.
+def plotFFT(t, y, output):
 
-  weights = np.zeros(len(frequencies))
+  # Calculate the FFT magnitude.
+  f, transform = fft(t, y)
+  mag = np.abs(transform)
 
-  for i in range(len(frequencies)):
-    if np.sum(heights[:, i]) > 0:
-      weights[i] = np.average(
-        np.cos(2 * np.pi * (frequencies[i] * 1E3) * (times * 1E-9)),
-        weights = heights[:, i]
-      )
-    else:
-      weights[i] = 1
+  # Plot the FFT magnitude.
+  plt.plot(f, mag)
 
-  return weights
+  # Axis labels.
+  style.xlabel("Frequency (kHz)")
+  style.ylabel("Arbitrary Units")
+
+  # Use a logarithmic vertical scale, and set the limits appropriately.
+  plt.yscale("log")
+  plt.xlim(0, 8000)
+  plt.ylim(np.min(mag[(f < 8000)]), None)
+
+  # Save and clear.
+  plt.savefig(output)
+  plt.clf()
+
+# ==============================================================================
+
+# s(omega)
+def sine(f, ts, tm, t0):
+  return (np.cos(2*np.pi*f*(tm - t0)*kHz_us) - np.cos(2*np.pi*f*(ts - t0)*kHz_us)) / (2*np.pi*f)
+
+# c(omega)
+def cosine(f, ts, tm, t0):
+  return (np.cos(2*np.pi*f*(tm - t0)*kHz_us) - np.cos(2*np.pi*f*(ts - t0)*kHz_us)) / (2*np.pi*f)
+
+# A(omega)
+# TODO: add errorbars
+def A(f, tau, rho, t0):
+  mask = (np.sum(rho, axis = 1) == 0)
+  weights = rho.copy()
+  weights[mask] = 1
+  result = np.average(
+    np.cos(2*np.pi*np.outer(f, tau - t0)*kHz_us),
+    axis = 1,
+    weights = weights
+  )
+  result[mask] = 0
+  return result
+
+# B(omega)
+# TODO: add errorbars
+def B(f, tau, rho, t0):
+  mask = (np.sum(rho, axis = 1) == 0)
+  weights = rho.copy()
+  weights[mask] = 1
+  result = np.average(
+    np.sin(2*np.pi*np.outer(f, tau - t0)*kHz_us),
+    axis = 1,
+    weights = weights
+  )
+  result[mask] = 0
+  return result

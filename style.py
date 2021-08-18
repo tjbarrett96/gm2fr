@@ -16,15 +16,15 @@ def setStyle(latex = False):
 
   # Font options.
   size = 16 if latex else 14
-  plt.rcParams["font.size"] = size * 0.85
+  plt.rcParams["font.size"] = size * 0.75
   plt.rcParams["axes.labelsize"] = size
   plt.rcParams["axes.titlesize"] = size
   plt.rcParams["xtick.labelsize"] = size
   plt.rcParams["ytick.labelsize"] = size
-  plt.rcParams["legend.fontsize"] = size * 0.85
+  plt.rcParams["legend.fontsize"] = size * 0.75
 
   # Rules for switching to scientific notation in axis tick labels.
-  plt.rcParams["axes.formatter.limits"] = (-4, 4)
+  plt.rcParams["axes.formatter.limits"] = (-4, 5)
   plt.rcParams["axes.formatter.use_mathtext"] = True
 
   # Marker and line options.
@@ -100,7 +100,7 @@ def colorbar(
 # ==============================================================================
 
 # Override plt.errorbar with automatic formatting.
-def errorbar(x, y, yErr, xErr = None, fmt = "o", ms = 4, **kwargs):
+def errorbar(x, y, yErr, xErr = None, fmt = "o", ms = 3, **kwargs):
 
   return plt.errorbar(
     x,
@@ -134,7 +134,7 @@ def databox(*args, left = True):
     string = ""
     for arg in args:
       string += f"${arg[0]}$ = {arg[1]:.4f}"
-      string += f" +/- {arg[2]:.4f}" if arg[2] is not None else ""
+      string += fr" $\pm$ {arg[2]:.4f}" if arg[2] is not None else ""
       string += f" {arg[3]}" if arg[3] is not None else ""
       string += "\n"
 

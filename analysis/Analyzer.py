@@ -1,10 +1,17 @@
 import numpy as np
 import numpy.lib.recfunctions as rec
+import matplotlib.pyplot as plt
 
 import gm2fr.utilities as util
+import gm2fr.style as style
 import gm2fr.analysis.FastRotation as fr
 import gm2fr.analysis.Transform as tr
 from gm2fr.simulation.histogram import Histogram
+from gm2fr.analysis.Optimizer import Optimizer
+from gm2fr.analysis.Results import Results
+
+import ROOT as root
+import root_numpy as rnp
 
 # Filesystem management.
 import os
@@ -17,7 +24,6 @@ import re
 # ==============================================================================
 
 # Organizes input/output for the fast rotation analysis.
-# TODO: let this class handle saving plots (pass them back here to save), so it can do PDFPages for scan results
 class Analyzer:
 
   # ============================================================================
@@ -90,8 +96,8 @@ class Analyzer:
     self.output = None
 
     # The current (structured) NumPy array of results.
-    self.results = None
-    self.groupResults = None
+    self.results = Results()
+    self.groupResults = Results() if self.group is not None else None
 
     # Get the path to the gm2fr/analysis/results directory.
     self.parent = os.path.dirname(gm2fr.analysis.__file__) + "/results"
@@ -125,30 +131,33 @@ class Analyzer:
         self.output = f"{self.parent}/{tag}"
 
       # If the output directory already exists, clear its contents.
-      if os.path.isdir(self.output):
+      # if os.path.isdir(self.output):
+      #
+      #   # Make sure the contents are consistent with an analysis directory.
+      #   subdirectories = [f.name for f in os.scandir(self.output) if f.is_dir()]
+      #   for subdir in subdirectories:
+      #     if subdir not in ["background", "signal"]:
+      #       raise RuntimeError((
+      #         "\nExisting output directory has unexpected structure."
+      #         "\nFor safety, will not delete/overwrite."
+      #       ))
+      #
+      #   # If the contents are normal, clear everything inside.
+      #   shutil.rmtree(self.output)
 
-        # Make sure the contents are consistent with an analysis directory.
-        subdirectories = [f.name for f in os.scandir(self.output) if f.is_dir()]
-        for subdir in subdirectories:
-          if subdir not in ["background", "signal"]:
-            raise RuntimeError((
-              "\nExisting output directory has unexpected structure."
-              "\nFor safety, will not delete/overwrite."
-            ))
+      def makeIfAbsent(path):
+        if not os.path.isdir(path):
+          print(f"\nCreating output directory '{path}'.")
+          os.mkdir(path)
 
-        # If the contents are normal, clear everything inside.
-        shutil.rmtree(self.output)
-
-      # Make the output directory.
-      print(f"\nCreating output directory '{tag}'.")
-      os.mkdir(self.output)
-
-      # Make the background and signal subdirectories.
-      os.mkdir(f"{self.output}/background")
-      os.mkdir(f"{self.output}/signal")
+      # Make the output directories, if they don't already exist.
+      makeIfAbsent(self.output)
+      makeIfAbsent(f"{self.output}/background")
+      makeIfAbsent(f"{self.output}/signal")
 
   # ============================================================================
 
+  # TODO: fit gaussian for one period after start time, extrapolate mean back nearest to zero for t0 seed
   def analyze(
     self,
     # Wiggle fit model. Options: None / "two" / "five" / "nine".
@@ -170,14 +179,14 @@ class Analyzer:
     # +/- range (in us) for the initial coarse t0 scan range.
     coarseRange = 0.020,
     # Step size (in us) for the initial coarse t0 scan range.
-    coarseStep = 0.0005,
+    coarseStep = 0.002,
     # +/- range (in us) for the subsequent fine t0 scan ranges.
     fineRange = 0.0005,
     # Step size (in us) for the subsequent fine t0 scan ranges.
-    fineStep = 0.000025,
+    fineStep = 0.00005,
     # Plotting option. 0 = nothing, 1 = main results, 2 = more details (slower).
     plots = 1,
-    # Optional true frequency distribution heights.
+    # Optional "data.npz" file from toy Monte Carlo simulation.
     truth = None
   ):
 
@@ -193,12 +202,30 @@ class Analyzer:
     groupIndex = 0
     for input, tag in zip(self.input, self.tags):
 
+      # Load the truth-level data for Toy MC, if supplied.
+      truth_results = None
+      if truth is not None:
+        if type(truth) is str:
+          if truth == "same":
+            truth = input
+
+          truth_joint = Histogram.load(truth, "joint")
+          truth_frequency = Histogram.load(truth, "frequencies")
+
+          ref = tr.Transform(None, n = n)
+          ref.signal = truth_frequency.heights
+          ref.frequency = truth_frequency.xCenters
+          ref.df = ref.frequency[1] - ref.frequency[0]
+          ref.cov = np.diag(truth_frequency.errors**2)
+          ref.setup()
+
+          truth_results = ref.results(parameters = False)
+
+        else:
+          raise ValueError("Could not load reference distribution.")
+
       # Produce the fast rotation signal.
-      if type(input) is tuple:
-        self.fastRotation = fr.FastRotation.produce(input[0], input[1], input[2], fit, n, self.units)
-      else:
-        h = Histogram.load(input)
-        self.fastRotation = fr.FastRotation(h.xCenters, h.heights, h.errors, fit, self.units, n)
+      self.fastRotation = fr.FastRotation.produce(input, fit, n, self.units)
 
       # If the fast rotation signal couldn't be produced, skip this input.
       if self.fastRotation is None:
@@ -207,6 +234,8 @@ class Analyzer:
       # Setup the output directory.
       self.setup(tag)
 
+      self.fastRotation.save(f"{self.output}/signal/signal.npz")
+
       # Plot the fast rotation signal, and wiggle fit (if present).
       if plots >= 1:
 
@@ -214,9 +243,13 @@ class Analyzer:
         self.fastRotation.plot(self.output, endTimes)
 
         if self.fastRotation.wgFit is not None:
-          self.fastRotation.wgFit.plot(self.output, endTimes[3:])
+          self.fastRotation.wgFit.plot(f"{self.output}/signal/WiggleFit.pdf")
           self.fastRotation.wgFit.plotFine(self.output, endTimes)
-          self.fastRotation.wgFit.plotFFT(self.output)
+          util.plotFFT(
+            self.fastRotation.wgFit.fineTime,
+            self.fastRotation.wgFit.fineSignal,
+            f"{self.output}/signal/RawFFT.pdf"
+          )
 
       # Zip together each parameter in the scans.
       iterations = list(itertools.product(start, end))
@@ -228,6 +261,10 @@ class Analyzer:
       i = 0
       for iStart, iEnd in iterations:
 
+        if len(iterations) > 1:
+          print("\nWorking on configuration:")
+          print(f"start = {iStart}, end = {iEnd}")
+
         # Evaluate the frequency distribution.
         self.transform = tr.Transform(
           self.fastRotation,
@@ -235,57 +272,90 @@ class Analyzer:
           iEnd,
           df,
           model,
-          coarseRange,
-          coarseStep,
-          fineRange,
-          fineStep,
-          optimize,
           t0 if type(t0) != list else t0[groupIndex],
           n
         )
 
+        fineScan = None
+        coarseScan = None
+
+        if optimize:
+
+          coarseScan = Optimizer(
+            self.transform,
+            t0 if type(t0) != list else t0[groupIndex],
+            coarseStep,
+            2*coarseRange
+          )
+          coarseScan.optimize()
+
+          fineScan = Optimizer(
+            self.transform,
+            coarseScan.t0,
+            fineStep,
+            2*fineRange
+          )
+          fineScan.optimize()
+          self.transform.t0 = fineScan.t0
+
+          if plots > 0:
+            coarseScan.plotChi2(f"{self.output}/background/coarse_scan.pdf")
+            fineScan.plotChi2(f"{self.output}/background/fine_scan.pdf")
+            fineScan.leftFit.plot(f"{self.output}/background/LeftFit.pdf")
+            fineScan.rightFit.plot(f"{self.output}/background/RightFit.pdf")
+            if plots > 1:
+              coarseScan.plotFits(f"{self.output}/background/AllFits_coarse.pdf")
+
         self.transform.process()
 
+        if truth is not None:
+
+          # Calculate and plot A(f), B(f).
+          A = util.A(truth_joint.yCenters, truth_joint.xCenters*1E-3, truth_joint.heights.T, self.transform.t0)
+          B = util.B(truth_joint.yCenters, truth_joint.xCenters*1E-3, truth_joint.heights.T, self.transform.t0)
+          plt.plot(truth_joint.yCenters, A, label = r"$A(f)$")
+          plt.plot(truth_joint.yCenters, B, label = r"$B(f)$")
+          style.xlabel("Frequency (kHz)")
+          style.ylabel("Coefficient")
+          plt.legend()
+          plt.savefig(f"{self.output}/coefficients.pdf")
+          plt.clf()
+
+          # Normalize the truth-level distribution to the same area as result.
+          area = np.sum(self.transform.signal * self.transform.df)
+          ref_area = np.sum(ref.signal * ref.df)
+          ref_scale = area / ref_area
+          ref.signal *= ref_scale
+          ref.cov *= ref_scale**2
+
+        # Determine which units to plot a distribution for.
         axesToPlot = []
         if plots > 0:
           axesToPlot = ["f", "x"]
           if plots > 1:
             axesToPlot = self.transform.axes.keys()
+
+        # Make the final distribution plots for each unit.
         for axis in axesToPlot:
+          # Plot the truth-level distribution for comparison, if present.
+          if truth is not None:
+            ref.plot(None, axis, databox = False, magic = False, label = "Truth")
           self.transform.plot(
             f"{self.output}/{util.labels[axis]['file']}.pdf",
-            axis
+            axis,
+            label = None if truth is None else "Result"
           )
 
         if plots > 0:
 
-          self.transform.plotFFT(self.output)
+          if truth is not None:
+            ref.plot(None, "f", databox = False, magic = False, label = "Truth")
           self.transform.plotMagnitude(self.output)
-
-          if optimize:
-
-            # Plot the coarse background optimization scan.
-            self.transform.plotOptimization(
-              outDir = f"{self.output}/background",
-              mode = "coarse",
-              all = True if plots > 1 else False
-            )
-
-            # Plot the fine background optimization scan.
-            self.transform.plotOptimization(
-              outDir = f"{self.output}/background",
-              mode = "fine"
-            )
-
-            # Plot the background fit with a one-sigma t0 perturbation to the left.
-            self.transform.leftFit.plot(
-              f"{self.output}/background/LeftFit.pdf"
-            )
-
-            # Plot the background fit with a one-sigma t0 perturbation to the right.
-            self.transform.rightFit.plot(
-              f"{self.output}/background/RightFit.pdf"
-            )
+          util.plotFFT(
+            self.transform.frTime,
+            self.transform.frSignal,
+            f"{self.output}/signal/FastRotationFFT.pdf"
+          )
 
           # Plot the final background fit.
           self.transform.bgFit.plot(f"{self.output}/BackgroundFit.pdf")
@@ -299,79 +369,45 @@ class Analyzer:
           self.transform.bgFit.save(f"{self.output}/background.npz")
 
         # Compile the results list of (name, value) pairs from each object.
-        resultsList = self.transform.results
+        results = self.transform.results()
         if self.transform.bgFit is not None:
-          resultsList += self.transform.bgFit.results
+          results.merge(self.transform.bgFit.results())
         if self.fastRotation.wgFit is not None:
-          resultsList += self.fastRotation.wgFit.results
+          results.merge(self.fastRotation.wgFit.results())
 
-        if truth is not None:
-          normalization = self.transform.df * np.sum(self.transform.signal)
-          difference = truth - (self.transform.signal / normalization)
-          truth_metric = difference.T @ difference
-          truth_chi2 = truth_metric / (self.transform.cov[0, 0] / normalization**2)
-          truth_chi2ndf = truth_chi2 / len(self.transform.signal)
-          resultsList += [("truth_chi2ndf", truth_chi2ndf)]
-          resultsList += [("truth_metric", truth_metric)]
+        # Add t_0 errors in quadrature with statistical errors.
+        # TODO: info box on plots needs to incorporate this
+        if fineScan is not None:
+          errors = fineScan.errors(self.transform)
+          for (axis, data) in errors.table.iteritems():
+            results.table[axis] = np.sqrt(results.table[axis]**2 + data**2)
 
-        # Initialize the results arrays, if not already done.
-        # TODO: make Results class which holds key-value list and has toArray()?
-        if self.results is None:
+        # Include the differences from the reference distribution, if provided.
+        if truth_results is not None:
+          diff_results = truth_results.copy()
+          # Set the ref_results column data to the difference from the results.
+          for (name, data) in diff_results.table.iteritems():
+            diff_results.table[name] = results.table[name] - diff_results.table[name]
+          # Change the column names with "diff" prefix.
+          diff_results.table.columns = [f"diff_{name}" for name in diff_results.table.columns]
+          results.merge(diff_results)
 
-          header = [name for name, value in resultsList]
-          self.results = np.zeros(
-            len(iterations),
-            dtype = [(name, np.float32) for name in header]
+        self.results.append(results)
+        if self.groupResults is not None:
+          self.groupResults.append(
+            results,
+            self.groupLabels[groupIndex] if not np.isnan(self.groupLabels[groupIndex]) else groupIndex
           )
-
-          if self.group is not None:
-            self.groupResults = np.zeros(
-              len(self.input) * len(iterations),
-              dtype = [("index", np.float32)] + [(name, np.float32) for name in header]
-            )
-
-        # Fill the results array.
-        for name, value in resultsList:
-
-          self.results[name][i] = value
-
-          if self.groupResults is not None:
-            self.groupResults["index"][groupIndex * len(iterations) + i] = self.groupLabels[groupIndex] if not np.isnan(self.groupLabels[groupIndex]) else groupIndex
-            self.groupResults[name][groupIndex * len(iterations) + i] = value
 
         i += 1
 
       # Save the results to disk.
       if self.output is not None:
-
-        # Save the results array in NumPy format.
-        np.save(f"{self.output}/results.npy", self.results)
-
-        # Save the results array as a CSV.
-        np.savetxt(
-          f"{self.output}/results.txt",
-          self.results,
-          fmt = "%16.5f",
-          header = "  ".join(f"{name:>16}" for name in self.results.dtype.names),
-          delimiter = "  ",
-          comments = ""
-        )
+        self.results.save(self.output)
 
       groupIndex += 1
 
     if self.group is not None:
-
-      # Save the results array in NumPy format.
-      np.save(f"{self.parent}/{self.group}/results.npy", self.groupResults)
-
-      # Save the results array as a CSV.
-      np.savetxt(
-        f"{self.parent}/{self.group}/results.txt",
-        self.groupResults,
-        fmt = "%16.5f",
-        header = "  ".join(f"{name:>16}" for name in self.groupResults.dtype.names),
-        delimiter = "  ",
-        comments = ""
-      )
+      self.groupResults.save(f"{self.parent}/{self.group}")
 
     print(f"\nCompleted in {time.time() - begin:.2f} seconds.")

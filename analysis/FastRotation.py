@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import time
+# import time
 import os
 
 import gm2fr.analysis.WiggleFit as wg
@@ -18,10 +18,7 @@ import root_numpy as rnp
 
 # ==============================================================================
 
-# TODO: serious cleaning up
 class FastRotation:
-
-  # ============================================================================
 
   # Constructor.
   def __init__(self, time, signal, error, fit = None, units = "us", n = 0.108):
@@ -58,50 +55,54 @@ class FastRotation:
 
   # ============================================================================
 
-  # TODO: add wiggle plots
-  # TODO: add optional pileup histogram
   @classmethod
-  def produce(cls, input, label, pileup = None, fit = "nine", n = 0.108, units = "us"):
+  def produce(cls, input, fit = "nine", n = 0.108, units = "us"):
 
-    # Create the fast rotation signal using a wiggle fit.
-    if fit is not None:
+    # Interpret the input as ROOT, with format (filename, label, pileup).
+    if type(input) is tuple:
 
-      print("\nPreparing fast rotation signal...")
-      begin = time.time()
+      rootFile = root.TFile(input[0])
+      histogram = rootFile.Get(input[1])
 
-      # Get the histograms from the file.
-      rootFile = root.TFile(input)
-      wiggle = rootFile.Get(label)
+      if input[2] is not None:
+        pileup = rootFile.Get(input[2])
+        histogram.Add(pileup, -1)
 
-      # Quit if the histogram is empty, or statistics are too low.
-      if wiggle.GetEntries() < 5E5:
+      if histogram.GetEntries() < 5E5:
         return None
 
-      # Subtract pileup, if provided.
-      if pileup is not None:
-        pileup = rootFile.Get(pileup)
-        wiggle.Add(pileup, -1)
+      signal, edges = rnp.hist2array(histogram, return_edges = True)
+      time = (edges[0][1:] + edges[0][:-1]) / 2
 
-      # Pull the finely-binned wiggle plot data.
-      wgSignal, wgEdges = rnp.hist2array(wiggle, return_edges = True)
-      wgTime = (wgEdges[0][1:] + wgEdges[0][:-1]) / 2
-      wgError = np.sqrt(np.abs(wgSignal))
-      wgError[wgError == 0] = 1
+      error = np.sqrt(np.abs(signal))
+      error[error == 0] = 1
 
-      # Close the input file.
       rootFile.Close()
 
-      if units == "ns":
-        wgTime *= 1E-3
-      elif units == "us":
-        pass
-      else:
-        raise ValueError(f"Time units '{units}' not recognized.")
+    # Interpret the input as the path to a saved Histogram object.
+    else:
+
+      histogram = Histogram.load(input, "signal")
+      signal, time, error = histogram.heights, histogram.xCenters, histogram.errors
+      # self.fastRotation = fr.FastRotation(h.xCenters, h.heights, h.errors, fit, self.units, n)
+
+    if units == "ns":
+      time *= 1E-3
+    elif units == "us":
+      pass
+    else:
+      raise ValueError(f"Time units '{units}' not recognized.")
+
+    # Create the fast rotation signal using a wiggle fit.
+    normalization = 1
+    wgFit = None
+
+    if fit is not None:
 
       # Perform the fit, using the coarsely-binned data.
       wgFit = wg.WiggleFit(
-        wgTime,
-        wgSignal,
+        time,
+        signal,
         model = fit,
         n = n
       )
@@ -109,32 +110,13 @@ class FastRotation:
 
       # Divide out the wiggle fit from the fine binning, rescaled for rebinning.
       normalization = wgFit.fineResult
-      frSignal = wgSignal / normalization
-      frError = wgError / normalization
 
-      print(f"\nFinished preparing fast rotation signal, in {(time.time() - begin):.2f} seconds.")
+      print(f"\nFinished preparing fast rotation signal.")#", in {(time.time() - begin):.2f} seconds.")
 
-      # Construct the fast rotation object
-      fr = cls(wgTime, frSignal, frError)
-      fr.wgFit = wgFit
-      return fr
-
-    # No wiggle fit; interpret the data directly as a fast rotation signal.
-    else:
-
-      # Get the fast rotation histogram from the file.
-      rootFile = root.TFile(input)
-      fastRotation = rootFile.Get(label)
-
-      # Convert to NumPy format.
-      frSignal, edges = rnp.hist2array(fastRotation, return_edges = True)
-      frTime = (edges[0][1:] + edges[0][:-1]) / 2
-
-      # TODO: Errors not currently implemented when loading data this way.
-      frError = np.ones(len(frSignal))
-
-      # Construct the fast rotation object
-      return cls(frTime, frSignal, frError)
+    # Construct the fast rotation object
+    fr = cls(time, signal / normalization, error / normalization)
+    fr.wgFit = wgFit
+    return fr
 
   # ============================================================================
 
@@ -165,3 +147,36 @@ class FastRotation:
 
       # Clear the figure.
       plt.clf()
+
+  # ============================================================================
+
+  def save(self, output, end = 300):
+
+    mask = (self.time < end)
+
+    # Save the transform and all axis units in NumPy format.
+    np.savez(
+      output,
+      time = self.time[mask],
+      signal = self.signal[mask],
+      error = self.error[mask]
+    )
+
+    # Create a ROOT histogram for the frequency distribution.
+    dt = self.time[1] - self.time[0]
+    histogram = root.TH1F(
+      "signal",
+      ";Time (#mus);Arbitrary Units",
+      len(self.time[mask]),
+      self.time[mask][0] - dt/2,
+      self.time[mask][-1] + dt/2
+    )
+
+    # Copy the signal into the histogram.
+    rnp.array2hist(self.signal[mask], histogram, errors = self.error[mask])
+
+    # Save the histogram.
+    name = output.split(".")[0]
+    outFile = root.TFile(f"{name}.root", "RECREATE")
+    histogram.Write()
+    outFile.Close()
