@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors
 import numpy as np
-import gm2fr.utilities as util
 
 # ==============================================================================
 
@@ -198,13 +197,6 @@ def imshow(
   )
   cbar = colorbar(label)
   return result, cbar
-
-# ==============================================================================
-
-# TODO
-def collimators(axis = "f"):
-  plt.axvspan(plt.xlim()[0], util.min[axis])
-  plt.axvspan(util.max[axis], plt.xlim()[-1])
 
 # ==============================================================================
 
