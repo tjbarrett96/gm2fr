@@ -1,7 +1,9 @@
 import numpy as np
 import scipy.optimize as opt
 import gm2fr.utilities as util
+from matplotlib.backends.backend_pdf import PdfPages
 
+from gm2fr.Histogram1D import Histogram1D
 from gm2fr.analysis.WiggleModels import *
 import matplotlib.pyplot as plt
 import gm2fr.style as style
@@ -15,8 +17,7 @@ class WiggleFit:
 
   def __init__(
     self,
-    time,           # time bin centers
-    signal,         # positron counts per time bin
+    signal,
     model = "five", # wiggle fit model ("two" / "five" / "nine")
     start = 30,     # fit start time (us)
     end = 650,      # fit end time (us)
@@ -24,19 +25,19 @@ class WiggleFit:
   ):
 
     # Finely-binned signal data for the fast rotation signal.
-    self.fineTime = time
-    self.fineSignal = signal
-    self.fineError = np.sqrt(np.abs(self.fineSignal))
+    self.fineSignal = signal.copy()
 
-    # Coarsely-binned signal data for the wiggle fit.
-    groups = len(self.fineTime) // 149
-    self.time = self.fineTime[:(groups * 149)].reshape((groups, 149)).mean(axis = 1)
-    self.signal = self.fineSignal[:(groups * 149)].reshape((groups, 149)).sum(axis = 1)
-    self.error = np.sqrt(np.abs(self.signal))
+    # Fit options.
+    self.start = start
+    self.end = end
+    self.n = n
+
+    self.group = int((util.magic["T"] * 1E-3) // self.fineSignal.width)
+    self.coarseSignal = self.fineSignal.copy().rebin(self.group).mask((self.start, self.end))
 
     # Ensure the errors are all non-zero.
-    self.fineError[self.fineError == 0] = 1
-    self.error[self.error == 0] = 1
+    self.fineSignal.errors[self.fineSignal.errors == 0] = 1
+    self.coarseSignal.errors[self.coarseSignal.errors == 0] = 1
 
     self.models = []
     if model == "two":
@@ -52,23 +53,9 @@ class WiggleFit:
       raise ValueError(f"Wiggle fit model '{model}' not recognized.")
     self.model = None
 
-    # Fit options.
-    self.start = start
-    self.end = end
-    self.n = n
-
-    # Fit portion of the data, with start/end mask applied.
-    mask = (self.time >= self.start) & (self.time <= self.end)
-    self.fitTime = self.time[mask]
-    self.fitSignal = self.signal[mask]
-    self.fitError = self.error[mask]
-
     # Fit results.
     self.fitResult = None
     self.fineResult = None
-
-    # Initialize the structured array of results, with column headers.
-    # self.results = []
 
   # ============================================================================
 
@@ -84,10 +71,10 @@ class WiggleFit:
       if self.model is not None:
         model.seeds[:len(self.model.pOpt)] = self.model.pOpt
 
-      model.fit(self.fitTime, self.fitSignal, self.fitError)
+      model.fit(self.coarseSignal)
 
       # Calculate the best fit and residuals.
-      self.fitResult = model.eval(self.fitTime)
+      self.fitResult = model.eval(self.coarseSignal.centers)
 
       # Status update.
       model.print()
@@ -95,13 +82,7 @@ class WiggleFit:
       self.model = model
 
     # Evaluate the finely-binned fit result.
-    self.fineResult = self.model.eval(self.fineTime) / 149
-
-    # self.model.plot(wrap = 102.5)
-    # plt.yscale("log")
-    # plt.show()
-
-    # self.results = self.model.results(prefix = "wg")
+    self.fineResult = self.model.eval(self.fineSignal) / self.group
 
 # ==============================================================================
 
@@ -114,12 +95,12 @@ class WiggleFit:
       modTime = 102.5
 
       # Calculate the indices (exclusive) at which a wrap occurs.
-      breaks = np.nonzero(np.diff(self.fitTime % modTime) < 0)[0] + 1
+      breaks = np.nonzero(np.diff(self.coarseSignal.centers % modTime) < 0)[0] + 1
 
       # Split the signal data into a list of chunks, one for each wrap.
-      times = np.split(self.fitTime, breaks)
-      signals = np.split(self.fitSignal, breaks)
-      errors = np.split(self.fitError, breaks)
+      times = np.split(self.coarseSignal.centers, breaks)
+      signals = np.split(self.coarseSignal.heights, breaks)
+      errors = np.split(self.coarseSignal.errors, breaks)
 
       # Plot each wrapped chunk of the data and fit.
       for i, (time, signal, error) in enumerate(zip(times, signals, errors)):
@@ -151,7 +132,7 @@ class WiggleFit:
     if output is not None:
 
       # Plot the signal.
-      plt.plot(self.fineTime, self.fineSignal)
+      plt.plot(self.fineSignal.centers, self.fineSignal.heights)
 
       # Label the axes.
       style.xlabel(r"Time ($\mu$s)")
@@ -159,7 +140,9 @@ class WiggleFit:
 
       # Plot the early-time contamination.
       plt.xlim(0, 5)
-      plt.savefig(f"{output}/signal/EarlyTime.pdf")
+
+      pdf = PdfPages(f"{output}/RawSignal.pdf")
+      pdf.savefig()
 
       # Save the figure over a range of time axis limits (in us).
       for end in endTimes:
@@ -168,11 +151,12 @@ class WiggleFit:
         plt.xlim(4, end)
 
         # Update the intensity limits.
-        view = self.fineSignal[(self.fineTime >= 4) & (self.fineTime <= end)]
+        view = self.fineSignal.heights[(self.fineSignal.centers >= 4) & (self.fineSignal.centers <= end)]
         plt.ylim(np.min(view), np.max(view))
 
         # Save the figure.
-        plt.savefig(f"{output}/signal/RawSignal_{end}us.pdf")
+        pdf.savefig()
 
       # Clear the figure.
       plt.clf()
+      pdf.close()

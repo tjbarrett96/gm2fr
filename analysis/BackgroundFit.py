@@ -10,6 +10,7 @@ from gm2fr.analysis.BackgroundModels import *
 import gm2fr.utilities as util
 import gm2fr.style as style
 style.setStyle()
+from gm2fr.Histogram1D import Histogram1D
 
 # ==============================================================================
 
@@ -21,69 +22,63 @@ class BackgroundFit:
   # Constructor.
   def __init__(
     self,
-    # The Transform object whose background will be fit.
     transform,
-    # The cosine transform.
-    signal,
-    # The t0 time used.
     t0,
-    # The covariance.
-    cov = None,
-    # Whether or not to include the end-time wiggle.
-    wiggle = True
+    start,
+    model
   ):
 
     # Keep a reference to the Transform object whose background we are fitting.
-    self.transform = transform
+    self.transform = transform.copy()
 
     # The cosine transform data.
-    self.frequency = transform.frequency
-    self.signal = signal.copy()
+    # self.frequency = transform.frequency
+    # self.signal = signal.copy()
 
     # Key times used in the cosine transform: start, end, and t0.
-    self.start = transform.start
-    self.end = transform.end
     self.t0 = t0
+    self.start = start
+    # self.end = transform.end
 
     # Fit data, with boundary mask applied.
-    self.x = self.frequency[transform.unphysical]
-    self.y = self.signal[transform.unphysical]
+    self.mask = util.unphysical(self.transform.centers)
+    self.x = self.transform.centers[self.mask]
+    self.y = self.transform.heights[self.mask]
 
     # The covariance matrix, its inverse, the variance, and correlation matrix.
-    self.cov = cov
-    if self.cov is None:
-      self.cov = np.diag(np.ones(len(self.frequency)))
+    self.cov = self.transform.cov if self.transform.cov.ndim == 2 else np.diag(self.transform.cov)
+    self.cov = self.cov[self.mask][:, self.mask]
 
-    # Extract the variance.
-    self.var = np.diag(self.cov)
+    # Extract the variance and normalized correlation matrix.
+    # self.var = np.diag(self.cov)
+    # norm = np.diag(1 / np.sqrt(self.var))
+    # self.corr = norm @ self.cov @ norm
 
-    # Extract the normalized correlation matrix.
-    norm = np.diag(1 / np.sqrt(self.var))
-    self.corr = norm @ self.cov @ norm
-
-    if transform.bgModel == "constant":
+    if model == "constant":
       self.model = Polynomial(0)
-    elif transform.bgModel == "parabola":
+    elif model == "parabola":
       self.model = Polynomial(2)
-    elif transform.bgModel == "sinc":
-      self.model = Sinc(np.min(self.signal), self.start - self.t0)
-    elif transform.bgModel == "error":
-      self.model = Error(np.min(self.signal), self.start - self.t0)
+    elif model == "sinc":
+      self.model = Sinc(np.min(self.transform.heights), self.start - self.t0)
+    elif model == "error":
+      self.model = Error(np.min(self.transform.heights), self.start - self.t0)
     else:
       self.model = None
 
-    if wiggle:
-      self.y -= self.wiggle(self.x)
+    # if wiggle:
+    #   self.y -= self.wiggle(self.x)
+
+    self.result = None
 
   def results(self):
     return self.model.results(prefix = "bg")
 
   # ============================================================================
 
-  # Frequency oversampling wiggle.
-  def wiggle(self, f):#, a):
-    # return 1E3 / (2*np.pi*f*1E-3) * np.sin(2*np.pi*f*(self.end - self.t0)*1E-3)
-    return 1E3 / (2*np.pi*f*1E-3) * (np.sin(2*np.pi*f*(self.end-self.t0)*1E-3) - np.sin(2*np.pi*f*(self.start-self.t0)*1E-3))
+  # Wiggle.
+  # def wiggle(self, f):#, a):
+  #   # return 1E3 / (2*np.pi*f*1E-3) * np.sin(2*np.pi*f*(self.end - self.t0)*1E-3)
+  #   return 1 / (self.transform.fr.xWidth * util.kHz_us) * util.sine(f, self.start, self.end, self.t0)
 
   # ============================================================================
 
@@ -91,8 +86,18 @@ class BackgroundFit:
   def fit(self):
 
     # self.model.fit(self.x, self.y - self.wiggle(self.x), self.cov)
-    self.model.fit(self.x, self.y, self.cov)
-    self.result = self.model.eval(self.frequency)
+    try:
+      self.model.fit(self.x, self.y, self.cov)
+    except ValueError:
+      print("\nWarning: problem with background covariance matrix. Re-trying with only variances.")
+      self.model.fit(self.x, self.y, np.sqrt(np.diag(self.cov)))
+
+    self.result = Histogram1D(
+      self.transform.edges,
+      heights = self.model.eval(self.transform.centers),
+      cov = self.model.covariance(self.transform.centers)
+    )
+    return self
     # self.results = self.model.results(prefix = "bg")
     # print(self.model.pOpt)
 
@@ -100,7 +105,7 @@ class BackgroundFit:
 
   # Return the background-subtracted transform.
   def subtract(self):
-    return self.signal - self.result - self.wiggle(self.frequency)
+    return self.transform + self.result*(-1)# - self.wiggle(self.frequency)
 
   # ============================================================================
 
@@ -109,15 +114,15 @@ class BackgroundFit:
 
     # Plot the background and fit.
     self.model.plot(
-      x = self.frequency,
+      x = self.transform.centers,
       dataLabel = "Background",
       fitLabel = "Background Fit"
     )
 
     # Plot the central (non-background) region of the transform.
     style.errorbar(
-      self.frequency[self.transform.physical],
-      self.signal[self.transform.physical] - self.wiggle(self.frequency[self.transform.physical]),
+      self.transform.centers[~self.mask],
+      self.transform.heights[~self.mask],
       None,
       fmt = "o-",
       label = "Cosine Transform"
@@ -125,7 +130,7 @@ class BackgroundFit:
 
     # Annotate the t_0 value and fit quality.
     style.databox(
-      ("t_0", self.t0*1000, None, "ns"),
+      ("t_0", self.t0 * 1E3, None, "ns"),
       (r"\chi^2/\mathrm{ndf}", self.model.chi2ndf, None, None),
       ("p", self.model.pval, None, None)
     )
@@ -143,29 +148,29 @@ class BackgroundFit:
   # ============================================================================
 
   # Plot the correlation matrix for the background fit.
-  def plotCorrelation(self, output):
-
-    style.imshow(
-      self.corr,
-      label = "Correlation",
-      vmin = -1,
-      vmax = 1
-    )
-
-    style.xlabel(f"Frequency Bin ($\Delta f = {self.transform.df}$ kHz)")
-    style.ylabel(f"Frequency Bin ($\Delta f = {self.transform.df}$ kHz)")
-
-    plt.savefig(output)
-    plt.clf()
+  # def plotCorrelation(self, output):
+  #
+  #   style.imshow(
+  #     self.corr,
+  #     label = "Correlation",
+  #     vmin = -1,
+  #     vmax = 1
+  #   )
+  #
+  #   style.xlabel(f"Frequency Bin ($\Delta f = {self.transform.width}$ kHz)")
+  #   style.ylabel(f"Frequency Bin ($\Delta f = {self.transform.width}$ kHz)")
+  #
+  #   plt.savefig(output)
+  #   plt.clf()
 
   # ============================================================================
 
   # Save this background fit in NumPy format.
-  def save(self, output = None):
-    if output is not None:
-        np.savez(
-          output,
-          frequency = self.frequency,
-          transform = self.signal,
-          fit = self.result
-        )
+  # def save(self, output = None):
+  #   if output is not None:
+  #       np.savez(
+  #         output,
+  #         frequency = self.frequency,
+  #         transform = self.signal,
+  #         fit = self.result
+  #       )

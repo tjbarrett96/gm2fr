@@ -28,7 +28,7 @@ def setStyle(latex = False):
   plt.rcParams["axes.formatter.use_mathtext"] = True
 
   # Marker and line options.
-  plt.rcParams["lines.markersize"] = 3
+  plt.rcParams["lines.markersize"] = 4
   plt.rcParams["lines.linewidth"] = 1
 
   # Draw grid.
@@ -100,7 +100,7 @@ def colorbar(
 # ==============================================================================
 
 # Override plt.errorbar with automatic formatting.
-def errorbar(x, y, yErr, xErr = None, fmt = "o", ms = 3, **kwargs):
+def errorbar(x, y, yErr, xErr = None, fmt = "o-", ms = 3, **kwargs):
 
   return plt.errorbar(
     x,
@@ -146,6 +146,28 @@ def databox(*args, left = True):
     va = "top",
     transform = plt.gca().transAxes
   )
+
+# ==============================================================================
+
+# Override plt.imshow with automatic formatting and colorbar.
+def colormesh(
+  x,
+  y,
+  heights,
+  label = None,
+  cmap = "coolwarm",
+  **kwargs
+):
+
+  result = plt.pcolormesh(
+    x,
+    y,
+    heights.T,
+    cmap = cmap,
+    **kwargs
+  )
+  cbar = colorbar(label)
+  return result, cbar
 
 # ==============================================================================
 

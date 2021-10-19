@@ -37,12 +37,12 @@ injection = GaussianMixture(
 # Choose poly. coeffs. (decreasing order) which shift the mean frequency over injection time.
 # For simple testing with no correlation, make this [0], or omit from the simulation object below.
 # e.g. correlation = [10 / 50, 0] makes a linear shift of +/- 10 kHz over +/- 50 ns.
-correlation = [10/50**2, 10/50, 0]
+correlation = [10/50**2, 0, 0]
 
 # Create the simulation object, specifying the output directory name.
 # The specified folder will be created in your current directory.
 simulation = Simulator(
-  "data/gaussian_quadratic",
+  "gaussian_quadratic",
   overwrite = True,
   kinematicsDistribution = frequency,
   timeDistribution = injection,

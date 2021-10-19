@@ -10,11 +10,12 @@ import time
 import ROOT as root
 import root_numpy as rnp
 
-import gm2fr.analysis.FastRotation
+# import gm2fr.analysis.FastRotation
 import gm2fr.analysis.Optimizer as opt
 from gm2fr.analysis.BackgroundFit import BackgroundFit
 import gm2fr.utilities as util
 from gm2fr.analysis.Results import Results
+from gm2fr.Histogram1D import Histogram1D
 
 import gm2fr.style as style
 
@@ -27,7 +28,7 @@ class Transform:
   # Constructor for the Transform object.
   def __init__(
     self,
-    # gm2fr.analysis.FastRotation object containing the signal.
+    # Histogram object containing the signal.
     fastRotation,
     # Cosine transform start time (us).
     start = 4,
@@ -47,16 +48,17 @@ class Transform:
     self.fr = fastRotation
     self.n = n
 
+    self.start, self.end = None, None
     if self.fr is not None:
       # The start and end times for the cosine transform.
-      self.start = max(start, self.fr.time[0])
-      self.end = min(end, self.fr.time[-1])
+      self.start = max(start, self.fr.centers[0])
+      self.end = min(end, self.fr.centers[-1])
 
       # Apply the selected time mask to the fast rotation data.
-      frMask = (self.fr.time >= self.start) & (self.fr.time <= self.end)
-      self.frTime = self.fr.time[frMask]
-      self.frSignal = self.fr.signal[frMask]
-      self.frError = self.fr.error[frMask]
+      frMask = (self.fr.centers >= self.start) & (self.fr.centers <= self.end)
+      self.frTime = self.fr.centers[frMask]
+      self.frSignal = self.fr.heights[frMask]
+      self.frError = self.fr.errors[frMask]
 
     # Define the frequency values for evaluating the cosine transform.
     self.df = df
@@ -173,12 +175,19 @@ class Transform:
   def transform(self, t0, sine = False):
 
     # Pass this object's instance variables to the Numba implementation.
-    return Transform.__transform(
-      self.frTime,
+    # return Transform.__transform(
+    #   self.frTime,
+    #   self.frSignal,
+    #   self.frequency,
+    #   t0,
+    #   sine
+    # )
+
+    function = np.sin if sine else np.cos
+    return np.einsum(
+      "i, ki -> k",
       self.frSignal,
-      self.frequency,
-      t0,
-      sine
+      function(2 * np.pi * np.outer(self.frequency, (self.frTime - t0)) * util.kHz_us)
     )
 
   # ============================================================================
@@ -191,25 +200,41 @@ class Transform:
     self.cov = self.covariance(self.t0)
 
     # Perform the final background fit using the covariance information.
-    self.bgFit = BackgroundFit(
-      transform = self,
-      signal = self.signal,
-      t0 = self.t0,
-      cov = self.cov[self.unphysical][:, self.unphysical]
-    )
-    self.bgFit.fit()
+    # TODO: move to Analyzer?
+    if self.bgModel is not None:
 
-    # Subtract the background.
-    self.signal = self.bgFit.subtract()
-    self.cov += self.bgFit.model.covariance(self.frequency)
+      self.bgFit = BackgroundFit(
+        transform = self,
+        signal = self.signal,
+        t0 = self.t0,
+        cov = self.cov[self.unphysical][:, self.unphysical]
+      )
+      self.bgFit.fit()
 
-    if update:
-      self.bgFit.model.print()
+      self.signal = self.bgFit.subtract()
+      self.cov += self.bgFit.model.covariance(self.frequency)
+
+      if update:
+        self.bgFit.model.print()
+
+  # ============================================================================
+
+  def copy(self):
+    result = Transform(self.fr, self.start, self.end, self.df, self.bgModel, self.t0, self.n)
+    result.frequency = self.frequency.copy()
+    result.signal = self.signal.copy()
+    result.cov = self.cov.copy()
+    result.err_t0 = self.err_t0
+    result.fft = self.fft.copy() if self.fft is not None else None
+    result.bgFit = self.bgFit
+    result.setup()
+    return result
 
   # ============================================================================
 
   def results(self, parameters = True, errors = True):
 
+    # TODO: move to Analyzer
     if parameters:
       results = {
         "start": self.start,
@@ -221,6 +246,7 @@ class Transform:
     else:
       results = {}
 
+    # TODO: move to Histogram
     for axis in self.axes.keys():
       results[axis] = self.getMean(axis)
       results[f"sig_{axis}"] = self.getWidth(axis)
@@ -234,14 +260,18 @@ class Transform:
 
   # Plot the result.
   # TODO: doesn't account for t_0 error added in Analyzer
-  def plot(self, output, axis = "f", databox = True, magic = True, label = None):
+  def plot(self, output, axis = "f", databox = True, magic = True, zero = True, label = None, ls = "o-", scale = 1):
 
     # Plot the specified distribution.
-    plt.plot(self.axes[axis][self.physical], self.signal[self.physical], 'o-', label = label)
+    plt.plot(self.axes[axis][self.physical], self.signal[self.physical] * scale, ls, label = label)
+    plt.xlim(util.min[axis], util.max[axis])
 
     # Plot the magic quantity as a vertical line.
     if magic:
       plt.axvline(util.magic[axis], ls = ":", c = "k", label = "Magic")
+
+    if zero:
+      style.yZero()
 
     # Axis labels.
     label, units = util.labels[axis]['plot'], util.labels[axis]['units']
@@ -250,17 +280,20 @@ class Transform:
 
     # Infobox containing mean and standard deviation.
     if databox:
-      style.databox(
-        (fr"\langle {util.labels[axis]['math']} \rangle",
-          self.getMean(axis),
-          self.getMeanError(axis),
-          util.labels[axis]["units"]),
-        (fr"\sigma_{{{util.labels[axis]['math']}}}",
-          self.getWidth(axis),
-          self.getWidthError(axis),
-          util.labels[axis]["units"]),
-        left = False if axis == "c_e" else True
-      )
+      try:
+        style.databox(
+          (fr"\langle {util.labels[axis]['math']} \rangle",
+            self.getMean(axis),
+            self.getMeanError(axis),
+            util.labels[axis]["units"]),
+          (fr"\sigma_{{{util.labels[axis]['math']}}}",
+            self.getWidth(axis),
+            self.getWidthError(axis),
+            util.labels[axis]["units"]),
+          left = False if axis == "c_e" else True
+        )
+      except:
+        pass
 
     # Add the legend.
     plt.legend(loc = "upper right" if axis != "c_e" else "center right")
@@ -268,16 +301,25 @@ class Transform:
     # Save to disk.
     if output is not None:
       plt.savefig(output)
-      plt.clf()
+      # plt.clf()
 
   # ============================================================================
 
-  def plotMagnitude(self, output):
+  def plotMagnitude(self, output, scale = None):
 
     # Calculate the cosine, sine, and Fourier (magnitude) transforms.
     real = self.transform(self.t0)
     imag = self.transform(self.t0, sine = True)
     mag = np.sqrt(real**2 + imag**2)
+
+    if scale is None:
+      scale = 1
+    else:
+      scale = scale / np.max(mag)
+
+    real *= scale
+    imag *= scale
+    mag *= scale
 
     # Plot the magnitude, real, and imaginary parts.
     plt.plot(self.frequency, mag, 'o-', label = "Fourier Magnitude")

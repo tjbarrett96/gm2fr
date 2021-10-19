@@ -1,7 +1,9 @@
 from gm2fr.analysis.BackgroundFit import BackgroundFit
 import gm2fr.analysis.Transform as Transform
-import gm2fr.analysis.FastRotation
+# import gm2fr.analysis.FastRotation
 from gm2fr.analysis.Results import Results
+import gm2fr.analysis.Model as model
+import gm2fr.utilities as util
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,15 +17,20 @@ class Optimizer:
 
   def __init__(
     self,
-    transform,
-    seed = 0.060,
+    fr,
+    frequencies,
+    model,
     step = 0.000025,
-    width = 0.001
+    width = 0.001,
+    seed = None
   ):
 
-    self.transform = transform
+    self.fr = fr
+    self.start = self.fr.centers[0]
+    self.frequencies = frequencies
+    self.model = model
 
-    self.seed = seed
+    self.seed = seed if seed is not None else self.getSeed()
     self.step = step
     self.width = width
 
@@ -40,23 +47,65 @@ class Optimizer:
 
   # ============================================================================
 
+  def getSeed(self, method = "average"):
+
+    # Select one cyclotron period after the transform start time.
+    mask = (self.fr.centers >= self.start) & (self.fr.centers <= self.start + util.magic["T"] * 1E-3)
+
+    # Refine the selection by taking the nearest pair of minima.
+    start = self.fr.centers[mask][np.argmin(self.fr.heights[mask])]
+    end = start + util.magic["T"] * 1E-3
+    mask = (self.fr.centers >= start) & (self.fr.centers <= end)
+
+    # Compute a naive average of the times within this turn.
+    if method == "average":
+
+      mid = np.average(self.fr.centers[mask], weights = self.fr.heights[mask])
+
+    # Fit a simple Gaussian to this turn.
+    elif method == "fit":
+
+      fit = model.Gaussian(2, (end + start) / 2, 0.025)
+      fit.fit(self.fr.centers[mask], self.fr.heights[mask], self.fr.errors[mask])
+      fit.print()
+      mid = fit.pOpt[1]
+
+    else:
+      raise ValueError(f"t0 seed estimation mode '{method}' not recognized.")
+
+    # Subtract multiples of the cyclotron period to get near t0 ~ 0.
+    periods = mid // (util.magic["T"] * 1E-3)
+    seed = mid - periods * util.magic["T"] * 1E-3
+
+    print(f"\nEstimated t0 seed using method '{method}': {seed*1E3:.2f} ns.")
+    return seed
+
+  # ============================================================================
+
   def optimize(self, index = 0):
 
     self.times = np.arange(self.seed - self.width/2, self.seed + self.width/2, self.step)
     self.fits = [None] * len(self.times)
 
-    cov = self.transform.covariance(self.seed, mask = self.transform.unphysical)
+    # Initialize the cosine transform histogram at the t0 seed.
+    transform = util.transform(self.fr, self.frequencies, t0 = self.seed)
+    # print(transform.cov)
 
     for i in range(len(self.times)):
 
-      signal = self.transform.transform(self.times[i])
+      # Update the transform in-place at the current t0, without re-estimating the covariance.
+      util.transform(self.fr, transform, t0 = self.times[i], errors = False)
 
-      self.fits[i] = BackgroundFit(self.transform, signal, self.times[i], cov)
+      self.fits[i] = BackgroundFit(transform, t0 = self.times[i], start = self.start, model = self.model)
+      # print(self.fits[i].cov)
       self.fits[i].fit()
+      # print(self.fits[i].model.pCov)
 
     minimum = min(self.fits, key = lambda fit: fit.model.chi2ndf)
     self.chi2ndf = np.array([fit.model.chi2ndf for fit in self.fits])
     optIndex = self.fits.index(minimum)
+
+    # print(self.fits[optIndex].model.pCov)
 
     # If there's no minimum sufficiently inside the scan window, try again.
     if optIndex < 2 or optIndex > len(self.times) - 3:
@@ -104,30 +153,36 @@ class Optimizer:
       rightMargin = rightTime - self.t0
       self.err_t0 = ((leftMargin + rightMargin) / 2)
 
-      self.leftTransform = Transform.Transform(
-        self.transform.fr,
-        self.transform.start,
-        self.transform.end,
-        self.transform.df,
-        self.transform.bgModel,
-        self.t0 - self.err_t0,
-        self.transform.n
-      )
-      self.leftTransform.process(update = False)
+      # self.leftTransform = Transform.Transform(
+      #   self.transform.fr,
+      #   self.transform.start,
+      #   self.transform.end,
+      #   self.transform.df,
+      #   self.transform.bgModel,
+      #   self.t0 - self.err_t0,
+      #   self.transform.n
+      # )
+      # self.leftTransform.process(update = False)
+      self.leftTransform = util.transform(self.fr, self.frequencies, self.t0 - self.err_t0)
+      self.leftFit = BackgroundFit(self.leftTransform, self.t0 - self.err_t0, self.start, self.model).fit()
+      self.leftTransform = self.leftFit.subtract()
 
-      self.rightTransform = Transform.Transform(
-        self.transform.fr,
-        self.transform.start,
-        self.transform.end,
-        self.transform.df,
-        self.transform.bgModel,
-        self.t0 + self.err_t0,
-        self.transform.n
-      )
-      self.rightTransform.process(update = False)
+      # self.rightTransform = Transform.Transform(
+      #   self.transform.fr,
+      #   self.transform.start,
+      #   self.transform.end,
+      #   self.transform.df,
+      #   self.transform.bgModel,
+      #   self.t0 + self.err_t0,
+      #   self.transform.n
+      # )
+      # self.rightTransform.process(update = False)
+      self.rightTransform = util.transform(self.fr, self.frequencies, self.t0 + self.err_t0)
+      self.rightFit = BackgroundFit(self.rightTransform, self.t0 + self.err_t0, self.start, self.model).fit()
+      self.rightTransform = self.rightFit.subtract()
 
-      self.leftFit = self.leftTransform.bgFit
-      self.rightFit = self.rightTransform.bgFit
+      # self.leftFit = self.leftTransform.bgFit
+      # self.rightFit = self.rightTransform.bgFit
 
       # Print an update, completing this round of optimization.
       print(f"\nCompleted background optimization.")
@@ -141,24 +196,26 @@ class Optimizer:
     results = {"err_t0": self.err_t0}
 
     # Propagate the uncertainty in t0 to the distribution mean and width.
-    for axis in ref.axes.keys():
+    for unit in util.frequencyTo.keys():
 
-      mean, width = ref.getMean(axis), ref.getWidth(axis)
+      conversion = util.frequencyTo[unit]
+      mean = ref.map(conversion).mean()
+      width = ref.map(conversion).std()
 
       # Find the change in the mean after +/- one-sigma shifts in t0.
-      left_mean_err = abs(mean - self.leftTransform.getMean(axis))
-      right_mean_err = abs(mean - self.rightTransform.getMean(axis))
+      left_mean_err = abs(mean - self.leftTransform.map(conversion).mean())
+      right_mean_err = abs(mean - self.rightTransform.map(conversion).mean())
 
       # Find the change in the width after +/- one-sigma shifts in t0.
-      left_width_err = abs(width - self.leftTransform.getWidth(axis))
-      right_width_err = abs(width - self.rightTransform.getWidth(axis))
+      left_width_err = abs(width - self.leftTransform.map(conversion).std())
+      right_width_err = abs(width - self.rightTransform.map(conversion).std())
 
       # Average the changes on either side of the optimal t0.
       mean_err_t0 = (left_mean_err + right_mean_err) / 2
       width_err_t0 = (left_width_err + right_width_err) / 2
 
-      results[f"err_{axis}"] = mean_err_t0
-      results[f"err_sig_{axis}"] = width_err_t0
+      results[f"err_{unit}"] = mean_err_t0
+      results[f"err_sig_{unit}"] = width_err_t0
 
     return Results(results)
 

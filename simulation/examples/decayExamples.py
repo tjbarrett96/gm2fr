@@ -17,10 +17,16 @@ import ROOT as root
 frequency = GaussianMixture([1], [6705], [10])
 injection = GaussianMixture([1], [0], [25])
 
-simulation = Simulator("exampleNoDecay", overwrite = True)
-simulation.useMixture(frequency, "frequency", injection, "nanoseconds")
+simulation = Simulator(
+  "exampleNoDecay",
+  overwrite = True,
+  kinematicsDistribution = frequency,
+  kinematicsUnits = "frequency",
+  timeDistribution = injection,
+  timeUnits = "nanoseconds"
+)
 
-simulation.simulate(muons = 1E6, decay = "none")
+simulation.simulate(muons = 1E6, decay = "none", normalize = False)
 simulation.save()
 simulation.plot()
 
@@ -30,10 +36,16 @@ simulation.plot()
 # Requires many more muons to get a smooth signal, but bin errors are more meaningful.
 # ==================================================================================================
 
-simulation = Simulator("exampleExponential", overwrite = True)
-simulation.useMixture(frequency, "frequency", injection, "nanoseconds")
+simulation = Simulator(
+  "exampleExponential",
+  overwrite = True,
+  kinematicsDistribution = frequency,
+  kinematicsUnits = "frequency",
+  timeDistribution = injection,
+  timeUnits = "nanoseconds"
+)
 
-simulation.simulate(muons = 1E7, decay = "exponential")
+simulation.simulate(muons = 1E7, decay = "exponential", normalize = False)
 simulation.save()
 simulation.plot()
 
@@ -43,9 +55,15 @@ simulation.plot()
 # Requires many more muons to get a smooth signal, but ideal choice when bin errors are important.
 # ==================================================================================================
 
-simulation = Simulator("exampleUniform", overwrite = True)
-simulation.useMixture(frequency, "frequency", injection, "nanoseconds")
+simulation = Simulator(
+  "exampleUniform",
+  overwrite = True,
+  kinematicsDistribution = frequency,
+  kinematicsUnits = "frequency",
+  timeDistribution = injection,
+  timeUnits = "nanoseconds"
+)
 
-simulation.simulate(muons = 1E7, decay = "uniform")
+simulation.simulate(muons = 1E7, decay = "uniform", normalize = False)
 simulation.save()
 simulation.plot()
