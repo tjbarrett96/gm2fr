@@ -16,19 +16,19 @@ def setStyle(latex = False):
 
   # Font options.
   size = 16 if latex else 14
-  plt.rcParams["font.size"] = size * 0.85
+  plt.rcParams["font.size"] = size * 0.75
   plt.rcParams["axes.labelsize"] = size
   plt.rcParams["axes.titlesize"] = size
   plt.rcParams["xtick.labelsize"] = size
   plt.rcParams["ytick.labelsize"] = size
-  plt.rcParams["legend.fontsize"] = size * 0.85
+  plt.rcParams["legend.fontsize"] = size * 0.75
 
   # Rules for switching to scientific notation in axis tick labels.
-  plt.rcParams["axes.formatter.limits"] = (-4, 4)
+  plt.rcParams["axes.formatter.limits"] = (-4, 5)
   plt.rcParams["axes.formatter.use_mathtext"] = True
 
   # Marker and line options.
-  plt.rcParams["lines.markersize"] = 3
+  plt.rcParams["lines.markersize"] = 4
   plt.rcParams["lines.linewidth"] = 1
 
   # Draw grid.
@@ -100,7 +100,7 @@ def colorbar(
 # ==============================================================================
 
 # Override plt.errorbar with automatic formatting.
-def errorbar(x, y, yErr, xErr = None, fmt = "o", ms = 4, **kwargs):
+def errorbar(x, y, yErr, xErr = None, fmt = "o-", ms = 3, **kwargs):
 
   return plt.errorbar(
     x,
@@ -134,7 +134,7 @@ def databox(*args, left = True):
     string = ""
     for arg in args:
       string += f"${arg[0]}$ = {arg[1]:.4f}"
-      string += f" +/- {arg[2]:.4f}" if arg[2] is not None else ""
+      string += fr" $\pm$ {arg[2]:.4f}" if arg[2] is not None else ""
       string += f" {arg[3]}" if arg[3] is not None else ""
       string += "\n"
 
@@ -146,6 +146,28 @@ def databox(*args, left = True):
     va = "top",
     transform = plt.gca().transAxes
   )
+
+# ==============================================================================
+
+# Override plt.imshow with automatic formatting and colorbar.
+def colormesh(
+  x,
+  y,
+  heights,
+  label = None,
+  cmap = "coolwarm",
+  **kwargs
+):
+
+  result = plt.pcolormesh(
+    x,
+    y,
+    heights.T,
+    cmap = cmap,
+    **kwargs
+  )
+  cbar = colorbar(label)
+  return result, cbar
 
 # ==============================================================================
 

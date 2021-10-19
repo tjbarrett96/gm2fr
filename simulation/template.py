@@ -37,25 +37,22 @@ injection = GaussianMixture(
 # Choose poly. coeffs. (decreasing order) which shift the mean frequency over injection time.
 # For simple testing with no correlation, make this [0], or omit from the simulation object below.
 # e.g. correlation = [10 / 50, 0] makes a linear shift of +/- 10 kHz over +/- 50 ns.
-correlation = [0]
+correlation = [10/50**2, 0, 0]
 
 # Create the simulation object, specifying the output directory name.
 # The specified folder will be created in your current directory.
-simulation = Simulator("data/exponential", overwrite = True)
-
-# Tell the simulation object to use the input Gaussian mixture distributions we defined above.
-# (I wrote this step separate from the creation of the simulation object above,
-# because there are multiple different input options, including ROOT files too.)
-simulation.useMixture(
-  frequency,     # GaussianMixture object for muon kinematics
-  "frequency",   # kinematics variable type: "frequency", "momentum", or "offset"
-  injection,     # GaussianMixture object for injection time
-  "nanoseconds", # injection time units: "nanoseconds", "microseconds", or "seconds"
-  correlation    # (optional) correlation polynomial coefficients; use [0] or omit this argument if not wanted
+simulation = Simulator(
+  "gaussian_quadratic",
+  overwrite = True,
+  kinematicsDistribution = frequency,
+  timeDistribution = injection,
+  kinematicsUnits = "frequency",
+  timeUnits = "nanoseconds",
+  correlation = correlation
 )
 
 # Run the simulation, using the specified number of muons.
-simulation.simulate(muons = 1E9, decay = "exponential", normalize = False)
+simulation.simulate(muons = 1E8, end = 200)
 
 # Save and plot the results.
 simulation.save()

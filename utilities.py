@@ -1,6 +1,17 @@
 import numpy as np
+import scipy.linalg as linalg
 import pandas as pd
 import scipy.stats
+
+import os
+import gm2fr
+import matplotlib.pyplot as plt
+import gm2fr.style as style
+import gm2fr.Histogram1D
+
+# ==============================================================================
+
+path = os.path.dirname(gm2fr.__file__)
 
 # ==============================================================================
 
@@ -13,9 +24,8 @@ a_mu = 11659208.9E-10
 # Muon charge (C).
 q_mu = 1.602176565E-19
 
-# Mean muon lifetime at rest (ns).
-# TODO: convert this to microseconds. probably also requires making the simulation code all in terms of microseconds... should be done anyway.
-lifetime = 2.1969811E3
+# Mean muon lifetime at rest (us).
+lifetime = 2.1969811
 
 # Mass conversion factor from GeV to kg.
 GeV_to_kg = 1E9 * q_mu / c**2
@@ -36,7 +46,7 @@ kHz_us = 1E-3
 
 magic = {
   "x": 0,
-  "dp/p0": 0,
+  "dp_p0": 0,
   "c_e": 0,
   "gamma": np.sqrt(1 / a_mu + 1)
 }
@@ -115,6 +125,19 @@ def radialOffsetToCorrection(radii, heights, n = 0.108):
 def frequencyToCorrection(frequencies, heights, n = 0.108):
   return radialOffsetToCorrection(frequencyToRadialOffset(frequencies), heights, n)
 
+frequencyTo = {
+  "f": lambda f: f,
+  "r": frequencyToRadius,
+  "x": frequencyToRadialOffset,
+  "T": frequencyToPeriod,
+  "gamma": frequencyToGamma,
+  "p": frequencyToMomentum,
+  "dp_p0": lambda f, n = 0.108: momentumToOffset(frequencyToMomentum(f, n)),
+  "tau": lambda f, n = 0.108: frequencyToGamma(f, n) * lifetime * 1E-3,
+  "beta": lambda f, n = 0.108: np.sqrt(1 - 1/frequencyToGamma(f, n)**2),
+  "c_e": lambda f, n = 0.108: 1E9 * 2 * n * (1 - n) * (magic["beta"] / magic["r"] * frequencyToRadialOffset(f))**2
+}
+
 # ==============================================================================
 
 min = {
@@ -140,14 +163,17 @@ max["gamma"] = frequencyToGamma(min["f"])
 min["p"] = radiusToMomentum(min["r"])
 max["p"] = radiusToMomentum(max["r"])
 
-min["dp/p0"] = momentumToOffset(min["p"]) * 100
-max["dp/p0"] = momentumToOffset(max["p"]) * 100
+min["dp_p0"] = momentumToOffset(min["p"]) * 100
+max["dp_p0"] = momentumToOffset(max["p"]) * 100
 
 min["tau"] = min["gamma"] * lifetime * 1E-3
 max["tau"] = max["gamma"] * lifetime * 1E-3
 
 min["beta"] = np.sqrt(1 - 1/min["gamma"]**2)
 max["beta"] = np.sqrt(1 - 1/max["gamma"]**2)
+
+min["c_e"] = 0
+max["c_e"] = None
 
 # ==============================================================================
 
@@ -157,14 +183,14 @@ labels = {
   "f": {
     "math": "f",
     "units": "kHz",
-    "plot": "Revolution Frequency",
+    "plot": "Frequency",
     "file": "frequency"
   },
 
   "T": {
     "math": "T",
     "units": "ns",
-    "plot": "Revolution Period",
+    "plot": "Period",
     "file": "period"
   },
 
@@ -196,7 +222,7 @@ labels = {
     "file": "lifetime"
   },
 
-  "dp/p0": {
+  "dp_p0": {
     "math": r"\delta p/p_0",
     "units": r"\%",
     "plot": "Fractional Momentum Offset",
@@ -354,18 +380,170 @@ def fft(time, data):
 
 # ==============================================================================
 
-# Correlation weight factors from a joint distribution of injection time and cyclotron frequency.
-def weights(times, frequencies, heights):
+# Plot an FFT of the raw positron signal.
+def plotFFT(t, y, output):
 
-  weights = np.zeros(len(frequencies))
+  # Calculate the FFT magnitude.
+  f, transform = fft(t, y)
+  mag = np.abs(transform)
 
-  for i in range(len(frequencies)):
-    if np.sum(heights[:, i]) > 0:
-      weights[i] = np.average(
-        np.cos(2 * np.pi * (frequencies[i] * 1E3) * (times * 1E-9)),
-        weights = heights[:, i]
+  # Plot the FFT magnitude.
+  plt.plot(f, mag)
+
+  # Axis labels.
+  style.xlabel("Frequency (kHz)")
+  style.ylabel("Arbitrary Units")
+
+  # Use a logarithmic vertical scale, and set the limits appropriately.
+  plt.yscale("log")
+  plt.xlim(0, 8000)
+  plt.ylim(np.min(mag[(f < 8000)]), None)
+
+  # Save and clear.
+  plt.savefig(output)
+  plt.clf()
+
+# ==============================================================================
+
+# Helper function that checks if an object matches the form of a 2-tuple (x, y).
+def isPair(obj):
+  return isinstance(obj, tuple) and len(obj) == 2
+
+# Helper function that checks if an object is an integer or float.
+def isNumber(obj):
+  return isinstance(obj, (int, float)) or isinstance(obj, np.number)
+
+# Helper function that checks if an object is an integer.
+def isInteger(obj):
+  return isinstance(obj, int) or isinstance(obj, np.integer)
+
+# Helper function that checks a boolean condition for each item in an iterable.
+def checkAll(obj, function):
+  return all(function(x) for x in obj)
+
+def isNumericPair(obj):
+  return isPair(obj) and checkAll(obj, isNumber)
+
+# Helper function that checks if an object is a d-dimensional NumPy array.
+def isArray(obj, d = None):
+  return isinstance(obj, np.ndarray) and (obj.ndim == d if d is not None else True)
+
+# Helper function that returns a mask where the given array is inside the given range.
+# def isInside(arr, range):
+#   if isNumericPair(range):
+#     if isArray(arr):
+#       return (arr >= range[0]) & (arr <= range[1])
+#     else:
+#       raise ValueError(f"Array data '{arr}' not understood.")
+#   else:
+#     raise ValueError(f"Range '{range}' not understood.")
+
+# ==============================================================================
+
+# Un-normalized sinc function, with optional scale in numerator: sin(ax)/x.
+def sinc(x, a = 1):
+  return a * np.sinc(a * x / np.pi)
+
+# s(omega)
+def sine(f, ts, tm, t0):
+  return sinc(2*np.pi*f, (tm - t0)*kHz_us) - sinc(2*np.pi*f, (ts - t0)*kHz_us)
+
+# c(omega)
+def cosine(f, ts, tm, t0):
+  # use trig identity for cos(a) - cos(b) to avoid indeterminate form
+  return -np.sin(np.pi*f*(tm + ts - 2*t0)*kHz_us) * sinc(np.pi*f, (tm-ts)*kHz_us)
+
+def physical(array, unit = "f"):
+  return (array >= min[unit]) & (array <= max[unit])
+
+def unphysical(array, unit = "f"):
+  return ~physical(array, unit)
+
+# # A(omega)
+# # TODO: add errorbars
+# def coefficient(rho, t0, function):
+#
+#   f, tau, heights, errors = rho.yCenters, rho.xCenters * 1E-3, rho.heights.T, rho.errors.T
+#   result, error = np.zeros(len(f)), np.zeros(len(f))
+#
+#   for i in range(len(f)):
+#
+#     total = np.sum(heights[i])
+#     if total == 0:
+#       result[i], error[i] = np.nan, np.nan
+#       continue
+#
+#     functionValues = function(2*np.pi*f[i]*(tau - t0)*kHz_us)
+#     result[i] = np.average(functionValues, weights = heights[i])
+#     error[i] = 1/total * np.sqrt(np.sum((functionValues - result[i])**2 * errors[i]**2))
+#
+#   return result, error
+
+def A(t, t0, f = magic["f"]):
+  return np.cos(2 * np.pi * f * (t - t0) * kHz_us)
+
+def B(t, t0, f = magic["f"]):
+  return np.sin(2 * np.pi * f * (t - t0) * kHz_us)
+
+def cosineTransform(frequency, signal, time, t0, wiggle = True):
+  result = np.einsum("i, ki -> k", signal, np.cos(2 * np.pi * np.outer(frequency, time - t0) * kHz_us))
+  if wiggle:
+    dt = time[1] - time[0]
+    return result - 1 / (dt * kHz_us) * sine(frequency, time[0], time[-1], t0)
+  else:
+    return result
+
+def sineTransform(frequency, signal, time, t0, wiggle = True):
+  result = np.einsum("i, ki -> k", signal, np.sin(2 * np.pi * np.outer(frequency, time - t0) * kHz_us))
+  if wiggle:
+    dt = time[1] - time[0]
+    return result + 1 / (dt * kHz_us) * cosine(frequency, time[0], time[-1], t0)
+  else:
+    return result
+
+def transform(signal, frequencies, t0, type = "cosine", errors = True, wiggle = True):
+
+  if isinstance(frequencies, gm2fr.Histogram1D.Histogram1D):
+    result = frequencies
+  else:
+    df = frequencies[1] - frequencies[0]
+    result = gm2fr.Histogram1D.Histogram1D(np.arange(frequencies[0] - df/2, frequencies[-1] + df, df))
+
+  differences = np.arange(result.length) * result.width
+  cov = None
+
+  # Note: to first order, cosine and sine transforms have the same covariance. (Not a typo.)
+  if type == "cosine":
+
+    heights = cosineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+    if errors:
+      cov = 0.5 * linalg.toeplitz(cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
+
+  elif type == "sine":
+
+    heights = sineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+    if errors:
+      cov = 0.5 * linalg.toeplitz(cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
+
+  elif type == "magnitude":
+
+    cosine = cosineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+    sine = sineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+
+    tempCos = linalg.toeplitz(cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
+    tempSin = linalg.toeplitz(sineTransform(differences, signal.errors**2, signal.centers, t0, False))
+
+    heights = np.sqrt(cosine**2 + sine**2)
+    if errors:
+      cov = 0.5 / np.outer(heights, heights) * (
+        (np.outer(cosine, cosine) + np.outer(sine, sine)) * tempCos \
+        + (np.outer(sine, cosine) - np.outer(cosine, sine)) * tempSin
       )
-    else:
-      weights[i] = 1
 
-  return weights
+  else:
+    raise ValueError(f"Frequency transform type '{type}' not recognized.")
+
+  result.setHeights(heights)
+  if errors:
+    result.setCov(cov)
+  return result

@@ -12,6 +12,8 @@ import ROOT as root
 # Gaussian mixture input.
 # ==================================================================================================
 
+print("Working on GaussianMixture example...")
+
 # Create a Gaussian mixture for the muon kinematics.
 # This can be cyclotron frequency (kHz), momentum (GeV), or momentum offset, specified later below.
 # This example uses cyclotron frequency.
@@ -35,16 +37,24 @@ injection = GaussianMixture(
 correlation = [10 / 50, 0]
 
 # Create the simulation object, specifying the output directory name.
-simulation = Simulator("exampleMixture", overwrite = True)
+simulation = Simulator(
+  "exampleMixture",
+  overwrite = True,
+  kinematicsDistribution = frequency,
+  kinematicsUnits = "frequency",
+  timeDistribution = injection,
+  timeUnits = "nanoseconds",
+  correlation = correlation
+)
 
 # Specify the source distributions (and optionally, correlation polynomial).
-simulation.useMixture(
-  frequency,     # GaussianMixture object for muon kinematics
-  "frequency",   # kinematics variable type: "frequency", "momentum", or "offset"
-  injection,     # GaussianMixture object for injection time
-  "nanoseconds", # injection time units: "nanoseconds", "microseconds", or "seconds"
-  correlation    # (optional) correlation polynomial coefficients
-)
+# simulation.useMixture(
+#   frequency,     # GaussianMixture object for muon kinematics
+#   "frequency",   # kinematics variable type: "frequency", "momentum", or "offset"
+#   injection,     # GaussianMixture object for injection time
+#   "nanoseconds", # injection time units: "nanoseconds", "microseconds", or "seconds"
+#   correlation    # (optional) correlation polynomial coefficients
+# )
 
 # Run, save, and plot the simulation.
 simulation.simulate(muons = 1E6)
@@ -54,6 +64,8 @@ simulation.plot()
 # ==================================================================================================
 # ROOT TH1 histogram input.
 # ==================================================================================================
+
+print("Working on TH1 example...")
 
 # Create/load the ROOT TH1 for muon kinematics.
 # This can be cyclotron frequency (kHz), momentum (GeV), or momentum offset, specified later below.
@@ -76,16 +88,24 @@ injection.FillRandom("timeFunction", 100_000)
 correlation = [-10 / 50**2, 0, 0]
 
 # Create the simulation object, specifying the output directory name.
-simulation = Simulator("exampleHistogram1D", overwrite = True)
+simulation = Simulator(
+  "exampleHistogram1D",
+  overwrite = True,
+  kinematicsDistribution = frequency,
+  kinematicsUnits = "frequency",
+  timeDistribution = injection,
+  timeUnits = "nanoseconds",
+  correlation = correlation
+)
 
 # Specify the source histograms (and optionally, correlation polynomial).
-simulation.useHistogram1D(
-  frequency,     # ROOT TH1 for muon kinematics
-  "frequency",   # kinematics variable type: "frequency", "momentum", or "offset"
-  injection,     # ROOT TH1 for injection time
-  "nanoseconds", # injection time units: "nanoseconds", "microseconds", or "seconds"
-  correlation    # (optional) correlation polynomial coefficients
-)
+# simulation.useHistogram1D(
+#   frequency,     # ROOT TH1 for muon kinematics
+#   "frequency",   # kinematics variable type: "frequency", "momentum", or "offset"
+#   injection,     # ROOT TH1 for injection time
+#   "nanoseconds", # injection time units: "nanoseconds", "microseconds", or "seconds"
+#   correlation    # (optional) correlation polynomial coefficients
+# )
 
 # Run, save, and plot the simulation.
 simulation.simulate(muons = 1E6)
@@ -95,6 +115,8 @@ simulation.plot()
 # ==================================================================================================
 # ROOT TH2 histogram input.
 # ==================================================================================================
+
+print("Working on TH2 example...")
 
 # Create/load a ROOT TH2 for the joint distribution of muon kinematics (x) and injection time (y).
 # Kinematics can be cyclotron frequency (kHz), momentum (GeV), or momentum offset.
@@ -106,16 +128,22 @@ function.SetParameters(1, 0, 25, 0, 0.0015)
 joint.FillRandom("f", 1_000_000)
 
 # Create the simulation object, specifying the output directory name.
-simulation = Simulator("exampleHistogram2D", overwrite = True)
-
-# Specify the source histogram.
-simulation.useHistogram2D(
-  joint,        # ROOT TH2 for joint distribution of injection time (x) and muon kinematics (y)
-  "offset",     # kinematics variable type: "frequency", "momentum", or "offset"
-  "nanoseconds" # injection time units: "nanoseconds", "microseconds", or "seconds"
+simulation = Simulator(
+  "exampleHistogram2D",
+  overwrite = True,
+  jointDistribution = joint,
+  kinematicsUnits = "offset",
+  timeUnits = "nanoseconds"
 )
 
+# Specify the source histogram.
+# simulation.useHistogram2D(
+#   joint,        # ROOT TH2 for joint distribution of injection time (x) and muon kinematics (y)
+#   "offset",     # kinematics variable type: "frequency", "momentum", or "offset"
+#   "nanoseconds" # injection time units: "nanoseconds", "microseconds", or "seconds"
+# )
+
 # Run, save, and plot the simulation.
-simulation.simulate(muons = 1E6)
+simulation.simulate(muons = 1E8)
 simulation.save()
 simulation.plot()
