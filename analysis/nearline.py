@@ -1,9 +1,9 @@
-from gm2fr.Analyzer import Analyzer
+from gm2fr.analysis.Analyzer import Analyzer
 import sys
 import re
 
 def run(filename, tag):
-  analyzer = Analyzer(filename, signal = "hSignalRatio", tag = tag)
+  analyzer = Analyzer(filename, signal = "signal", tags = tag)
   analyzer.analyze(fit = None, end = 150)
 
 if __name__ == "__main__":

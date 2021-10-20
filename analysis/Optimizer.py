@@ -1,9 +1,8 @@
 from gm2fr.analysis.BackgroundFit import BackgroundFit
-import gm2fr.analysis.Transform as Transform
-# import gm2fr.analysis.FastRotation
 from gm2fr.analysis.Results import Results
 import gm2fr.analysis.Model as model
 import gm2fr.utilities as util
+from gm2fr.Histogram1D import Histogram1D
 
 import numpy as np
 import matplotlib.pyplot as plt

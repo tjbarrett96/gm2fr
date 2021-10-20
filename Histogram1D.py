@@ -1,5 +1,6 @@
 import numpy as np
 import array
+import scipy.linalg as linalg
 
 import matplotlib.pyplot as plt
 import gm2fr.style as style
@@ -435,11 +436,11 @@ class Histogram1D:
   @staticmethod
   def transform(signal, frequencies, t0, type = "cosine", errors = True, wiggle = True):
 
-    if isinstance(frequencies, gm2fr.Histogram1D.Histogram1D):
+    if isinstance(frequencies, Histogram1D):
       result = frequencies
     else:
       df = frequencies[1] - frequencies[0]
-      result = gm2fr.Histogram1D.Histogram1D(np.arange(frequencies[0] - df/2, frequencies[-1] + df, df))
+      result = Histogram1D(np.arange(frequencies[0] - df/2, frequencies[-1] + df, df))
 
     differences = np.arange(result.length) * result.width
     cov = None
@@ -447,23 +448,23 @@ class Histogram1D:
     # Note: to first order, cosine and sine transforms have the same covariance. (Not a typo.)
     if type == "cosine":
 
-      heights = cosineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+      heights = util.cosineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
       if errors:
-        cov = 0.5 * linalg.toeplitz(cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
+        cov = 0.5 * linalg.toeplitz(util.cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
 
     elif type == "sine":
 
-      heights = sineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+      heights = util.sineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
       if errors:
-        cov = 0.5 * linalg.toeplitz(cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
+        cov = 0.5 * linalg.toeplitz(util.cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
 
     elif type == "magnitude":
 
-      cosine = cosineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
-      sine = sineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+      cosine = util.cosineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+      sine = util.sineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
 
-      tempCos = linalg.toeplitz(cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
-      tempSin = linalg.toeplitz(sineTransform(differences, signal.errors**2, signal.centers, t0, False))
+      tempCos = linalg.toeplitz(util.cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
+      tempSin = linalg.toeplitz(util.sineTransform(differences, signal.errors**2, signal.centers, t0, False))
 
       heights = np.sqrt(cosine**2 + sine**2)
       if errors:

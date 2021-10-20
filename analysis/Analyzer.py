@@ -6,7 +6,6 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 import gm2fr.utilities as util
 import gm2fr.style as style
-import gm2fr.analysis.Transform as tr
 from gm2fr.Histogram1D import Histogram1D
 from gm2fr.Histogram2D import Histogram2D
 from gm2fr.analysis.Optimizer import Optimizer
