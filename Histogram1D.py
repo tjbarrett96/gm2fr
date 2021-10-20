@@ -429,3 +429,53 @@ class Histogram1D:
     else:
       raise ValueError("Histogram file format not recognized.")
     return Histogram1D(edges, heights = heights, cov = cov)
+
+  # ================================================================================================
+
+  @staticmethod
+  def transform(signal, frequencies, t0, type = "cosine", errors = True, wiggle = True):
+
+    if isinstance(frequencies, gm2fr.Histogram1D.Histogram1D):
+      result = frequencies
+    else:
+      df = frequencies[1] - frequencies[0]
+      result = gm2fr.Histogram1D.Histogram1D(np.arange(frequencies[0] - df/2, frequencies[-1] + df, df))
+
+    differences = np.arange(result.length) * result.width
+    cov = None
+
+    # Note: to first order, cosine and sine transforms have the same covariance. (Not a typo.)
+    if type == "cosine":
+
+      heights = cosineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+      if errors:
+        cov = 0.5 * linalg.toeplitz(cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
+
+    elif type == "sine":
+
+      heights = sineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+      if errors:
+        cov = 0.5 * linalg.toeplitz(cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
+
+    elif type == "magnitude":
+
+      cosine = cosineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+      sine = sineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+
+      tempCos = linalg.toeplitz(cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
+      tempSin = linalg.toeplitz(sineTransform(differences, signal.errors**2, signal.centers, t0, False))
+
+      heights = np.sqrt(cosine**2 + sine**2)
+      if errors:
+        cov = 0.5 / np.outer(heights, heights) * (
+          (np.outer(cosine, cosine) + np.outer(sine, sine)) * tempCos \
+          + (np.outer(sine, cosine) - np.outer(cosine, sine)) * tempSin
+        )
+
+    else:
+      raise ValueError(f"Frequency transform type '{type}' not recognized.")
+
+    result.setHeights(heights)
+    if errors:
+      result.setCov(cov)
+    return result

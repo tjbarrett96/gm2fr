@@ -88,13 +88,13 @@ class Optimizer:
     self.fits = [None] * len(self.times)
 
     # Initialize the cosine transform histogram at the t0 seed.
-    transform = util.transform(self.fr, self.frequencies, t0 = self.seed)
+    transform = Histogram1D.transform(self.fr, self.frequencies, t0 = self.seed)
     # print(transform.cov)
 
     for i in range(len(self.times)):
 
       # Update the transform in-place at the current t0, without re-estimating the covariance.
-      util.transform(self.fr, transform, t0 = self.times[i], errors = False)
+      Histogram1D.transform(self.fr, transform, t0 = self.times[i], errors = False)
 
       self.fits[i] = BackgroundFit(transform, t0 = self.times[i], start = self.start, model = self.model)
       # print(self.fits[i].cov)
@@ -163,7 +163,7 @@ class Optimizer:
       #   self.transform.n
       # )
       # self.leftTransform.process(update = False)
-      self.leftTransform = util.transform(self.fr, self.frequencies, self.t0 - self.err_t0)
+      self.leftTransform = Histogram1D.transform(self.fr, self.frequencies, self.t0 - self.err_t0)
       self.leftFit = BackgroundFit(self.leftTransform, self.t0 - self.err_t0, self.start, self.model).fit()
       self.leftTransform = self.leftFit.subtract()
 
@@ -177,7 +177,7 @@ class Optimizer:
       #   self.transform.n
       # )
       # self.rightTransform.process(update = False)
-      self.rightTransform = util.transform(self.fr, self.frequencies, self.t0 + self.err_t0)
+      self.rightTransform = Histogram1D.transform(self.fr, self.frequencies, self.t0 + self.err_t0)
       self.rightFit = BackgroundFit(self.rightTransform, self.t0 + self.err_t0, self.start, self.model).fit()
       self.rightTransform = self.rightFit.subtract()
 

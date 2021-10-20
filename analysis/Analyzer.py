@@ -304,7 +304,7 @@ class Analyzer:
           if plots > 0:
             fineScan.plotChi2(f"{self.output}/BackgroundChi2.pdf")
 
-        self.transform = util.transform(frMask, f, opt_t0)
+        self.transform = Histogram1D.transform(frMask, f, opt_t0)
 
         self.bgFit = None
         if model is not None:
@@ -445,9 +445,9 @@ class Analyzer:
 
           if truth is not None:
             truth_frequency.plot(errors = False, label = "Truth")
-          util.transform(self.fastRotation, f, opt_t0, type = "cosine").plot()
-          util.transform(self.fastRotation, f, opt_t0, type = "sine").plot()
-          util.transform(self.fastRotation, f, opt_t0, type = "magnitude").plot()
+          Histogram1D.transform(self.fastRotation, f, opt_t0, type = "cosine").plot()
+          Histogram1D.transform(self.fastRotation, f, opt_t0, type = "sine").plot()
+          Histogram1D.transform(self.fastRotation, f, opt_t0, type = "magnitude").plot()
           plt.savefig(f"{self.output}/magnitude.pdf")
           plt.clf()
           # self.transform.plotMagnitude(self.output, scale = np.max(ref.signal) if truth is not None else 1)
