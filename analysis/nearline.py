@@ -14,9 +14,10 @@ if __name__ == "__main__":
 
   filename = sys.argv[1]
 
-  try:
-    tag = re.findall("run(\d{5})", filename)[0]
-  except:
-    tag = filename.split(".")[0]
+  runNumbers = re.findall(r"run(\d{5})", filename)
+  if len(runNumbers) == 1:
+    tag = f"Run{runNumbers[0]}"
+  else:
+    tag = re.findall(r"(\w+).root", filename)[0]
 
   run(filename, tag)
