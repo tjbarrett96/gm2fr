@@ -469,6 +469,7 @@ class Analyzer:
             # self.transform.bgFit.save(f"{self.output}/background.npz")
 
           self.transform.save(f"{self.output}/transform.npz")
+          self.transform.save(f"{self.output}/transform.root", "transform")
 
         # Compile the results list of (name, value) pairs from each object.
         results = Results({"start": iStart, "end": iEnd, "df": df, "t0": opt_t0, "err_t0": fineScan.err_t0 if fineScan is not None else 0})
