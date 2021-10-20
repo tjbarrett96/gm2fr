@@ -1,4 +1,4 @@
-import gm2fr.Analyzer as Analyzer
+from gm2fr.Analyzer import Analyzer
 import sys
 import re
 
