@@ -33,7 +33,7 @@ class WiggleFit:
     self.n = n
 
     self.group = int((util.magic["T"] * 1E-3) // self.fineSignal.width)
-    self.coarseSignal = self.fineSignal.copy().rebin(self.group).mask((self.start, self.end))
+    self.coarseSignal = self.fineSignal.copy().rebin(self.group, discard = True).mask((self.start, self.end))
 
     # Ensure the errors are all non-zero.
     self.fineSignal.errors[self.fineSignal.errors == 0] = 1

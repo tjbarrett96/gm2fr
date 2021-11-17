@@ -395,6 +395,9 @@ class Analyzer:
           truth_frequency.plot(errors = False, label = "True Distribution", scale = np.max(ref_predicted.heights) / np.max(truth_frequency.heights), ls = ":")
           ref_predicted.plot(label = "Predicted Transform")
           self.transform.plot(label = "Actual Transform")
+          style.xlabel("Frequency (kHz)")
+          style.ylabel("Arbitrary Units")
+          plt.legend()
           plt.savefig(f"{self.output}/predicted_result.pdf")
           plt.clf()
 
@@ -415,30 +418,40 @@ class Analyzer:
 
           truth_frequency.plot(label = "True Distribution", ls = ":", scale = scale * 0.5)
           transform_corr.plot(label = "Corrected Transform", ls = "--")
+          style.xlabel("Frequency (kHz)")
+          style.ylabel("Arbitrary Units")
+          plt.legend()
           plt.savefig(f"{self.output}/truth_corrected.pdf")
           plt.clf()
 
         # Determine which units to plot a distribution for.
         axesToPlot = []
         if plots > 0:
-          axesToPlot = ["f", "x"]
+          axesToPlot = ["f", "x", "dp_p0"]
           if plots > 1:
             axesToPlot = util.frequencyTo.keys()
 
         pdf = PdfPages(f"{self.output}/AllDistributions.pdf")
+        rootFile = root.TFile(f"{self.output}/transform.root", "RECREATE")
 
         # Make the final distribution plots for each unit.
         for axis in axesToPlot:
           # Plot the truth-level distribution for comparison, if present.
           if truth is not None:
             ref_predicted.plot(label = "Predicted")
-          self.transform.copy().map(util.frequencyTo[axis]).plot(
+          mapped = self.transform.copy().map(util.frequencyTo[axis])
+          mapped.toRoot(
+            f"transform_{axis}",
+            ";" + util.labels[axis]["plot"] + (f" ({util.labels[axis]['units']})" if util.labels[axis]['units'] != "" else "") + ";"
+          ).Write()
+          mapped.plot(
             label = None if truth is None else "Result"
           )
           pdf.savefig()
           plt.clf()
 
         pdf.close()
+        rootFile.Close()
 
         if plots > 0:
 
@@ -469,7 +482,7 @@ class Analyzer:
             # self.transform.bgFit.save(f"{self.output}/background.npz")
 
           self.transform.save(f"{self.output}/transform.npz")
-          self.transform.save(f"{self.output}/transform.root", "transform")
+          # self.transform.save(f"{self.output}/transform.root", "transform")
 
         # Compile the results list of (name, value) pairs from each object.
         results = Results({"start": iStart, "end": iEnd, "df": df, "t0": opt_t0, "err_t0": fineScan.err_t0 if fineScan is not None else 0})

@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors
+from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 
 # ==============================================================================
@@ -290,3 +291,6 @@ def yStats(
 
   label = f"${avg:.2f} \pm {std:.2f}$" + f" {units}" if units is not None else ""
   return line, fill, label
+
+def makePDF(path):
+  return PdfPages(path)

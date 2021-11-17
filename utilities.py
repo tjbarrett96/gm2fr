@@ -100,9 +100,9 @@ def frequencyToGamma(f, n = 0.108):
 def offsetToMomentum(dpp0):
   return (1 + dpp0) * magic["p"]
 
-# Conversion from momentum (GeV) to fractional momentum offset.
+# Conversion from momentum (GeV) to fractional momentum offset (%).
 def momentumToOffset(p):
-  return (p - magic["p"]) / magic["p"]
+  return (p - magic["p"]) / magic["p"] * 100
 
 # Conversion from fractional momentum offset to cyclotron frequency (kHz).
 def offsetToFrequency(dpp0):
@@ -180,6 +180,20 @@ max["c_e"] = None
 # String labels for each variable: math mode, units, plot axes, and filename.
 labels = {
 
+  "beta": {
+    "math": r"\beta",
+    "units": "c",
+    "plot": "Speed",
+    "file": "beta"
+  },
+
+  "r": {
+    "math": "r",
+    "units": "mm",
+    "plot": "Equilibrium Radius",
+    "file": "fullRadius"
+  },
+
   "f": {
     "math": "f",
     "units": "kHz",
@@ -197,7 +211,7 @@ labels = {
   "x": {
     "math": "x_e",
     "units": "mm",
-    "plot": "Equilibrium Radius",
+    "plot": "Equilibrium Radial Offset",
     "file": "radius"
   },
 
@@ -224,7 +238,7 @@ labels = {
 
   "dp_p0": {
     "math": r"\delta p/p_0",
-    "units": r"\%",
+    "units": "%",
     "plot": "Fractional Momentum Offset",
     "file": "offset"
   },

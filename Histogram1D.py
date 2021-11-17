@@ -105,7 +105,7 @@ class Histogram1D:
 
   # Override the *= operator to scale the bin entries in-place.
   def __imul__(self, scale):
-    if util.isNumber(scale):
+    if util.isNumber(scale) or util.isArray(scale, 1):
       self.heights *= scale
       self.cov *= abs(scale)**2
     elif isinstance(scale, Histogram1D) and (scale.edges == self.edges).all():
@@ -297,12 +297,12 @@ class Histogram1D:
     length = array.shape[axis]
     even = (length % step != 0)
     if not even and not discard:
-      raise ValueError(f"Cannot rebin {length} bins into {blocks} blocks.")
+      raise ValueError(f"Cannot rebin {length} bins into {length / step:.2f} blocks.")
 
     blocks = np.split(array, np.arange(0, length, step), axis)
     if not even and discard:
       blocks = blocks[:-1]
-    return np.concatenate([block.sum(axis) for block in blocks], axis)
+    return np.concatenate([block.sum(axis, keepdims = True) for block in blocks], axis)
 
   def updateErrors(self):
     if self.cov.ndim == 1:
@@ -318,10 +318,10 @@ class Histogram1D:
   def rebin(self, step, discard = False):
 
     if util.isInteger(step) and step > 0:
-      self.heights = Histogram.splitSum(self.heights, step, 0, discard)
-      self.cov = Histogram.splitSum(self.cov, step, 0, discard)
+      self.heights = Histogram1D.splitSum(self.heights, step, 0, discard)
+      self.cov = Histogram1D.splitSum(self.cov, step, 0, discard)
       if self.cov.ndim == 2:
-        self.cov = Histogram.splitSum(self.cov, step, 1, discard)
+        self.cov = Histogram1D.splitSum(self.cov, step, 1, discard)
       self.updateErrors()
 
       self.edges = self.edges[::step]
@@ -404,8 +404,11 @@ class Histogram1D:
   # ================================================================================================
 
   def toRoot(self, name, labels = ""):
-    histogram = root.TH1F(name, labels, self.length, array.array("f", list(self.edges)))
-    rnp.array2hist(self.heights, histogram, errors = self.errors)
+    edges = np.sort(self.edges)
+    sortedIndices = np.argsort(self.centers)
+    heights, errors = self.heights[sortedIndices], self.errors[sortedIndices]
+    histogram = root.TH1F(name, labels, self.length, array.array("f", list(edges)))
+    rnp.array2hist(heights, histogram, errors = errors)
     histogram.ResetStats()
     return histogram
 
