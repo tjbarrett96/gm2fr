@@ -218,6 +218,7 @@ class Histogram1D:
     total = np.sum(self.heights)
     if total == 0:
       return np.nan, np.nan if error else np.nan
+
     avg = np.average(self.centers, weights = self.heights)
     if not error:
       return avg

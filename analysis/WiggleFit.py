@@ -140,6 +140,7 @@ class WiggleFit:
 
       # Plot the early-time contamination.
       plt.xlim(0, 5)
+      plt.ylim(0, None)
 
       pdf = PdfPages(f"{output}/RawSignal.pdf")
       pdf.savefig()
@@ -152,7 +153,7 @@ class WiggleFit:
 
         # Update the intensity limits.
         view = self.fineSignal.heights[(self.fineSignal.centers >= 4) & (self.fineSignal.centers <= end)]
-        plt.ylim(np.min(view), np.max(view))
+        plt.ylim(0, np.max(view))
 
         # Save the figure.
         pdf.savefig()

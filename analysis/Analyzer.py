@@ -149,7 +149,7 @@ class Analyzer:
   # TODO: fit gaussian for one period after start time, extrapolate mean back nearest to zero for t0 seed
   def analyze(
     self,
-    # Wiggle fit model. Options: None / "two" / "five" / "nine".
+    # Wiggle fit model. Options: None / "two" / "five" / "nine" / "ratio".
     fit = "nine",
     # Expected quadrupole field index, to aid the nine-parameter fit.
     n = 0.108,
@@ -166,13 +166,13 @@ class Analyzer:
     # Frequency interval (kHz) for the cosine transform.
     df = 2,
     # +/- range (in us) for the initial coarse t0 scan range.
-    coarseRange = 0.020,
+    coarseRange = 0.010,
     # Step size (in us) for the initial coarse t0 scan range.
-    coarseStep = 0.002,
+    coarseStep = 0.004,
     # +/- range (in us) for the subsequent fine t0 scan ranges.
     fineRange = 0.0005,
     # Step size (in us) for the subsequent fine t0 scan ranges.
-    fineStep = 0.00005,
+    fineStep = 0.0001,
     # Plotting option. 0 = nothing, 1 = main results, 2 = more details (slower).
     plots = 1,
     # Optional "data.npz" file from toy Monte Carlo simulation.
@@ -209,24 +209,42 @@ class Analyzer:
         ref_predicted = truth_frequency.copy()
         # truth_results = truth_frequency.results()
 
+      # Try to load the fast rotation signal.
       try:
-        self.fastRotation = Histogram1D.load(file, signal)
+
+        # Create the fast rotation signal using the ratio method.
+        if fit == "ratio":
+
+          numerator = Histogram1D.load(file, f"{signal}_Num")
+          denominator = Histogram1D.load(file, f"{signal}_Den")
+          if pileup is not None:
+            try:
+              numerator.heights -= Histogram1D.load(file, f"{pileup}_Num").heights
+              denominator.heights -= Histogram1D.load(file, f"{pileup}_Den").heights
+            except:
+              print(f"\nWarning: could not load pileup histogram; continuing without pileup correction.")
+          self.fastRotation = numerator.divide(denominator, zeros = 1)
+
+        # Load the wiggle data, to be fit below.
+        else:
+
+          self.fastRotation = Histogram1D.load(file, signal)
+          if pileup is not None:
+            try:
+              self.fastRotation.heights -= Histogram1D.load(file, pileup).heights
+            except:
+              print(f"\nWarning: could not load pileup histogram; continuing without pileup correction.")
+
       except:
         print(f"\nWarning: could not load fast rotation signal; continuing to next file.")
         continue
-
-      try:
-        if pileup is not None:
-          self.fastRotation.heights -= Histogram1D.load(file, pileup).heights
-      except:
-        print(f"\nWarning: could not load pileup histogram; continuing without pileup correction.")
 
       if self.units == "ns":
         self.fastRotation.map(lambda t: t * 1E-3)
 
       # Perform the wiggle fit, and remove it from the input signal.
       wgFit = None
-      if fit is not None:
+      if fit is not None and fit != "ratio":
         wgFit = wg.WiggleFit(self.fastRotation, model = fit, n = n)
         wgFit.fit()
         self.fastRotation *= 1 / wgFit.fineResult
@@ -243,6 +261,9 @@ class Analyzer:
         self.fastRotation.plot(errors = False)
         style.xlabel(r"Time ($\mu$s)")
         style.ylabel("Arbitrary Units")
+
+        mask = (self.fastRotation.centers >= 0) & (self.fastRotation.centers <= 5)
+        plt.ylim(0, 1.05 * np.max(self.fastRotation.heights[mask]))
         plt.xlim(0, 5)
 
         pdf = PdfPages(f"{self.output}/FastRotation.pdf")
@@ -286,17 +307,10 @@ class Analyzer:
         opt_t0 = t0
         if optimize and model is not None:
 
-          coarseScan = Optimizer(frMask, f, model, 0.002, 0.020)
+          coarseScan = Optimizer(frMask, f, model, coarseStep, 2*coarseRange)
           coarseScan.optimize()
 
-          fineScan = Optimizer(
-            frMask,
-            f,
-            model,
-            fineStep,
-            2*fineRange,
-            seed = coarseScan.t0
-          )
+          fineScan = Optimizer(frMask, f, model, fineStep, 2*fineRange, seed = coarseScan.t0)
           fineScan.optimize()
           opt_t0 = fineScan.t0
 
@@ -342,10 +356,6 @@ class Analyzer:
           plt.savefig(f"{self.output}/scaled.pdf")
           plt.clf()
 
-          # Calculate the four main terms with appropriate scale factors.
-          scale = 1 / (self.fastRotation.width * util.kHz_us)
-          peak = (A * truth_frequency) * (scale * 0.5)
-
           def convolve(histogram, function):
             result = histogram.copy().clear()
             fDifferences = function(np.subtract.outer(histogram.centers, histogram.centers))
@@ -357,20 +367,12 @@ class Analyzer:
             result.updateErrors()
             return result
 
-          distortion = convolve(
-            B_rho,
-            lambda x: util.cosine(x, iStart, iEnd, opt_t0)
-          ) * (-scale * truth_frequency.width)
-
-          background = convolve(
-            A_rho,
-            lambda x: util.sinc(2*np.pi*x, (iStart - opt_t0) * util.kHz_us)
-          ) * (-scale * truth_frequency.width)
-
-          # wiggle = scale * util.sine(ref.frequency, iStart, iEnd, self.transform.t0)
-          wiggle = truth_frequency.copy().clear().setHeights(
-            scale * util.sine(truth_frequency.centers, iStart, iEnd, opt_t0)
-          )
+          # Calculate the four main terms with appropriate scale factors.
+          scale = 1 / (self.fastRotation.width * util.kHz_us)
+          peak = (A * truth_frequency) * (scale * 0.5)
+          distortion = convolve(B_rho, lambda x: util.cosine(x, iStart, iEnd, opt_t0)) * (-scale * truth_frequency.width)
+          background = convolve(A_rho, lambda x: util.sinc(2*np.pi*x, (iStart - opt_t0) * util.kHz_us)) * (-scale * truth_frequency.width)
+          wiggle = truth_frequency.copy().clear().setHeights(scale * util.sine(truth_frequency.centers, iStart, iEnd, opt_t0))
 
           # Plot the four main terms individually.
           style.yZero()
@@ -429,60 +431,12 @@ class Analyzer:
         if plots > 0:
           axesToPlot = ["f", "x", "dp_p0"]
           if plots > 1:
-            axesToPlot = util.frequencyTo.keys()
+            axesToPlot = list(util.frequencyTo.keys())
+            axesToPlot.remove("c_e")
+            axesToPlot.remove("beta")
 
         pdf = PdfPages(f"{self.output}/AllDistributions.pdf")
         rootFile = root.TFile(f"{self.output}/transform.root", "RECREATE")
-
-        # Make the final distribution plots for each unit.
-        for axis in axesToPlot:
-          # Plot the truth-level distribution for comparison, if present.
-          if truth is not None:
-            ref_predicted.plot(label = "Predicted")
-          mapped = self.transform.copy().map(util.frequencyTo[axis])
-          mapped.toRoot(
-            f"transform_{axis}",
-            ";" + util.labels[axis]["plot"] + (f" ({util.labels[axis]['units']})" if util.labels[axis]['units'] != "" else "") + ";"
-          ).Write()
-          mapped.plot(
-            label = None if truth is None else "Result"
-          )
-          pdf.savefig()
-          plt.clf()
-
-        pdf.close()
-        rootFile.Close()
-
-        if plots > 0:
-
-          if truth is not None:
-            truth_frequency.plot(errors = False, label = "Truth")
-          Histogram1D.transform(self.fastRotation, f, opt_t0, type = "cosine").plot()
-          Histogram1D.transform(self.fastRotation, f, opt_t0, type = "sine").plot()
-          Histogram1D.transform(self.fastRotation, f, opt_t0, type = "magnitude").plot()
-          plt.savefig(f"{self.output}/magnitude.pdf")
-          plt.clf()
-          # self.transform.plotMagnitude(self.output, scale = np.max(ref.signal) if truth is not None else 1)
-          util.plotFFT(
-            frMask.centers,
-            frMask.heights,
-            f"{self.output}/FastRotationFFT.pdf"
-          )
-
-          # Plot the final background fit.
-          if self.bgFit is not None:
-
-            self.bgFit.plot(f"{self.output}/BackgroundFit.pdf")
-
-            # Plot the correlation matrix among frequency bins in the background fit.
-            # self.bgFit.plotCorrelation(
-            #   f"{self.output}/BackgroundCorr.pdf"
-            # )
-
-            # self.transform.bgFit.save(f"{self.output}/background.npz")
-
-          self.transform.save(f"{self.output}/transform.npz")
-          # self.transform.save(f"{self.output}/transform.root", "transform")
 
         # Compile the results list of (name, value) pairs from each object.
         results = Results({"start": iStart, "end": iEnd, "df": df, "t0": opt_t0, "err_t0": fineScan.err_t0 if fineScan is not None else 0})
@@ -530,6 +484,65 @@ class Analyzer:
       # Save the results to disk.
       if self.output is not None:
         self.results.save(self.output)
+
+        # Make the final distribution plots for each unit.
+        for axis in axesToPlot:
+          # Plot the truth-level distribution for comparison, if present.
+          if truth is not None:
+            ref_predicted.plot(label = "Predicted")
+          mapped = self.transform.copy().map(util.frequencyTo[axis])
+          mapped.toRoot(
+            f"transform_{axis}",
+            ";" + util.labels[axis]["plot"] + (f" ({util.labels[axis]['units']})" if util.labels[axis]['units'] != "" else "") + ";"
+          ).Write()
+          mapped.plot(
+            label = None if truth is None else "Result"
+          )
+          plt.axvline(util.magic[axis], ls = ":", c = "k", label = "Magic")
+          style.yZero()
+          style.ylabel("Arbitrary Units")
+          style.xlabel(util.labels[axis]["plot"] + (f" ({util.labels[axis]['units']})" if util.labels[axis]['units'] != "" else ""))
+          style.databox(
+            (rf"\langle {util.labels[axis]['math']} \rangle", results.table[axis].iloc[0], results.table[f"err_{axis}"].iloc[0], util.labels[axis]["units"]),
+            (rf"\sigma_{{{util.labels[axis]['math']}}}", results.table[f"sig_{axis}"].iloc[0], results.table[f"err_sig_{axis}"].iloc[0], util.labels[axis]["units"])
+          )
+          plt.legend()
+          pdf.savefig()
+          plt.clf()
+
+        pdf.close()
+        rootFile.Close()
+
+        if plots > 0:
+
+          if truth is not None:
+            truth_frequency.plot(errors = False, label = "Truth")
+          Histogram1D.transform(self.fastRotation, f, opt_t0, type = "cosine").plot()
+          Histogram1D.transform(self.fastRotation, f, opt_t0, type = "sine").plot()
+          Histogram1D.transform(self.fastRotation, f, opt_t0, type = "magnitude").plot()
+          plt.savefig(f"{self.output}/magnitude.pdf")
+          plt.clf()
+          # self.transform.plotMagnitude(self.output, scale = np.max(ref.signal) if truth is not None else 1)
+          util.plotFFT(
+            frMask.centers,
+            frMask.heights,
+            f"{self.output}/FastRotationFFT.pdf"
+          )
+
+          # Plot the final background fit.
+          if self.bgFit is not None:
+
+            self.bgFit.plot(f"{self.output}/BackgroundFit.pdf")
+
+            # Plot the correlation matrix among frequency bins in the background fit.
+            # self.bgFit.plotCorrelation(
+            #   f"{self.output}/BackgroundCorr.pdf"
+            # )
+
+            # self.transform.bgFit.save(f"{self.output}/background.npz")
+
+          self.transform.save(f"{self.output}/transform.npz")
+          # self.transform.save(f"{self.output}/transform.root", "transform")
 
     if self.group is not None:
       self.groupResults.save(f"{self.parent}/{self.group}")

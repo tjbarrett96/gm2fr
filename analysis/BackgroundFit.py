@@ -119,6 +119,8 @@ class BackgroundFit:
       fitLabel = "Background Fit"
     )
 
+    style.yZero()
+
     # Plot the central (non-background) region of the transform.
     style.errorbar(
       self.transform.centers[~self.mask],

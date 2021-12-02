@@ -139,7 +139,7 @@ class Model:
   def plot(self, x = None, dataLabel = "Data", fitLabel = "Fit"):
 
     # Plot the data with errorbars.
-    style.errorbar(self.x, self.y, self.err, zorder = 0, label = dataLabel)
+    style.errorbar(self.x, self.y, self.err, zorder = 0, fmt = "o", label = dataLabel)
 
     # Evaluate the fit result and one-sigma error band.
     fn_x = self.x if x is None else x

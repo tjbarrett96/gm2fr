@@ -4,6 +4,7 @@ import pandas as pd
 import scipy.stats
 
 import os
+import re
 import gm2fr
 import matplotlib.pyplot as plt
 import gm2fr.style as style
@@ -12,6 +13,13 @@ import gm2fr.style as style
 # ==============================================================================
 
 path = os.path.dirname(gm2fr.__file__)
+
+def findIndex(string):
+  match = re.search(r"\w+(\d+)$", string)
+  return match.group(1) if match else None
+
+def findIndices(sequence):
+  return [index for index in (findIndex(item) for item in sequence) if index is not None]
 
 # ==============================================================================
 

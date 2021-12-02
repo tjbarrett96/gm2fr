@@ -46,6 +46,7 @@ class Optimizer:
 
   # ============================================================================
 
+  # TODO: method "fit" is buggy, claims it has not found good minimum when it has
   def getSeed(self, method = "average"):
 
     # Select one cyclotron period after the transform start time.
@@ -198,16 +199,16 @@ class Optimizer:
     for unit in util.frequencyTo.keys():
 
       conversion = util.frequencyTo[unit]
-      mean = ref.map(conversion).mean()
-      width = ref.map(conversion).std()
+      mean = ref.copy().map(conversion).mean()
+      width = ref.copy().map(conversion).std()
 
       # Find the change in the mean after +/- one-sigma shifts in t0.
-      left_mean_err = abs(mean - self.leftTransform.map(conversion).mean())
-      right_mean_err = abs(mean - self.rightTransform.map(conversion).mean())
+      left_mean_err = abs(mean - self.leftTransform.copy().map(conversion).mean())
+      right_mean_err = abs(mean - self.rightTransform.copy().map(conversion).mean())
 
       # Find the change in the width after +/- one-sigma shifts in t0.
-      left_width_err = abs(width - self.leftTransform.map(conversion).std())
-      right_width_err = abs(width - self.rightTransform.map(conversion).std())
+      left_width_err = abs(width - self.leftTransform.copy().map(conversion).std())
+      right_width_err = abs(width - self.rightTransform.copy().map(conversion).std())
 
       # Average the changes on either side of the optimal t0.
       mean_err_t0 = (left_mean_err + right_mean_err) / 2
