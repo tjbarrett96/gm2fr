@@ -102,7 +102,7 @@ class Analyzer:
     self.output = None
 
     # The current (structured) NumPy array of results.
-    self.results = Results()
+    self.results = None
     self.groupResults = Results() if self.group is not None else None
 
     # Get the path to the gm2fr/analysis/results directory.
@@ -194,6 +194,7 @@ class Analyzer:
     for groupIndex, (file, signal, pileup, tag) in enumerate(self.input):
 
       print(f"\nWorking on '{tag}'.")
+      self.results = Results()
 
       # Load the truth-level data for Toy MC, if supplied.
       # TODO: incorporate this into input, not analyze
@@ -474,7 +475,7 @@ class Analyzer:
         #   diff_results.table.columns = [f"diff_{name}" for name in diff_results.table.columns]
         #   results.merge(diff_results)
 
-        self.results.append(results)
+        self.results.append(results, self.groupLabels[groupIndex] if not np.isnan(self.groupLabels[groupIndex]) else groupIndex)
         if self.groupResults is not None:
           self.groupResults.append(
             results,
