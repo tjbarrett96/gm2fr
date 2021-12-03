@@ -111,8 +111,8 @@ class Optimizer:
     # if optIndex < 2 or optIndex > len(self.times) - 3:
 
     # Fit a parabola to the whole distribution, and estimate the minimum.
-    a, b, c = np.polyfit(self.times, self.chi2ndf, 2)
-    est_t0 = -b/(2*a)
+    popt = np.polyfit(self.times, self.chi2ndf, 2)
+    est_t0 = -popt[1] / (2 * popt[0])
 
     if est_t0 < self.times[0] or est_t0 > self.times[-1]:
 
