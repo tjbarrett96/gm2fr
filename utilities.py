@@ -15,7 +15,7 @@ import gm2fr.style as style
 path = os.path.dirname(gm2fr.__file__)
 
 def findIndex(string):
-  match = re.search(r"\D+(\d+?)$", string)
+  match = re.search(r"\D+(\d+)", string)
   return match.group(1) if match else None
 
 def findIndices(sequence):

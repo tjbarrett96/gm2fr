@@ -108,86 +108,89 @@ class Optimizer:
     # print(self.fits[optIndex].model.pCov)
 
     # If there's no minimum sufficiently inside the scan window, try again.
-    if optIndex < 2 or optIndex > len(self.times) - 3:
+    # if optIndex < 2 or optIndex > len(self.times) - 3:
 
-      # Fit a parabola to the whole distribution, and estimate the minimum.
-      a, b, c = np.polyfit(self.times, self.chi2ndf, 2)
-      est_t0 = -b/(2*a)
+    # Fit a parabola to the whole distribution, and estimate the minimum.
+    a, b, c = np.polyfit(self.times, self.chi2ndf, 2)
+    est_t0 = -b/(2*a)
+
+    if est_t0 < self.times[0] or est_t0 > self.times[-1]:
 
       # Print an update.
       print("\nOptimal t0 not found within time window.")
       print(f"Trying again with re-estimated t0 seed: {est_t0 * 1000:.4f} ns.")
 
-      # Make a recursive call to optimize again using the new estimate.
+      # Make a recursive call to optimize again using the new estimate, up to 5 times.
       if index < 5:
         self.seed = est_t0
         self.optimize(index + 1)
-      else:
-        self.t0 = est_t0
+        return
+      # else:
+      #   self.t0 = est_t0
 
     # Otherwise, if there is a minimum sufficiently inside the scan window...
-    else:
+    # else:
 
-      # Remember the optimal fit from the scan.
-      self.bgFit = self.fits[optIndex]
+    # Remember the optimal fit from the scan.
+    self.bgFit = self.fits[optIndex]
 
-      # Fit a parabola to the 2 neighbors on either side of the minimum.
-      popt = np.polyfit(
-        self.times[(optIndex - 2):(optIndex + 3)],
-        self.chi2ndf[(optIndex - 2):(optIndex + 3)],
-        2
-      )
+    # Fit a parabola to the 2 neighbors on either side of the minimum.
+    # popt = np.polyfit(
+    #   self.times[(optIndex - 2):(optIndex + 3)],
+    #   self.chi2ndf[(optIndex - 2):(optIndex + 3)],
+    #   2
+    # )
 
-      # Estimate t0 using the minimum of the parabolic fit.
-      self.t0 = -popt[1] / (2 * popt[0]) # -b/2a (quadratic formula)
+    # Estimate t0 using the minimum of the parabolic fit.
+    self.t0 = est_t0#-popt[1] / (2 * popt[0]) # -b/2a (quadratic formula)
 
-      # Get the value of the minimum chi2 from the fit.
-      min_chi2 = np.polyval(popt, self.t0) * self.bgFit.model.ndf
+    # Get the value of the minimum chi2 from the fit.
+    min_chi2 = np.polyval(popt, self.t0) * self.bgFit.model.ndf
 
-      # Fit a parabola to the entire window, and extrapolate chi2_min + 1.
-      a, b, c = popt * self.bgFit.model.ndf
-      c -= min_chi2 + 1
-      leftTime = (-b - np.sqrt(b**2 - 4*a*c)) / (2*a) # quadratic formula
-      rightTime = (-b + np.sqrt(b**2 - 4*a*c)) / (2*a) # quadratic formula
-      leftMargin = self.t0 - leftTime
-      rightMargin = rightTime - self.t0
-      self.err_t0 = ((leftMargin + rightMargin) / 2)
+    # Fit a parabola to the entire window, and extrapolate chi2_min + 1.
+    a, b, c = popt * self.bgFit.model.ndf
+    c -= min_chi2 + 1
+    leftTime = (-b - np.sqrt(b**2 - 4*a*c)) / (2*a) # quadratic formula
+    rightTime = (-b + np.sqrt(b**2 - 4*a*c)) / (2*a) # quadratic formula
+    leftMargin = self.t0 - leftTime
+    rightMargin = rightTime - self.t0
+    self.err_t0 = ((leftMargin + rightMargin) / 2)
 
-      # self.leftTransform = Transform.Transform(
-      #   self.transform.fr,
-      #   self.transform.start,
-      #   self.transform.end,
-      #   self.transform.df,
-      #   self.transform.bgModel,
-      #   self.t0 - self.err_t0,
-      #   self.transform.n
-      # )
-      # self.leftTransform.process(update = False)
-      self.leftTransform = Histogram1D.transform(self.fr, self.frequencies, self.t0 - self.err_t0)
-      self.leftFit = BackgroundFit(self.leftTransform, self.t0 - self.err_t0, self.start, self.model).fit()
-      self.leftTransform = self.leftFit.subtract()
+    # self.leftTransform = Transform.Transform(
+    #   self.transform.fr,
+    #   self.transform.start,
+    #   self.transform.end,
+    #   self.transform.df,
+    #   self.transform.bgModel,
+    #   self.t0 - self.err_t0,
+    #   self.transform.n
+    # )
+    # self.leftTransform.process(update = False)
+    self.leftTransform = Histogram1D.transform(self.fr, self.frequencies, self.t0 - self.err_t0)
+    self.leftFit = BackgroundFit(self.leftTransform, self.t0 - self.err_t0, self.start, self.model).fit()
+    self.leftTransform = self.leftFit.subtract()
 
-      # self.rightTransform = Transform.Transform(
-      #   self.transform.fr,
-      #   self.transform.start,
-      #   self.transform.end,
-      #   self.transform.df,
-      #   self.transform.bgModel,
-      #   self.t0 + self.err_t0,
-      #   self.transform.n
-      # )
-      # self.rightTransform.process(update = False)
-      self.rightTransform = Histogram1D.transform(self.fr, self.frequencies, self.t0 + self.err_t0)
-      self.rightFit = BackgroundFit(self.rightTransform, self.t0 + self.err_t0, self.start, self.model).fit()
-      self.rightTransform = self.rightFit.subtract()
+    # self.rightTransform = Transform.Transform(
+    #   self.transform.fr,
+    #   self.transform.start,
+    #   self.transform.end,
+    #   self.transform.df,
+    #   self.transform.bgModel,
+    #   self.t0 + self.err_t0,
+    #   self.transform.n
+    # )
+    # self.rightTransform.process(update = False)
+    self.rightTransform = Histogram1D.transform(self.fr, self.frequencies, self.t0 + self.err_t0)
+    self.rightFit = BackgroundFit(self.rightTransform, self.t0 + self.err_t0, self.start, self.model).fit()
+    self.rightTransform = self.rightFit.subtract()
 
-      # self.leftFit = self.leftTransform.bgFit
-      # self.rightFit = self.rightTransform.bgFit
+    # self.leftFit = self.leftTransform.bgFit
+    # self.rightFit = self.rightTransform.bgFit
 
-      # Print an update, completing this round of optimization.
-      print(f"\nCompleted background optimization.")
-      print(f"{'best chi2/ndf':>16} = {self.bgFit.model.chi2ndf:.4f}")
-      print(f"{'new t0':>16} = {self.t0*1000:.4f} +/- {self.err_t0*1000:.4f} ns")
+    # Print an update, completing this round of optimization.
+    print(f"\nCompleted background optimization.")
+    print(f"{'best chi2/ndf':>16} = {self.bgFit.model.chi2ndf:.4f}")
+    print(f"{'new t0':>16} = {self.t0*1000:.4f} +/- {self.err_t0*1000:.4f} ns")
 
   # ============================================================================
 
