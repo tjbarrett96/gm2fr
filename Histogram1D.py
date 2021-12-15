@@ -5,7 +5,8 @@ import scipy.linalg as linalg
 import matplotlib.pyplot as plt
 import gm2fr.style as style
 style.setStyle()
-import gm2fr.utilities as util
+# import gm2fr.utilities as util
+import gm2fr.io as io
 
 import ROOT as root
 import root_numpy as rnp
@@ -54,9 +55,9 @@ class Histogram1D:
 
   @staticmethod
   def parseBinning(bins, range):
-    if util.isNumber(bins) and util.isNumericPair(range):
+    if io.isNumber(bins) and io.isNumericPair(range):
       return np.linspace(range[0], range[1], bins + 1)
-    elif util.isArray(bins, 1) and range is None:
+    elif io.isArray(bins, 1) and range is None:
       return bins.copy()
     else:
       raise ValueError(f"Histogram bins '{bins}' and range '{range}' not understood.")
@@ -105,7 +106,7 @@ class Histogram1D:
 
   # Override the *= operator to scale the bin entries in-place.
   def __imul__(self, scale):
-    if util.isNumber(scale) or util.isArray(scale, 1):
+    if io.isNumber(scale) or io.isArray(scale, 1):
       self.heights *= scale
       self.cov *= abs(scale)**2
     elif isinstance(scale, Histogram1D) and (scale.edges == self.edges).all():
@@ -132,13 +133,13 @@ class Histogram1D:
     return result
 
   def __rmul__(other, self):
-    return self * other
+    return other * self
 
   # ================================================================================================
 
   # Divide bin entries in-place, optionally replacing dividends near zero.
   def divide(self, other, zeros = 0):
-    if util.isNumber(other):
+    if io.isNumber(other) or io.isArray(other, 1):
       self.heights /= other
       self.cov /= abs(other)**2
     elif isinstance(other, Histogram1D) and np.allclose(other.edges, self.edges):
@@ -168,7 +169,7 @@ class Histogram1D:
     return result
 
   def __rdiv__(other, self):
-    return self / other
+    return other / self
 
   # ================================================================================================
 
@@ -272,7 +273,7 @@ class Histogram1D:
   # TODO: don't discard original data, just make a new view (so we can re-mask)
   def mask(self, range):
 
-    if util.isNumericPair(range):
+    if io.isNumericPair(range):
       minIndex = np.searchsorted(self.centers, range[0], side = "left")
       maxIndex = np.searchsorted(self.centers, range[1], side = "right")
 
@@ -296,11 +297,12 @@ class Histogram1D:
   def splitSum(array, step, axis = 0, discard = False):
 
     length = array.shape[axis]
-    even = (length % step != 0)
+    even = (length % step == 0)
     if not even and not discard:
       raise ValueError(f"Cannot rebin {length} bins into {length / step:.2f} blocks.")
 
-    blocks = np.split(array, np.arange(0, length, step), axis)
+    # Note: indices are SPLIT points; including a boundary index puts an empty array!
+    blocks = np.split(array, np.arange(step, length - 1, step), axis)
     if not even and discard:
       blocks = blocks[:-1]
     return np.concatenate([block.sum(axis, keepdims = True) for block in blocks], axis)
@@ -318,7 +320,7 @@ class Histogram1D:
   # Merge integer groups of bins along the x- or y-axes.
   def rebin(self, step, discard = False):
 
-    if util.isInteger(step) and step > 0:
+    if io.isInteger(step) and step > 0:
       self.heights = Histogram1D.splitSum(self.heights, step, 0, discard)
       self.cov = Histogram1D.splitSum(self.cov, step, 0, discard)
       if self.cov.ndim == 2:
@@ -419,15 +421,21 @@ class Histogram1D:
   @staticmethod
   def load(filename, label = None):
     if filename.endswith(".root") and label is not None:
-      rootFile = root.TFile(filename)
-      histogram = rootFile.Get(label)
-      heights, edges = rnp.hist2array(histogram, return_edges = True)
+      try:
+        rootFile = root.TFile(filename)
+        histogram = rootFile.Get(label)
+        heights, edges = rnp.hist2array(histogram, return_edges = True)
+      except:
+        raise FileNotFoundError()
       edges = edges[0]
       cov = np.array([histogram.GetBinError(i + 1)**2 for i in range(histogram.GetNbinsX())])
       rootFile.Close()
     elif filename.endswith(".npz"):
       prefix = "" if label is None else f"{label}/"
-      data = np.load(filename)
+      try:
+        data = np.load(filename)
+      except:
+        raise FileNotFoundError()
       edges = data[f'{prefix}edges']
       heights = data[f'{prefix}heights']
       cov = data[f"{prefix}cov"]
@@ -437,50 +445,50 @@ class Histogram1D:
 
   # ================================================================================================
 
-  @staticmethod
-  def transform(signal, frequencies, t0, type = "cosine", errors = True, wiggle = True):
-
-    if isinstance(frequencies, Histogram1D):
-      result = frequencies
-    else:
-      df = frequencies[1] - frequencies[0]
-      result = Histogram1D(np.arange(frequencies[0] - df/2, frequencies[-1] + df, df))
-
-    differences = np.arange(result.length) * result.width
-    cov = None
-
-    # Note: to first order, cosine and sine transforms have the same covariance. (Not a typo.)
-    if type == "cosine":
-
-      heights = util.cosineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
-      if errors:
-        cov = 0.5 * linalg.toeplitz(util.cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
-
-    elif type == "sine":
-
-      heights = util.sineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
-      if errors:
-        cov = 0.5 * linalg.toeplitz(util.cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
-
-    elif type == "magnitude":
-
-      cosine = util.cosineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
-      sine = util.sineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
-
-      tempCos = linalg.toeplitz(util.cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
-      tempSin = linalg.toeplitz(util.sineTransform(differences, signal.errors**2, signal.centers, t0, False))
-
-      heights = np.sqrt(cosine**2 + sine**2)
-      if errors:
-        cov = 0.5 / np.outer(heights, heights) * (
-          (np.outer(cosine, cosine) + np.outer(sine, sine)) * tempCos \
-          + (np.outer(sine, cosine) - np.outer(cosine, sine)) * tempSin
-        )
-
-    else:
-      raise ValueError(f"Frequency transform type '{type}' not recognized.")
-
-    result.setHeights(heights)
-    if errors:
-      result.setCov(cov)
-    return result
+  # @staticmethod
+  # def transform(signal, frequencies, t0, type = "cosine", errors = True, wiggle = True):
+  #
+  #   if isinstance(frequencies, Histogram1D):
+  #     result = frequencies
+  #   else:
+  #     df = frequencies[1] - frequencies[0]
+  #     result = Histogram1D(np.arange(frequencies[0] - df/2, frequencies[-1] + df, df))
+  #
+  #   differences = np.arange(result.length) * result.width
+  #   cov = None
+  #
+  #   # Note: to first order, cosine and sine transforms have the same covariance. (Not a typo.)
+  #   if type == "cosine":
+  #
+  #     heights = util.cosineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+  #     if errors:
+  #       cov = 0.5 * linalg.toeplitz(util.cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
+  #
+  #   elif type == "sine":
+  #
+  #     heights = util.sineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+  #     if errors:
+  #       cov = 0.5 * linalg.toeplitz(util.cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
+  #
+  #   elif type == "magnitude":
+  #
+  #     cosine = util.cosineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+  #     sine = util.sineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
+  #
+  #     tempCos = linalg.toeplitz(util.cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
+  #     tempSin = linalg.toeplitz(util.sineTransform(differences, signal.errors**2, signal.centers, t0, False))
+  #
+  #     heights = np.sqrt(cosine**2 + sine**2)
+  #     if errors:
+  #       cov = 0.5 / np.outer(heights, heights) * (
+  #         (np.outer(cosine, cosine) + np.outer(sine, sine)) * tempCos \
+  #         + (np.outer(sine, cosine) - np.outer(cosine, sine)) * tempSin
+  #       )
+  #
+  #   else:
+  #     raise ValueError(f"Frequency transform type '{type}' not recognized.")
+  #
+  #   result.setHeights(heights)
+  #   if errors:
+  #     result.setCov(cov)
+  #   return result

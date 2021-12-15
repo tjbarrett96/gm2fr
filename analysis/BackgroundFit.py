@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 import matplotlib.text
 
 from gm2fr.analysis.BackgroundModels import *
-import gm2fr.utilities as util
+# import gm2fr.utilities as util
+import gm2fr.constants as const
 import gm2fr.style as style
 style.setStyle()
 from gm2fr.Histogram1D import Histogram1D
@@ -41,7 +42,7 @@ class BackgroundFit:
     # self.end = transform.end
 
     # Fit data, with boundary mask applied.
-    self.mask = util.unphysical(self.transform.centers)
+    self.mask = const.unphysical(self.transform.centers)
     self.x = self.transform.centers[self.mask]
     self.y = self.transform.heights[self.mask]
 
@@ -132,9 +133,9 @@ class BackgroundFit:
 
     # Annotate the t_0 value and fit quality.
     style.databox(
-      ("t_0", self.t0 * 1E3, None, "ns"),
-      (r"\chi^2/\mathrm{ndf}", self.model.chi2ndf, None, None),
-      ("p", self.model.pval, None, None)
+      style.Entry(self.t0 * 1E3, "t_0", None, "ns"),
+      style.Entry(self.model.chi2ndf, r"\chi^2/\mathrm{ndf}", None, None),
+      style.Entry(self.model.pval, "p", None, None)
     )
 
     # Make the axis labels and legend.

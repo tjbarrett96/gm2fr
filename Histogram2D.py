@@ -4,7 +4,8 @@ import array
 import matplotlib.pyplot as plt
 import gm2fr.style as style
 style.setStyle()
-import gm2fr.utilities as util
+# import gm2fr.utilities as util
+import gm2fr.io as io
 from gm2fr.Histogram1D import Histogram1D
 
 import ROOT as root
@@ -104,7 +105,7 @@ class Histogram2D:
 
   # Override the *= operator to scale the bin entries in-place.
   def __imul__(self, scale):
-    if util.isNumber(scale):
+    if io.isNumber(scale):
       self.heights *= scale
       self.errors *= abs(scale)
     elif isinstance(scale, Histogram2D):
@@ -224,7 +225,7 @@ class Histogram2D:
     for axis, range in enumerate(ranges):
       if range is None:
         continue
-      if util.isNumericPair(range):
+      if io.isNumericPair(range):
         min = np.searchsorted(self.centers[axis], range[0], side = "left")
         max = np.searchsorted(self.centers[axis], range[1], side = "right")
 
@@ -247,7 +248,7 @@ class Histogram2D:
     for axis, step in enumerate(steps):
       if step is None:
         continue
-      if util.isInteger(step) and step > 0:
+      if io.isInteger(step) and step > 0:
         self.heights = Histogram1D.splitSum(self.heights, step, axis, discard)
         self.errors = np.sqrt(Histogram1D.splitSum(self.errors**2, step, axis, discard))
         self.edges[axis] = self.edges[axis][::step]

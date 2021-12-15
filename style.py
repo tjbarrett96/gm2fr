@@ -2,8 +2,9 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
+import gm2fr.constants as const
 
-# ==============================================================================
+# ==================================================================================================
 
 # Set the default plotting options.
 def setStyle(latex = False):
@@ -72,7 +73,7 @@ def setStyle(latex = False):
   plt.rcParams["figure.subplot.top"] = 0.93
   plt.rcParams["figure.subplot.right"] = 0.93
 
-# ==============================================================================
+# ==================================================================================================
 
 # Override plt.xlabel with automatic formatting.
 def xlabel(label):
@@ -82,61 +83,42 @@ def xlabel(label):
 def ylabel(label):
   return plt.ylabel(label, ha = "right", y = 1)
 
-# ==============================================================================
+# ==================================================================================================
 
 # Override plt.colorbar with automatic formatting.
-def colorbar(
-  label = None,
-  pad = 0.01,
-  fraction = 0.10,
-  aspect = 18,
-  **kwargs
-):
+def colorbar(label = None, pad = 0.01, fraction = 0.10, aspect = 18, **kwargs):
   cbar = plt.colorbar(pad = pad, fraction = fraction, aspect = aspect, **kwargs)
   if label is not None:
     cbar.set_label(label, ha = "right", y = 1)
   return cbar
 
-# ==============================================================================
+# ==================================================================================================
 
 # Override plt.errorbar with automatic formatting.
 def errorbar(x, y, yErr, xErr = None, fmt = "o-", ms = 3, **kwargs):
+  return plt.errorbar(x, y, yErr, xErr, fmt = fmt, ms = ms, capsize = 2, lw = 1, elinewidth = 0.5, mew = 0.5, **kwargs)
 
-  return plt.errorbar(
-    x,
-    y,
-    yErr,
-    xErr,
-    fmt = fmt,
-    ms = ms,
-    capsize = 2,
-    linewidth = 1,
-    **kwargs
-  )
+# ==================================================================================================
 
-# ==============================================================================
+class Entry:
 
-# TODO: add a non-latex option, without alignment; check rcParams[latex] to switch
-def databox(*args, left = True):
+  def __init__(self, val, sym, err = None, units = None):
+    (self.val, self.err) = (val, err)
+    (self.sym, self.units) = (sym.symbol, sym.units) if isinstance(sym, const.Quantity) else (sym, units)
+
+  def format(self, align = False, places = 4):
+    m = "" if align else "$" # math mode boundary character: "" if already inside math env, else "$"
+    amp = "&" if align else "" # alignment character: "&" if inside math align env, else ""
+    err = "" if self.err is None else rf" {m}\pm{m} {self.err:.{places}f}"
+    units = "" if self.units is None else (rf"\;\text{{{self.units}}}" if align else f" {self.units}")
+    return rf"{m}{self.sym}{m} {amp}= {self.val:.{places}f}{err}{units}"
+
+def databox(*entries, left = True):
 
   if plt.rcParams["text.usetex"]:
-
-    string = r"\begin{align*}"
-    for arg in args:
-      string += f"{arg[0]} &= {arg[1]:.4f}"
-      string += fr" \pm {arg[2]:.4f}" if arg[2] is not None else ""
-      string += fr" \; \text{{{arg[3]}}}" if arg[3] is not None else ""
-      string += r" \\[-0.5ex]"
-    string += r"\end{align*}"
-
+    string = r"\begin{align*}" + r"\\[-0.5ex]".join([entry.format(align = True) for entry in entries]) + r"\end{align*}"
   else:
-
-    string = ""
-    for arg in args:
-      string += f"${arg[0]}$ = {arg[1]:.4f}"
-      string += fr" $\pm$ {arg[2]:.4f}" if arg[2] is not None else ""
-      string += f" {arg[3]}" if arg[3] is not None else ""
-      string += "\n"
+    string = "\n".join([entry.format(align = False) for entry in entries])
 
   plt.text(
     0.03 if left else 0.97,
@@ -147,29 +129,15 @@ def databox(*args, left = True):
     transform = plt.gca().transAxes
   )
 
-# ==============================================================================
+# ==================================================================================================
 
 # Override plt.imshow with automatic formatting and colorbar.
-def colormesh(
-  x,
-  y,
-  heights,
-  label = None,
-  cmap = "coolwarm",
-  **kwargs
-):
-
-  result = plt.pcolormesh(
-    x,
-    y,
-    heights.T,
-    cmap = cmap,
-    **kwargs
-  )
+def colormesh(x, y, heights, label = None, cmap = "coolwarm", **kwargs):
+  result = plt.pcolormesh(x, y, heights.T, cmap = cmap, **kwargs)
   cbar = colorbar(label)
   return result, cbar
 
-# ==============================================================================
+# ==================================================================================================
 
 # Override plt.imshow with automatic formatting and colorbar.
 def imshow(
@@ -199,20 +167,17 @@ def imshow(
   cbar = colorbar(label)
   return result, cbar
 
-# ==============================================================================
-
-# Keyword arguments for dotted lines.
-dotStyle = {"linestyle": ":", "color": "k"}
+# ==================================================================================================
 
 # Draw a horizontal line at y = 0.
-def yZero():
-  return plt.axhline(0, **dotStyle)
+def yZero(ls = ":", c = "k"):
+  return plt.axhline(0, linestyle = ls, color = c)
 
 # Draw a vertical line at x = 0.
-def xZero():
-  return plt.axvline(0, **dotStyle)
+def xZero(ls = ":", c = "k"):
+  return plt.axvline(0, linestyle = ls, color = c)
 
-# ==============================================================================
+# ==================================================================================================
 
 def xStats(avg, std, units = None, color = "k"):
 
@@ -239,7 +204,7 @@ def xStats(avg, std, units = None, color = "k"):
   label = f"${avg:.2f} \pm {std:.2f}$" + f" {units}" if units is not None else ""
   return line, fill, label
 
-# ==============================================================================
+# ==================================================================================================
 
 def yStats(
   x,

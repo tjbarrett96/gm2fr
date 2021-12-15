@@ -1,6 +1,7 @@
 from gm2fr.analysis.Model import Model
 import numpy as np
-import gm2fr.utilities as util
+# import gm2fr.utilities as util
+import gm2fr.constants as const
 
 # ==============================================================================
 
@@ -104,7 +105,7 @@ class NineParameter(FiveParameter):
   def __init__(self, n = 0.108):
     super().__init__()
     self.name = "nine-parameter wiggle"
-    fcbo = (1 - np.sqrt(1 - n)) * util.magic["f"] * 1E-3
+    fcbo = (1 - np.sqrt(1 - n)) * const.info["f"].magic * 1E-3
     self.names += ["tau_cbo", "A_cbo", "f_cbo", "phi_cbo"]
     self.units += ["us",      "",      "MHz",   "rad"    ]
     self.seeds += [150,       0.005,   fcbo,    np.pi    ]

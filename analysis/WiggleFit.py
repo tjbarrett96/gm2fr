@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.optimize as opt
-import gm2fr.utilities as util
+# import gm2fr.utilities as util
+import gm2fr.constants as const
 from matplotlib.backends.backend_pdf import PdfPages
 
 from gm2fr.Histogram1D import Histogram1D
@@ -32,7 +33,7 @@ class WiggleFit:
     self.end = end
     self.n = n
 
-    self.group = int((util.magic["T"] * 1E-3) // self.fineSignal.width)
+    self.group = int((const.info["T"].magic * 1E-3) // self.fineSignal.width)
     self.coarseSignal = self.fineSignal.copy().rebin(self.group, discard = True).mask((self.start, self.end))
 
     # Ensure the errors are all non-zero.
@@ -116,8 +117,8 @@ class WiggleFit:
 
       # Annotate the fit quality.
       style.databox(
-        (r"\chi^2/\mathrm{ndf}", self.model.chi2ndf, None, None),
-        ("p", self.model.pval, None, None)
+        style.Entry(self.model.chi2ndf, r"\chi^2/\mathrm{ndf}"),
+        style.Entry(self.model.pval, "p")
       )
 
       # Save and clear.

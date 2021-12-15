@@ -141,7 +141,7 @@ frequencyTo = {
   "gamma": frequencyToGamma,
   "p": frequencyToMomentum,
   "dp_p0": lambda f, n = 0.108: momentumToOffset(frequencyToMomentum(f, n)),
-  "tau": lambda f, n = 0.108: frequencyToGamma(f, n) * lifetime * 1E-3,
+  "tau": lambda f, n = 0.108: frequencyToGamma(f, n) * lifetime,
   "beta": lambda f, n = 0.108: np.sqrt(1 - 1/frequencyToGamma(f, n)**2),
   "c_e": lambda f, n = 0.108: 1E9 * 2 * n * (1 - n) * (magic["beta"] / magic["r"] * frequencyToRadialOffset(f))**2
 }

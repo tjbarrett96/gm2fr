@@ -44,18 +44,17 @@ class Results:
 
   # ============================================================================
 
-  def save(self, path):
+  def save(self, path, filename = "results", decimals = 5):
 
     array = self.array()
-    np.save(f"{path}/results.npy", array)
+    np.save(f"{path}/{filename}.npy", array)
 
-    decimals = 5
     longestName = max([len(name) for name in array.dtype.names])
     onesPlaces = max(int(np.log10(np.nanmax(self.table.to_numpy()))), 0) + 1
     maxLength = max(longestName, onesPlaces + 1 + decimals)
 
     np.savetxt(
-      f"{path}/results.txt",
+      f"{path}/{filename}.txt",
       array,
       fmt = f"%{maxLength}.{decimals}f",
       header = "  ".join(f"{{:>{maxLength}}}".format(name) for name in array.dtype.names),

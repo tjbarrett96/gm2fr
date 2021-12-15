@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.optimize as opt
-import gm2fr.utilities as util
+# import gm2fr.utilities as util
+import gm2fr.calculations as calc
 from gm2fr.analysis.Results import Results
 from gm2fr.Histogram1D import Histogram1D
 
@@ -110,7 +111,7 @@ class Model:
       self.chi2ndf = self.chi2 / self.ndf
 
       # Calculate the two-sided p-value for this chi2 & ndf.
-      self.pval = util.pval(self.chi2, self.ndf)
+      self.pval = calc.pval(self.chi2, self.ndf)
 
   # ============================================================================
 

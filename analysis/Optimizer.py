@@ -1,7 +1,9 @@
 from gm2fr.analysis.BackgroundFit import BackgroundFit
 from gm2fr.analysis.Results import Results
 import gm2fr.analysis.Model as model
-import gm2fr.utilities as util
+# import gm2fr.utilities as util
+import gm2fr.constants as const
+import gm2fr.calculations as calc
 from gm2fr.Histogram1D import Histogram1D
 
 import numpy as np
@@ -50,11 +52,11 @@ class Optimizer:
   def getSeed(self, method = "average"):
 
     # Select one cyclotron period after the transform start time.
-    mask = (self.fr.centers >= self.start) & (self.fr.centers <= self.start + util.magic["T"] * 1E-3)
+    mask = (self.fr.centers >= self.start) & (self.fr.centers <= self.start + const.info["T"].magic * 1E-3)
 
     # Refine the selection by taking the nearest pair of minima.
     start = self.fr.centers[mask][np.argmin(self.fr.heights[mask])]
-    end = start + util.magic["T"] * 1E-3
+    end = start + const.info["T"].magic * 1E-3
     mask = (self.fr.centers >= start) & (self.fr.centers <= end)
 
     # Compute a naive average of the times within this turn.
@@ -74,8 +76,8 @@ class Optimizer:
       raise ValueError(f"t0 seed estimation mode '{method}' not recognized.")
 
     # Subtract multiples of the cyclotron period to get near t0 ~ 0.
-    periods = mid // (util.magic["T"] * 1E-3)
-    seed = mid - periods * util.magic["T"] * 1E-3
+    periods = mid // (const.info["T"].magic * 1E-3)
+    seed = mid - periods * const.info["T"].magic * 1E-3
 
     print(f"\nEstimated t0 seed using method '{method}': {seed*1E3:.2f} ns.")
     return seed
@@ -88,13 +90,21 @@ class Optimizer:
     self.fits = [None] * len(self.times)
 
     # Initialize the cosine transform histogram at the t0 seed.
-    transform = Histogram1D.transform(self.fr, self.frequencies, t0 = self.seed)
+    transform = calc.transform(self.fr, self.frequencies, t0 = self.seed)
     # print(transform.cov)
+    # cos_transform = calc.transform(self.fr, self.frequencies, 0, "cosine")
+    # sin_transform = calc.transform(self.fr, self.frequencies, 0, "sine")
+    # x = 1 / (1 + np.tan(2 * np.pi * const.info["f"].magic * self.seed * const.kHz_us)**2)
+    # transform = np.sqrt(1 - x) * sin_transform + (-1)*np.sqrt(x) * cos_transform
+    # transform.plot()
+    # plt.show()
 
     for i in range(len(self.times)):
 
       # Update the transform in-place at the current t0, without re-estimating the covariance.
-      Histogram1D.transform(self.fr, transform, t0 = self.times[i], errors = False)
+      calc.transform(self.fr, transform, t0 = self.times[i], errors = False)
+      # x = 1 / (1 + np.tan(2 * np.pi * const.info["f"].magic * self.times[i] * const.kHz_us)**2)
+      # transform = np.sqrt(1 - x) * sin_transform + (-1)*np.sqrt(x) * cos_transform
 
       self.fits[i] = BackgroundFit(transform, t0 = self.times[i], start = self.start, model = self.model)
       # print(self.fits[i].cov)
@@ -103,7 +113,16 @@ class Optimizer:
 
     minimum = min(self.fits, key = lambda fit: fit.model.chi2ndf)
     self.chi2ndf = np.array([fit.model.chi2ndf for fit in self.fits])
+    # print(self.chi2ndf)
     optIndex = self.fits.index(minimum)
+
+    # pdf = PdfPages(f"test{index}.pdf")
+    # for fit in self.fits:
+    #   plt.figure()
+    #   fit.plot()
+    #   pdf.savefig()
+    #   plt.close()
+    # pdf.close()
 
     # print(self.fits[optIndex].model.pCov)
 
@@ -112,6 +131,15 @@ class Optimizer:
 
     # Fit a parabola to the whole distribution, and estimate the minimum.
     popt = np.polyfit(self.times, self.chi2ndf, 2)
+
+    # if popt[0] < 0 and index < 5:
+    #   print("Trying again...")
+    #   width = self.frequencies[-1] - self.frequencies[0]
+    #   step = self.frequencies[1] - self.frequencies[0]
+    #   self.frequencies = np.arange(self.frequencies[0] - width/4, self.frequencies[-1] + width/4, step)
+    #   self.optimize(index + 1)
+    #   return
+
     est_t0 = -popt[1] / (2 * popt[0])
 
     if est_t0 < self.times[0] or est_t0 > self.times[-1]:
@@ -166,7 +194,7 @@ class Optimizer:
     #   self.transform.n
     # )
     # self.leftTransform.process(update = False)
-    self.leftTransform = Histogram1D.transform(self.fr, self.frequencies, self.t0 - self.err_t0)
+    self.leftTransform = calc.transform(self.fr, self.frequencies, self.t0 - self.err_t0)
     self.leftFit = BackgroundFit(self.leftTransform, self.t0 - self.err_t0, self.start, self.model).fit()
     self.leftTransform = self.leftFit.subtract()
 
@@ -180,7 +208,7 @@ class Optimizer:
     #   self.transform.n
     # )
     # self.rightTransform.process(update = False)
-    self.rightTransform = Histogram1D.transform(self.fr, self.frequencies, self.t0 + self.err_t0)
+    self.rightTransform = calc.transform(self.fr, self.frequencies, self.t0 + self.err_t0)
     self.rightFit = BackgroundFit(self.rightTransform, self.t0 + self.err_t0, self.start, self.model).fit()
     self.rightTransform = self.rightFit.subtract()
 
@@ -199,9 +227,9 @@ class Optimizer:
     results = {"err_t0": self.err_t0}
 
     # Propagate the uncertainty in t0 to the distribution mean and width.
-    for unit in util.frequencyTo.keys():
+    for unit in const.info.keys():
 
-      conversion = util.frequencyTo[unit]
+      conversion = const.info[unit].fromF
       mean = ref.copy().map(conversion).mean()
       width = ref.copy().map(conversion).std()
 

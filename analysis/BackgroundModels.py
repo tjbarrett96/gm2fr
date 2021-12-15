@@ -1,5 +1,6 @@
 from gm2fr.analysis.Model import Model
-import gm2fr.utilities as util
+# import gm2fr.utilities as util
+import gm2fr.constants as const
 import numpy as np
 import scipy.special as sp
 
@@ -37,7 +38,7 @@ class Sinc(Model):
   def __init__(self, scale = 1, gap = 1):
     super().__init__()
     self.name = "sinc background"
-    self.seeds = [scale, util.magic["f"], 1/(2*np.pi*gap*util.kHz_us)]
+    self.seeds = [scale, const.info["f"].magic, 1/(2*np.pi*gap*const.kHz_us)]
 
   # ============================================================================
 
@@ -72,8 +73,8 @@ class Error(Model):
   def __init__(self, scale = 1, gap = 1):
     super().__init__()
     self.name = "error background"
-    self.b = np.pi * gap * util.kHz_us
-    self.seeds = [scale, util.magic["f"], 12]
+    self.b = np.pi * gap * const.kHz_us
+    self.seeds = [scale, const.info["f"].magic, 12]
 
   # ============================================================================
 
