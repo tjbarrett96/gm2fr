@@ -1,6 +1,8 @@
 import numpy as np
 import array
 import scipy.linalg as linalg
+import scipy.sparse as sparse
+import scipy.interpolate as interp
 
 import matplotlib.pyplot as plt
 import gm2fr.style as style
@@ -104,103 +106,147 @@ class Histogram1D:
 
   # ================================================================================================
 
-  # Override the *= operator to scale the bin entries in-place.
-  def __imul__(self, scale):
-    if io.isNumber(scale) or io.isArray(scale, 1):
-      self.heights *= scale
-      self.cov *= abs(scale)**2
-    elif isinstance(scale, Histogram1D) and (scale.edges == self.edges).all():
-      self.heights *= scale.heights
-      if self.cov.ndim == 1 and scale.cov.ndim == 1:
-        self.cov = scale.heights**2 * self.cov + self.heights**2 * scale.cov
-      elif self.cov.ndim == 1 and scale.cov.ndim == 2:
-        self.cov = scale.heights**2 * np.diag(self.cov) + np.outer(self.heights, self.heights) * scale.cov
-      elif self.cov.ndim == 2 and scale.cov.ndim == 1:
-        self.cov = self.heights**2 * np.diag(scale.cov) + np.outer(scale.heights, scale.heights) * self.cov
-      else:
-        self.cov = np.outer(self.heights, self.heights) * scale.cov + np.outer(scale.heights, scale.heights) * self.cov
-    else:
-      raise ValueError("Cannot multiply histogram by given scale.")
-    self.updateErrors()
-    return self
+  def __neg__(self):
+    result = self.copy()
+    result.heights = -result.heights
+    return result
 
   # ================================================================================================
 
-  # Override the * operator.
-  def __mul__(self, other):
-    result = self.copy()
-    result *= other
+  # a(self) + b.
+  # 'cov' is the covariance between 'a' and 'b'.
+  # 'err' is the uncertainty in 'b', only used if 'b' is a scalar.
+  def add(a, b, cov = None, err = None):
+    result = a.copy()
+    if isinstance(b, Histogram1D) and (b.edges == a.edges).all():
+      result.heights += b.heights
+      result.cov = a.cov + b.cov
+      if cov is not None:
+        result.cov += cov + cov.T
+      if err is not None:
+        raise ValueError("Argument 'err' is unused when both operands are Histogram1Ds.")
+    elif io.isNumber(b):
+      result.heights += b
+      result.cov = a.cov
+      if err is not None:
+        result.cov += err**2
+      if cov is not None:
+        raise NotImplementedError()
+    else:
+      raise ValueError()
+    result.updateErrors()
     return result
-
-  def __rmul__(other, self):
-    return other * self
 
   # ================================================================================================
 
-  # Divide bin entries in-place, optionally replacing dividends near zero.
-  def divide(self, other, zeros = 0):
-    if io.isNumber(other) or io.isArray(other, 1):
-      self.heights /= other
-      self.cov /= abs(other)**2
-    elif isinstance(other, Histogram1D) and np.allclose(other.edges, self.edges):
-      otherHeights = np.where(np.isclose(other.heights, 0), zeros, other.heights)
-      self.heights /= otherHeights
-      if self.cov.ndim == 1 and other.cov.ndim == 1:
-        self.cov = self.cov / otherHeights**2 + (self.heights / otherHeights**2)**2 * other.cov
-      elif self.cov.ndim == 1 and other.cov.ndim == 2:
-        self.cov = np.diag(self.cov) / otherHeights**2 + np.outer(self.heights, self.heights) / np.outer(otherHeights, otherHeights)**2 * other.cov
-      elif self.cov.ndim == 2 and other.cov.ndim == 1:
-        self.cov = (self.heights / otherHeights**2)**2 * np.diag(other.cov) + 1/np.outer(otherHeights, otherHeights) * self.cov
+  # a(self) - b
+  def subtract(a, b, cov = None, err = None):
+    return a.add(-b, cov = (-cov if cov is not None else None), err = err)
+
+  # ================================================================================================
+
+  # a(self) * b
+  def multiply(a, b, cov = None, err = None):
+    result = a.copy()
+    if isinstance(b, Histogram1D) and (b.edges == a.edges).all():
+      result.heights *= b.heights
+      result.cov = np.outer(b.heights, b.heights) * a.cov + np.outer(a.heights, a.heights) * b.cov
+      if cov is not None:
+        temp = np.outer(b.heights, a.heights) * cov
+        result.cov += temp + temp.T
+      if err is not None:
+        raise ValueError("Argument 'err' is unused when both operands are Histogram1Ds.")
+    elif io.isNumber(b):
+      result.heights *= b
+      result.cov = b**2 * a.cov
+      if err is not None:
+        result.cov += np.outer(a.heights, a.heights) * err**2
+      if cov is not None:
+        raise NotImplementedError()
+    elif io.isArray(b):
+      result.heights *= b
+      if result.cov.ndim == 2:
+        result.cov = np.outer(b, b) * a.cov + np.outer(a.heights, a.heights)
       else:
-        self.cov = 1/np.outer(otherHeights, otherHeights) * self.cov + np.outer(self.heights, self.heights) / np.outer(otherHeights, otherHeights)**2 * other.cov
+        result.cov = b**2 * a.cov
     else:
-      raise ValueError("Cannot divide histogram by given scale.")
-    self.updateErrors()
-    return self
-
-  # Override the /= operator to divide the bin entries in-place.
-  def __idiv__(self, other):
-    return self.divide(other)
-
-  # Override the / operator.
-  def __div__(self, other):
-    result = self.copy()
-    result /= other
+      raise ValueError()
+    result.updateErrors()
     return result
 
-  def __rdiv__(other, self):
-    return other / self
+  # ================================================================================================
+
+  # a(self) / b
+  def divide(a, b, cov = None, err = None, zero = 0):
+    result = a.copy()
+    if isinstance(b, Histogram1D) and (b.edges == a.edges).all():
+      result.heights /= np.where(b.heights == 0, zero, b.heights)
+      result.cov = 1 / np.outer(b.heights, b.heights) * a.cov + np.outer(a.heights, a.heights) / np.outer(b.heights, b.heights)**2 * b.cov
+      if cov is not None:
+        temp = np.outer(1 / b.heights, a.heights / b.heights**2) * cov
+        result.cov -= temp + temp.T
+      if err is not None:
+        raise ValueError("Argument 'err' is unused when both operands are Histogram1Ds.")
+    elif io.isNumber(b):
+      result.heights /= b
+      result.cov = a.cov / b**2
+      if err is not None:
+        result.cov += np.outer(a.heights, a.heights) / b**4 * err**2
+      if cov is not None:
+        raise NotImplementedError()
+    elif io.isArray(b):
+      result.heights /= b
+      if result.cov.ndim == 2:
+        result.cov = a.cov / np.outer(b, b)
+      else:
+        result.cov = a.cov / b**2
+    else:
+      raise ValueError()
+    result.updateErrors()
+    return result
+
+  # ================================================================================================
+
+  # a(self)^b
+  def power(a, b):
+    result = a.copy()
+    if io.isNumber(b):
+      result.heights **= b
+      result.cov = b**2 * np.outer(a.heights, a.heights)**(b - 1) * a.cov
+    else:
+      raise NotImplementedError()
+    result.updateErrors()
+    return result
 
   # ================================================================================================
 
   def setHeights(self, heights):
-    self.heights = heights
+    self.heights = heights.copy()
     return self
 
   def setCov(self, cov):
-    self.cov = cov
+    self.cov = cov.copy()
     self.updateErrors()
     return self
 
   # ================================================================================================
 
-  # Override the += operator to add bin entries in-place, assuming statistical independence.
-  def __iadd__(self, other):
-    self.heights += other.heights
-    if self.cov.ndim == other.cov.ndim:
-      self.cov += other.cov
-    elif self.cov.ndim == 1 and other.cov.ndim == 2:
-      self.cov = np.diag(self.cov) + other.cov
-    else:
-      self.cov += np.diag(other.cov)
-    self.updateErrors()
-    return self
-
-  # ================================================================================================
-
-  def __add__(self, other):
-    result = self.copy()
-    result += other
+  def convolve(self, function):
+    result = self.copy().clear()
+    # extra = len(result.heights)
+    # if io.isNumber(result.width):
+    #   df = result.width
+    #   leftPad = np.arange(result.centers[0] - extra * df, result.centers[0], df)
+    #   rightPad = np.arange(result.centers[-1] + df, result.centers[-1] + (extra + 1) * df, df)
+    #   paddedCenters = np.concatenate((leftPad, result.centers, rightPad))
+    #   paddedHeights = np.concatenate((np.zeros(len(leftPad)), self.heights, np.zeros(len(rightPad))))
+    # else:
+    paddedCenters, paddedHeights = result.centers, self.heights
+    fDifferences = function(np.subtract.outer(self.centers, paddedCenters))
+    centralDifferences = function(np.subtract.outer(self.centers, self.centers))
+    result.heights = np.einsum("i, ki -> k", paddedHeights, fDifferences)
+    result.cov = np.einsum(f"ki, {'lj, ij' if self.cov.ndim == 2 else 'li, i'} -> kl", centralDifferences, centralDifferences, self.cov)
+    result.updateErrors()
     return result
 
   # ================================================================================================
@@ -337,10 +383,17 @@ class Histogram1D:
 
   # ================================================================================================
 
-  def interpolate(self, x):
+  def interpolate(self, x, spline = True):
 
     # Interpolate new bin heights at the desired bin centers.
-    heights = np.interp(x, self.centers, self.heights)
+    if io.isNumber(x):
+      x = np.arange(self.edges[0], self.edges[-1] + x, x)
+
+    if spline:
+      tck = interp.splrep(self.centers, self.heights)
+      heights = interp.splev(x, tck)
+    else:
+      heights = np.interp(x, self.centers, self.heights)
 
     # Assume the bin edges are halfway between each bin center.
     edges = np.zeros(len(x) + 1)
@@ -354,7 +407,7 @@ class Histogram1D:
   # ================================================================================================
 
   # Plot this histogram.
-  def plot(self, errors = True, bar = False, label = None, scale = 1, **kwargs):
+  def plot(self, errors = True, bar = False, label = None, scale = 1, ls = "-", **kwargs):
 
     # Set the x and y limits.
     # plt.xlim(self.edges[0], self.edges[-1])
@@ -375,9 +428,9 @@ class Histogram1D:
       )
     else:
       if errors:
-        return style.errorbar(self.centers, self.heights * scale, self.errors * scale, label = label, **kwargs)
+        return style.errorbar(self.centers, self.heights * scale, self.errors * scale, label = label, ls = ls, **kwargs)
       else:
-        return plt.plot(self.centers, self.heights * scale, label = label, **kwargs)
+        return plt.plot(self.centers, self.heights * scale, label = label, ls = ls, **kwargs)
 
   # ================================================================================================
 
@@ -442,53 +495,3 @@ class Histogram1D:
     else:
       raise ValueError("Histogram file format not recognized.")
     return Histogram1D(edges, heights = heights, cov = cov)
-
-  # ================================================================================================
-
-  # @staticmethod
-  # def transform(signal, frequencies, t0, type = "cosine", errors = True, wiggle = True):
-  #
-  #   if isinstance(frequencies, Histogram1D):
-  #     result = frequencies
-  #   else:
-  #     df = frequencies[1] - frequencies[0]
-  #     result = Histogram1D(np.arange(frequencies[0] - df/2, frequencies[-1] + df, df))
-  #
-  #   differences = np.arange(result.length) * result.width
-  #   cov = None
-  #
-  #   # Note: to first order, cosine and sine transforms have the same covariance. (Not a typo.)
-  #   if type == "cosine":
-  #
-  #     heights = util.cosineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
-  #     if errors:
-  #       cov = 0.5 * linalg.toeplitz(util.cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
-  #
-  #   elif type == "sine":
-  #
-  #     heights = util.sineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
-  #     if errors:
-  #       cov = 0.5 * linalg.toeplitz(util.cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
-  #
-  #   elif type == "magnitude":
-  #
-  #     cosine = util.cosineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
-  #     sine = util.sineTransform(result.centers, signal.heights, signal.centers, t0, wiggle)
-  #
-  #     tempCos = linalg.toeplitz(util.cosineTransform(differences, signal.errors**2, signal.centers, t0, False))
-  #     tempSin = linalg.toeplitz(util.sineTransform(differences, signal.errors**2, signal.centers, t0, False))
-  #
-  #     heights = np.sqrt(cosine**2 + sine**2)
-  #     if errors:
-  #       cov = 0.5 / np.outer(heights, heights) * (
-  #         (np.outer(cosine, cosine) + np.outer(sine, sine)) * tempCos \
-  #         + (np.outer(sine, cosine) - np.outer(cosine, sine)) * tempSin
-  #       )
-  #
-  #   else:
-  #     raise ValueError(f"Frequency transform type '{type}' not recognized.")
-  #
-  #   result.setHeights(heights)
-  #   if errors:
-  #     result.setCov(cov)
-  #   return result

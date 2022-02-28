@@ -13,13 +13,21 @@ path = os.path.dirname(gm2fr.__file__)
 # Find the first set of integers within a string.
 def findIndex(string):
   match = re.search(r"\D+(\d+)", string)
-  return match.group(1) if match else None
+  return int(match.group(1)) if match else None
 
 # Return a list of numerical indices extracted from a sequence of strings.
 def findIndices(sequence):
   return [index for index in (findIndex(item) for item in sequence) if index is not None]
 
 # ==================================================================================================
+
+def makeIfAbsent(path):
+  if not os.path.isdir(path):
+    print(f"\nCreating output directory '{path}'.")
+    os.mkdir(path)
+
+def forceList(obj):
+  return [obj] if type(obj) is not list else obj
 
 # Checks if an object matches the form of a 2-tuple (x, y).
 def isPair(obj):

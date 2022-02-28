@@ -118,3 +118,25 @@ class Error(Model):
     return result
 
 # ==============================================================================
+
+class Template(Model):
+
+  def __init__(self, template):
+    super().__init__()
+    self.name = "template"
+    self.template = template
+    self.seeds = [1, 1, 0]
+    # self.seeds = [1]
+    # self.seeds = [1, 1]
+
+  def function(self, f, a, b, c):
+    return a * self.template(b * (f - c))
+
+  # def function(self, f, a):
+  #   return a * self.template(f)
+
+  # def function(self, f, a, b):
+  #   return a * self.template(b * f)
+
+  def gradient(self, f):
+    return np.zeros(shape = (len(self.seeds), len(f)))

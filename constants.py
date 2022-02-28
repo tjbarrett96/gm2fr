@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 # ==================================================================================================
 
@@ -33,6 +34,7 @@ kHz_us = 1E-3
 
 # Class that groups information pertaining to different quantities, e.g. momentum, frequency, etc.
 class Quantity:
+  
   def __init__(
     self,
     label, # readable label string to appear in plots, e.g. "Equilibrium Radius"
@@ -48,6 +50,9 @@ class Quantity:
     self.magic, self.min, self.max = magic, min, max
     self.toF, self.fromF = toF, fromF
 
+  def formatLabel(self):
+    return self.label + (f" ({self.units})" if self.units is not None else "")
+
 # ==================================================================================================
 
 # Dictionary containing information (e.g. labels, magic values, etc.) for various types of quantities.
@@ -60,7 +65,7 @@ info = {
   "p": Quantity("Momentum", "p", "GeV"),
   "gamma": Quantity("Boost Factor", r"\gamma", None),
   "beta": Quantity("Speed", r"\beta", "$c$"),
-  "dp_p0": Quantity("Fractional Momentum Offset", r"\Delta p/p_0", "%"),
+  "dp_p0": Quantity("Fractional Momentum Offset", r"\Delta p/p_0", r"\%" if plt.rcParams["text.usetex"] else "%"),
   "T": Quantity("Period", "T", "ns"),
   "tau": Quantity("Lifetime", r"\tau", r"$\mu$s"),
   "c_e": Quantity("Electric Field Correction", "C_E", "ppb")

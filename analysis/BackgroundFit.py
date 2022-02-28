@@ -2,6 +2,7 @@ import numpy as np
 import scipy.optimize as opt
 import scipy.special as sp
 import scipy.linalg
+import copy
 
 import matplotlib.pyplot as plt
 import matplotlib.text
@@ -32,14 +33,9 @@ class BackgroundFit:
     # Keep a reference to the Transform object whose background we are fitting.
     self.transform = transform.copy()
 
-    # The cosine transform data.
-    # self.frequency = transform.frequency
-    # self.signal = signal.copy()
-
     # Key times used in the cosine transform: start, end, and t0.
     self.t0 = t0
     self.start = start
-    # self.end = transform.end
 
     # Fit data, with boundary mask applied.
     self.mask = const.unphysical(self.transform.centers)
@@ -63,11 +59,10 @@ class BackgroundFit:
       self.model = Sinc(np.min(self.transform.heights), self.start - self.t0)
     elif model == "error":
       self.model = Error(np.min(self.transform.heights), self.start - self.t0)
+    elif isinstance(model, Template):
+      self.model = copy.deepcopy(model)
     else:
       self.model = None
-
-    # if wiggle:
-    #   self.y -= self.wiggle(self.x)
 
     self.result = None
 
@@ -76,17 +71,9 @@ class BackgroundFit:
 
   # ============================================================================
 
-  # Wiggle.
-  # def wiggle(self, f):#, a):
-  #   # return 1E3 / (2*np.pi*f*1E-3) * np.sin(2*np.pi*f*(self.end - self.t0)*1E-3)
-  #   return 1 / (self.transform.fr.xWidth * util.kHz_us) * util.sine(f, self.start, self.end, self.t0)
-
-  # ============================================================================
-
   # Perform the background fit.
   def fit(self):
 
-    # self.model.fit(self.x, self.y - self.wiggle(self.x), self.cov)
     try:
       self.model.fit(self.x, self.y, self.cov)
     except ValueError:
@@ -99,14 +86,6 @@ class BackgroundFit:
       cov = self.model.covariance(self.transform.centers)
     )
     return self
-    # self.results = self.model.results(prefix = "bg")
-    # print(self.model.pOpt)
-
-  # ============================================================================
-
-  # Return the background-subtracted transform.
-  def subtract(self):
-    return self.transform + self.result*(-1)# - self.wiggle(self.frequency)
 
   # ============================================================================
 
@@ -127,7 +106,7 @@ class BackgroundFit:
       self.transform.centers[~self.mask],
       self.transform.heights[~self.mask],
       None,
-      fmt = "o-",
+      ls = "-",
       label = "Cosine Transform"
     )
 

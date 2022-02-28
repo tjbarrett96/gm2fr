@@ -85,6 +85,13 @@ def ylabel(label):
 
 # ==================================================================================================
 
+def twinx(right = 0.875):
+  plt.twinx()
+  plt.grid(False)
+  plt.subplots_adjust(right = right)
+
+# ==================================================================================================
+
 # Override plt.colorbar with automatic formatting.
 def colorbar(label = None, pad = 0.01, fraction = 0.10, aspect = 18, **kwargs):
   cbar = plt.colorbar(pad = pad, fraction = fraction, aspect = aspect, **kwargs)
@@ -95,8 +102,18 @@ def colorbar(label = None, pad = 0.01, fraction = 0.10, aspect = 18, **kwargs):
 # ==================================================================================================
 
 # Override plt.errorbar with automatic formatting.
-def errorbar(x, y, yErr, xErr = None, fmt = "o-", ms = 3, **kwargs):
-  return plt.errorbar(x, y, yErr, xErr, fmt = fmt, ms = ms, capsize = 2, lw = 1, elinewidth = 0.5, mew = 0.5, **kwargs)
+def errorbar(x, y, yErr, xErr = None, ls = "-", ms = 3, **kwargs):
+  return plt.errorbar(x, y, yErr, xErr, fmt = f"o{ls}", ms = ms, capsize = 2, lw = 1, elinewidth = 0.5, mew = 0.5, **kwargs)
+
+# ==================================================================================================
+
+# Shortcut for labeling axes, adding legend, saving the figure, and clearing the plot.
+def labelAndSave(xLabel, yLabel, filename):
+  xlabel(xLabel)
+  ylabel(yLabel)
+  plt.legend()
+  plt.savefig(filename)
+  plt.clf()
 
 # ==================================================================================================
 

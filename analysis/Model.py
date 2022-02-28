@@ -41,6 +41,7 @@ class Model:
     self.chi2 = None
     self.ndf = None
     self.chi2ndf = None
+    self.err_chi2ndf = None
     self.pval = None
 
   # ============================================================================
@@ -109,6 +110,7 @@ class Model:
       # Calculate the reduced chi-squared.
       self.ndf = len(self.x) - len(self.pOpt)
       self.chi2ndf = self.chi2 / self.ndf
+      self.err_chi2ndf = np.sqrt(2 / self.ndf) # std. dev. of reduced chi-squared distribution
 
       # Calculate the two-sided p-value for this chi2 & ndf.
       self.pval = calc.pval(self.chi2, self.ndf)
@@ -140,7 +142,7 @@ class Model:
   def plot(self, x = None, dataLabel = "Data", fitLabel = "Fit"):
 
     # Plot the data with errorbars.
-    style.errorbar(self.x, self.y, self.err, zorder = 0, fmt = "o", label = dataLabel)
+    style.errorbar(self.x, self.y, self.err, zorder = 0, ls = "", label = dataLabel)
 
     # Evaluate the fit result and one-sigma error band.
     fn_x = self.x if x is None else x
@@ -161,6 +163,7 @@ class Model:
       f"{prefix}_chi2": self.chi2,
       f"{prefix}_ndf": self.ndf,
       f"{prefix}_chi2ndf": self.chi2ndf,
+      f"{prefix}_err_chi2ndf": self.err_chi2ndf,
       f"{prefix}_pval": self.pval
     }
 
@@ -179,7 +182,7 @@ class Model:
     print(f"\nCompleted {self.name} fit.")
 
     if self.chi2ndf is not None:
-      print(f"{'chi2/ndf':>12} = {self.chi2ndf:.4f}")
+      print(f"{'chi2/ndf':>12} = {self.chi2ndf:.4f} +/- {self.err_chi2ndf:.4f}")
       print(f"{'p-value':>12} = {self.pval:.4f}")
 
     for i in range(len(self.pOpt)):
