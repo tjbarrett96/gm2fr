@@ -139,7 +139,7 @@ class Analyzer:
     end = 200, # End time (in us) for the cosine transform.
     t0 = 0.070, # t0 time (in us) for the cosine transform.
     optimize = True, # Search for an optimal t0 from the seed, or use the fixed value.
-    iterate = True,
+    iterate = False,
     model = "sinc", # Background fit model: "constant" / "parabola" / "sinc" / "error".
     df = 2, # Frequency interval (in kHz) for the cosine transform.
     coarseWidth = 0.020, # full range (in us) for the initial coarse t0 scan range.

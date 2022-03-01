@@ -6,6 +6,7 @@ import gm2fr.constants as const
 import gm2fr.calculations as calc
 from gm2fr.Histogram1D import Histogram1D
 
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 import gm2fr.style as style
@@ -65,7 +66,7 @@ class Optimizer:
     mid = np.average(time[mask], weights = signal[mask])
 
     # Subtract multiples of the cyclotron period to get near t0 ~ 0.
-    periods = int(round(mid / (const.info["T"].magic * 1E-3)))
+    periods = int(floor(mid / (const.info["T"].magic * 1E-3)))
     seed = mid - periods * const.info["T"].magic * 1E-3
 
     print(f"\nEstimated t0 seed: {seed*1E3:.2f} ns.")

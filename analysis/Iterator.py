@@ -73,7 +73,7 @@ class Iterator:
       # Terminate if no improvement.
       if not self.success:
         print("\nTerminating iteration: no further improvement.")
-        return self.result
+        break
 
       # Update the result.
       self.result = self.transform.optCosine.subtract(self.newBGFit.result)
