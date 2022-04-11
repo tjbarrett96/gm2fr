@@ -11,11 +11,11 @@ class Transform:
 
   # ================================================================================================
 
-  def __init__(self, signal, start = 4, end = 250, df = 2, width = 150):
+  def __init__(self, signal, df = 2, width = 150):
 
     self.signal = signal
-    self.start = start
-    self.end = end
+    self.start = self.signal.centers[0]
+    self.end = self.signal.centers[-1]
     self.scale = 1 / (signal.width * const.kHz_us)
 
     f = np.arange(const.info["f"].magic - width / 2, const.info["f"].magic + width / 2 + df, df)
@@ -36,10 +36,11 @@ class Transform:
   def transform(self):
 
     # Mask the fast rotation signal data between the start and end times.
-    mask = (self.signal.centers >= self.start) & (self.signal.centers <= self.end)
-    time = self.signal.centers[mask]
-    signal = self.signal.heights[mask]
-    errors = self.signal.errors[mask]
+    # mask = (self.signal.centers >= self.start) & (self.signal.centers <= self.end)
+    # time = self.signal.centers[mask]
+    # signal = self.signal.heights[mask]
+    # errors = self.signal.errors[mask]
+    time, signal, errors = self.signal.centers, self.signal.heights, self.signal.errors
 
     # Compute the cosine transform, and subtract the s(f) wiggle function.
     cosTransform = calc.npTransform(np.cos, self.rawCosine.centers, signal, time)

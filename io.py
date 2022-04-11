@@ -6,49 +6,68 @@ import numpy as np
 # ==================================================================================================
 
 # Path to the top of the gm2fr project directory.
-path = os.path.dirname(gm2fr.__file__)
+gm2fr_path = os.path.dirname(gm2fr.__file__)
 
 # ==================================================================================================
 
-# Find the first set of integers within a string.
-def findIndex(string):
-  match = re.search(r"\D+(\d+)", string)
+def find_index(string):
+  """Returns the first sequence of digits within a string as an integer, or else None."""
+  match = re.search(r"\D*(\d+)", string)
   return int(match.group(1)) if match else None
 
-# Return a list of numerical indices extracted from a sequence of strings.
-def findIndices(sequence):
-  return [index for index in (findIndex(item) for item in sequence) if index is not None]
+# ==================================================================================================
+
+def find_indices(sequence):
+  """Returns a list of numerical indices extracted from a sequence of strings, skipping non-matches."""
+  # return [index for index in (find_index(item) for item in sequence) if index is not None]
+  return [find_index(item) for item in sequence]
 
 # ==================================================================================================
 
-def makeIfAbsent(path):
+def make_if_absent(path):
+  """Creates a directory at the given path if it does not already exist."""
   if not os.path.isdir(path):
     print(f"\nCreating output directory '{path}'.")
     os.mkdir(path)
 
-def forceList(obj):
+# ==================================================================================================
+
+def force_list(obj):
+  """Returns a single-element list containing the object, unless already a list."""
   return [obj] if type(obj) is not list else obj
 
-# Checks if an object matches the form of a 2-tuple (x, y).
-def isPair(obj):
+# ==================================================================================================
+
+def is_pair(obj):
+  """Checks if an object matches the form of a 2-tuple (x, y)."""
   return isinstance(obj, tuple) and len(obj) == 2
 
-# Checks if an object is an integer or float.
-def isNumber(obj):
+# ==================================================================================================
+
+def is_number(obj):
+  """Checks if an object is an integer or float."""
   return isinstance(obj, (int, float)) or isinstance(obj, np.number)
 
-# Checks if an object is an integer.
-def isInteger(obj):
+# ==================================================================================================
+
+def is_integer(obj):
+  """Checks if an object is an integer."""
   return isinstance(obj, int) or isinstance(obj, np.integer)
 
-# Checks a boolean condition for each item in an iterable.
-def checkAll(obj, function):
+# ==================================================================================================
+
+def check_all(obj, function):
+  """Checks the given boolean condition for all items in the given container object."""
   return all(function(x) for x in obj)
 
-# Checks if an object is a 2-tuple of numbers.
-def isNumericPair(obj):
-  return isPair(obj) and checkAll(obj, isNumber)
+# ==================================================================================================
 
-# Checks if an object is a d-dimensional NumPy array.
-def isArray(obj, d = None):
+def is_numeric_pair(obj):
+  """Checks if an object is a 2-tuple of numbers."""
+  return is_pair(obj) and check_all(obj, is_number)
+
+# ==================================================================================================
+
+def is_array(obj, d = None):
+  """Checks if an object is a d-dimensional NumPy array."""
   return isinstance(obj, np.ndarray) and (obj.ndim == d if d is not None else True)

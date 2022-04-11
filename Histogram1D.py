@@ -57,9 +57,9 @@ class Histogram1D:
 
   @staticmethod
   def parseBinning(bins, range):
-    if io.isNumber(bins) and io.isNumericPair(range):
+    if io.is_number(bins) and io.is_numeric_pair(range):
       return np.linspace(range[0], range[1], bins + 1)
-    elif io.isArray(bins, 1) and range is None:
+    elif io.is_array(bins, 1) and range is None:
       return bins.copy()
     else:
       raise ValueError(f"Histogram bins '{bins}' and range '{range}' not understood.")
@@ -75,6 +75,7 @@ class Histogram1D:
     self.length = len(self.centers)
 
     # If all bins are the same width, update the bin and range format accordingly.
+    # TODO: np.isclose is too small to catch bin widths from simulation
     if np.all(np.isclose(self.width, self.width[0])):
       self.width = self.width[0]
       self.bins = len(self.centers)
@@ -125,7 +126,7 @@ class Histogram1D:
         result.cov += cov + cov.T
       if err is not None:
         raise ValueError("Argument 'err' is unused when both operands are Histogram1Ds.")
-    elif io.isNumber(b):
+    elif io.is_number(b):
       result.heights += b
       result.cov = a.cov
       if err is not None:
@@ -156,14 +157,14 @@ class Histogram1D:
         result.cov += temp + temp.T
       if err is not None:
         raise ValueError("Argument 'err' is unused when both operands are Histogram1Ds.")
-    elif io.isNumber(b):
+    elif io.is_number(b):
       result.heights *= b
       result.cov = b**2 * a.cov
       if err is not None:
         result.cov += np.outer(a.heights, a.heights) * err**2
       if cov is not None:
         raise NotImplementedError()
-    elif io.isArray(b):
+    elif io.is_array(b):
       result.heights *= b
       if result.cov.ndim == 2:
         result.cov = np.outer(b, b) * a.cov + np.outer(a.heights, a.heights)
@@ -180,21 +181,21 @@ class Histogram1D:
   def divide(a, b, cov = None, err = None, zero = 0):
     result = a.copy()
     if isinstance(b, Histogram1D) and (b.edges == a.edges).all():
-      result.heights /= np.where(b.heights == 0, zero, b.heights)
+      result.heights /= np.where(np.isclose(b.heights, 0), zero, b.heights)
       result.cov = 1 / np.outer(b.heights, b.heights) * a.cov + np.outer(a.heights, a.heights) / np.outer(b.heights, b.heights)**2 * b.cov
       if cov is not None:
         temp = np.outer(1 / b.heights, a.heights / b.heights**2) * cov
         result.cov -= temp + temp.T
       if err is not None:
         raise ValueError("Argument 'err' is unused when both operands are Histogram1Ds.")
-    elif io.isNumber(b):
+    elif io.is_number(b):
       result.heights /= b
       result.cov = a.cov / b**2
       if err is not None:
         result.cov += np.outer(a.heights, a.heights) / b**4 * err**2
       if cov is not None:
         raise NotImplementedError()
-    elif io.isArray(b):
+    elif io.is_array(b):
       result.heights /= b
       if result.cov.ndim == 2:
         result.cov = a.cov / np.outer(b, b)
@@ -210,7 +211,7 @@ class Histogram1D:
   # a(self)^b
   def power(a, b):
     result = a.copy()
-    if io.isNumber(b):
+    if io.is_number(b):
       result.heights **= b
       result.cov = b**2 * np.outer(a.heights, a.heights)**(b - 1) * a.cov
     else:
@@ -234,7 +235,7 @@ class Histogram1D:
   def convolve(self, function):
     result = self.copy().clear()
     # extra = len(result.heights)
-    # if io.isNumber(result.width):
+    # if io.is_number(result.width):
     #   df = result.width
     #   leftPad = np.arange(result.centers[0] - extra * df, result.centers[0], df)
     #   rightPad = np.arange(result.centers[-1] + df, result.centers[-1] + (extra + 1) * df, df)
@@ -252,8 +253,22 @@ class Histogram1D:
   # ================================================================================================
 
   # Transform this histogram's bin edges according to the supplied function.
+  # TODO: must sort bin edges in order of increasing value? but only if monotonic...
   def map(self, function):
+
+    # Apply the function to the bin edges.
     self.edges = function(self.edges)
+
+    # Sort the bin edges in increasing order.
+    # sorted_indices = self.edges.argsort()
+    # self.edges = self.edges[sorted_indices]
+    # self.heights = self.heights[sorted_indices]
+    # if self.cov.ndim == 1:
+    #   self.cov = self.cov[sorted_indices]
+    # else:
+    #   self.cov = self.cov[sorted_indices][sorted_indices]
+
+    self.updateErrors()
     self.updateBins()
     return self
 
@@ -319,7 +334,7 @@ class Histogram1D:
   # TODO: don't discard original data, just make a new view (so we can re-mask)
   def mask(self, range):
 
-    if io.isNumericPair(range):
+    if io.is_numeric_pair(range):
       minIndex = np.searchsorted(self.centers, range[0], side = "left")
       maxIndex = np.searchsorted(self.centers, range[1], side = "right")
 
@@ -366,7 +381,7 @@ class Histogram1D:
   # Merge integer groups of bins along the x- or y-axes.
   def rebin(self, step, discard = False):
 
-    if io.isInteger(step) and step > 0:
+    if io.is_integer(step) and step > 0:
       self.heights = Histogram1D.splitSum(self.heights, step, 0, discard)
       self.cov = Histogram1D.splitSum(self.cov, step, 0, discard)
       if self.cov.ndim == 2:
@@ -386,7 +401,7 @@ class Histogram1D:
   def interpolate(self, x, spline = True):
 
     # Interpolate new bin heights at the desired bin centers.
-    if io.isNumber(x):
+    if io.is_number(x):
       x = np.arange(self.edges[0], self.edges[-1] + x, x)
 
     if spline:
@@ -407,19 +422,30 @@ class Histogram1D:
   # ================================================================================================
 
   # Plot this histogram.
-  def plot(self, errors = True, bar = False, label = None, scale = 1, ls = "-", **kwargs):
+  def plot(self, errors = True, bar = False, start = None, end = None, skip = 1, label = None, scale = 1, ls = "-", **kwargs):
+
+    # Select points to plot, skipping by 'skip' and scaling by 'scale'.
+    plot_centers = self.centers[::skip]
+    plot_heights, plot_errors = self.heights[::skip] * scale, self.errors[::skip] * scale
+
+    # Mask the data points between 'start' and 'end'.
+    plot_start = np.min(plot_centers) if start is None else start
+    plot_end = np.max(plot_centers) if end is None else end
+    mask = (plot_centers >= plot_start) & (plot_centers <= plot_end)
+    plot_centers = plot_centers[mask]
+    plot_heights, plot_errors = plot_heights[mask], plot_errors[mask]
 
     # Set the x and y limits.
-    # plt.xlim(self.edges[0], self.edges[-1])
-    # if np.min(self.heights) > 0:
-    #   plt.ylim(0, None)
+    plt.xlim(plot_centers[0], plot_centers[-1])
+    # if np.min(plot_heights) > 0:
+    #   plt.ylim(0, 1.05 * np.max(plot_heights))
 
     # Make a bar plot if requested, or else errorbar/line plot.
     if bar:
       return plt.bar(
-        self.centers,
-        self.heights * scale,
-        yerr = self.errors * scale if errors else None,
+        plot_centers,
+        plot_heights,
+        yerr = plot_errors if errors else None,
         width = self.width,
         label = label,
         linewidth = 0.5,
@@ -428,13 +454,14 @@ class Histogram1D:
       )
     else:
       if errors:
-        return style.errorbar(self.centers, self.heights * scale, self.errors * scale, label = label, ls = ls, **kwargs)
+        return style.errorbar(plot_centers, plot_heights, plot_errors, label = label, ls = ls, **kwargs)
       else:
-        return plt.plot(self.centers, self.heights * scale, label = label, ls = ls, **kwargs)
+        return plt.plot(plot_centers, plot_heights, label = label, ls = ls, **kwargs)
 
   # ================================================================================================
 
   # Save this histogram to disk in NumPy format.
+  # TODO: match ROOT format
   def save(self, filename, name = None, labels = ""):
     if filename.endswith(".root") and name is not None:
       file = root.TFile(filename, "RECREATE")

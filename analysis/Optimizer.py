@@ -66,7 +66,7 @@ class Optimizer:
     mid = np.average(time[mask], weights = signal[mask])
 
     # Subtract multiples of the cyclotron period to get near t0 ~ 0.
-    periods = int(floor(mid / (const.info["T"].magic * 1E-3)))
+    periods = int(math.floor(mid / (const.info["T"].magic * 1E-3)))
     seed = mid - periods * const.info["T"].magic * 1E-3
 
     print(f"\nEstimated t0 seed: {seed*1E3:.2f} ns.")
@@ -131,6 +131,8 @@ class Optimizer:
     print(f"\nCompleted background optimization in {(time.time() - begin):.2} seconds.")
     print(f"{'best chi2/ndf':>16} = {(min_chi2 / ndf):.4f}")
     print(f"{'new t0':>16} = {self.t0*1000:.4f} +/- {(self.err_t0 * 1000):.4f} ns")
+
+    return self.t0
 
   # ================================================================================================
 

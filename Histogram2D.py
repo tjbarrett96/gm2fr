@@ -105,7 +105,7 @@ class Histogram2D:
 
   # Override the *= operator to scale the bin entries in-place.
   def __imul__(self, scale):
-    if io.isNumber(scale):
+    if io.is_number(scale):
       self.heights *= scale
       self.errors *= abs(scale)
     elif isinstance(scale, Histogram2D):
@@ -225,7 +225,7 @@ class Histogram2D:
     for axis, range in enumerate(ranges):
       if range is None:
         continue
-      if io.isNumericPair(range):
+      if io.is_numeric_pair(range):
         min = np.searchsorted(self.centers[axis], range[0], side = "left")
         max = np.searchsorted(self.centers[axis], range[1], side = "right")
 
@@ -248,7 +248,7 @@ class Histogram2D:
     for axis, step in enumerate(steps):
       if step is None:
         continue
-      if io.isInteger(step) and step > 0:
+      if io.is_integer(step) and step > 0:
         self.heights = Histogram1D.splitSum(self.heights, step, axis, discard)
         self.errors = np.sqrt(Histogram1D.splitSum(self.errors**2, step, axis, discard))
         self.edges[axis] = self.edges[axis][::step]

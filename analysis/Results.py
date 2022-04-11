@@ -6,10 +6,11 @@ import pandas as pd
 class Results:
 
   def __init__(self, data = None):
-    self.table = pd.DataFrame(
-      data,
-      index = [0] if data is not None else None
-    )
+    # self.table = pd.DataFrame(
+    #   data,
+    #   index = [0] if data is not None else None
+    # )
+    self.table = pd.DataFrame(data)
 
   # ============================================================================
 
@@ -24,8 +25,8 @@ class Results:
   def append(self, result, index = None):
 
     # If an index was specified and there's only one row, set the new index.
-    if index is not None and len(result.table) == 1:
-      result.table.index = [index]
+    # if index is not None and len(result.table) == 1:
+    #   result.table.index = [index]
 
     # Append the other table to this table.
     self.table = self.table.append(result.table)
@@ -61,3 +62,9 @@ class Results:
       delimiter = "  ",
       comments = ""
     )
+
+    # ============================================================================
+
+    @staticmethod
+    def load(self, path):
+      return Results(np.load(path))

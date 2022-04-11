@@ -108,11 +108,14 @@ def errorbar(x, y, yErr, xErr = None, ls = "-", ms = 3, **kwargs):
 # ==================================================================================================
 
 # Shortcut for labeling axes, adding legend, saving the figure, and clearing the plot.
-def labelAndSave(xLabel, yLabel, filename):
+def labelAndSave(xLabel, yLabel, output):
   xlabel(xLabel)
   ylabel(yLabel)
   plt.legend()
-  plt.savefig(filename)
+  if isinstance(output, PdfPages):
+    output.savefig()
+  else:
+    plt.savefig(output)
   plt.clf()
 
 # ==================================================================================================
