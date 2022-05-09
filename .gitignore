@@ -21,13 +21,18 @@ datasets.py
 # Generally, ignore any subdirectories unless explicitly allowed below.
 */
 
-# Keep the simulation and analysis subdirectories, but ignore further subdirectories.
+# Keep the simulation directory, but ignore further subdirectories by default.
 !simulation
-!analysis
 simulation/*/
+
+# Keep the analysis directory, but ignore further subdirectories by default.
+!analysis
 analysis/*/
 
-# Keep an empty gm2fr/simulation/data folder, but not any contents.
+# Keep the analysis/scripts directory.
+!analysis/scripts
+
+# Keep an empty simulation/data folder, but not any contents.
 !simulation/data
 simulation/data/*
 !simulation/data/.gitkeep

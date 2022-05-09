@@ -6,11 +6,11 @@ import pandas as pd
 class Results:
 
   def __init__(self, data = None):
-    # self.table = pd.DataFrame(
-    #   data,
-    #   index = [0] if data is not None else None
-    # )
-    self.table = pd.DataFrame(data)
+    self.table = pd.DataFrame(
+      data,
+      index = [0] if data is not None else None
+    )
+    # self.table = pd.DataFrame(data)
 
   # ============================================================================
 
@@ -34,7 +34,7 @@ class Results:
   # ============================================================================
 
   def array(self):
-    return self.table.to_records()
+    return self.table.to_records(index = False)
 
   # ============================================================================
 
@@ -63,8 +63,8 @@ class Results:
       comments = ""
     )
 
-    # ============================================================================
+  # ============================================================================
 
-    @staticmethod
-    def load(self, path):
-      return Results(np.load(path))
+  @staticmethod
+  def load(path):
+    return Results(np.load(path))
