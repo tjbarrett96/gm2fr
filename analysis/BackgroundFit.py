@@ -1,14 +1,9 @@
 import numpy as np
-import scipy.optimize as opt
-import scipy.special as sp
-import scipy.linalg
 import copy
 
 import matplotlib.pyplot as plt
-import matplotlib.text
 
 from gm2fr.analysis.BackgroundModels import *
-# import gm2fr.utilities as util
 import gm2fr.constants as const
 import gm2fr.style as style
 style.setStyle()

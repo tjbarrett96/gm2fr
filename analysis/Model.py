@@ -1,6 +1,5 @@
 import numpy as np
 import scipy.optimize as opt
-# import gm2fr.utilities as util
 import gm2fr.calculations as calc
 from gm2fr.analysis.Results import Results
 from gm2fr.Histogram1D import Histogram1D

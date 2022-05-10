@@ -4,7 +4,6 @@ import scipy.stats
 import matplotlib.pyplot as plt
 import gm2fr.style as style
 style.setStyle()
-from gm2fr.Histogram1D import Histogram1D
 
 # ==================================================================================================
 

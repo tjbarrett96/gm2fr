@@ -1,11 +1,7 @@
 import sys
 import ROOT as root
-import re
-import numpy as np
-import os
 import gm2fr.io as io
 from merge_results import merge_results
-
 from gm2fr.analysis.Analyzer import Analyzer
 
 # ==================================================================================================

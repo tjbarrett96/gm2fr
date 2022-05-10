@@ -1,9 +1,5 @@
 import numpy as np
-import numpy.lib.recfunctions as rec
 import matplotlib.pyplot as plt
-import scipy.optimize as opt
-import scipy.interpolate as interp
-from matplotlib.backends.backend_pdf import PdfPages
 
 # import gm2fr.utilities as util
 import gm2fr.io as io
@@ -12,24 +8,19 @@ import gm2fr.calculations as calc
 import gm2fr.style as style
 from gm2fr.analysis.Transform import Transform
 from gm2fr.Histogram1D import Histogram1D
-from gm2fr.Histogram2D import Histogram2D
 from gm2fr.analysis.Optimizer import Optimizer
 from gm2fr.analysis.Results import Results
-import gm2fr.analysis.WiggleFit as wg
+from gm2fr.analysis.WiggleFit import WiggleFit
 from gm2fr.analysis.BackgroundFit import BackgroundFit
-from gm2fr.analysis.BackgroundModels import Template
 from gm2fr.analysis.Iterator import Iterator
 from gm2fr.analysis.Corrector import Corrector
 
 import ROOT as root
-import root_numpy as rnp
 
 # Filesystem management.
 import os
 import gm2fr.analysis
 import time
-import itertools
-import re
 
 # ==================================================================================================
 
@@ -107,7 +98,7 @@ class Analyzer:
     # Create the fast rotation signal using a wiggle fit.
     elif method in ("two", "five", "nine"):
 
-      self.wiggle_fit = wg.WiggleFit(self.raw_signal, model = method, n = self.n)
+      self.wiggle_fit = WiggleFit(self.raw_signal, model = method, n = self.n)
       self.wiggle_fit.fit()
       self.fr_signal = self.raw_signal.divide(self.wiggle_fit.fineResult)
 
@@ -188,7 +179,7 @@ class Analyzer:
         self.fr_signal.save(f"{self.output_path}/signal.npz")
         self.fr_signal.save(f"{self.output_path}/signal.root", "signal")
 
-        pdf = PdfPages(f"{self.output_path}/FastRotation.pdf")
+        pdf = style.makePDF(f"{self.output_path}/FastRotation.pdf")
         endTimes = [5, 100, 300]
         for endTime in endTimes:
           self.fr_signal.plot(errors = False, start = 4, end = endTime, skip = int(np.clip(endTime - 4, 1, 10)))
@@ -211,7 +202,7 @@ class Analyzer:
           axesToPlot.remove("c_e")
           axesToPlot.remove("beta")
 
-      pdf = PdfPages(f"{self.output_path}/AllDistributions.pdf")
+      pdf = style.makePDF(f"{self.output_path}/AllDistributions.pdf")
       rootFile = root.TFile(f"{self.output_path}/transform.root", "RECREATE")
 
       # Compile the results list of (name, value) pairs from each object.

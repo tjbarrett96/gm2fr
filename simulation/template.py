@@ -1,6 +1,5 @@
 from gm2fr.simulation.mixture import GaussianMixture
 from gm2fr.simulation.simulator import Simulator
-import gm2fr.utilities as util
 
 import matplotlib.pyplot as plt
 import gm2fr.style as style

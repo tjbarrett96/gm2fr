@@ -1,10 +1,6 @@
 import numpy as np
-import scipy.optimize as opt
-# import gm2fr.utilities as util
 import gm2fr.constants as const
-from matplotlib.backends.backend_pdf import PdfPages
 
-from gm2fr.Histogram1D import Histogram1D
 from gm2fr.analysis.WiggleModels import *
 import matplotlib.pyplot as plt
 import gm2fr.style as style
@@ -143,7 +139,7 @@ class WiggleFit:
       plt.xlim(0, 5)
       plt.ylim(0, None)
 
-      pdf = PdfPages(f"{output}/RawSignal.pdf")
+      pdf = style.makePDF(f"{output}/RawSignal.pdf")
       pdf.savefig()
 
       # Save the figure over a range of time axis limits (in us).

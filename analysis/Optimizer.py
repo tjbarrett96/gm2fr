@@ -1,17 +1,11 @@
 from gm2fr.analysis.BackgroundFit import BackgroundFit
-from gm2fr.analysis.Results import Results
-import gm2fr.analysis.Model as model
-# import gm2fr.utilities as util
 import gm2fr.constants as const
-import gm2fr.calculations as calc
-from gm2fr.Histogram1D import Histogram1D
 
-import math
+# import math
 import numpy as np
 import matplotlib.pyplot as plt
 import gm2fr.style as style
 style.setStyle()
-from matplotlib.backends.backend_pdf import PdfPages
 import time
 
 # ==================================================================================================
@@ -66,7 +60,7 @@ class Optimizer:
     mid = np.average(time[mask], weights = signal[mask])
 
     # Subtract multiples of the cyclotron period to get near t0 ~ 0.
-    periods = int(math.floor(mid / (const.info["T"].magic * 1E-3)))
+    periods = int(np.floor(mid / (const.info["T"].magic * 1E-3)))
     seed = mid - periods * const.info["T"].magic * 1E-3
 
     print(f"\nEstimated t0 seed: {seed*1E3:.2f} ns.")
@@ -181,7 +175,7 @@ class Optimizer:
     plt.rcParams["text.usetex"] = False
 
     # Initialize the multi-page PDF file for scan plots.
-    pdf = PdfPages(output)
+    pdf = style.makePDF(output)
 
     # Plot each background fit, updating the initialized plot each time.
     for i in range(len(self.fits)):

@@ -1,6 +1,5 @@
 from gm2fr.analysis.Model import Model
 import numpy as np
-# import gm2fr.utilities as util
 import gm2fr.constants as const
 
 # ==============================================================================

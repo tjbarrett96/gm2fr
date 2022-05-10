@@ -7,7 +7,8 @@ import root_numpy as rnp
 from gm2fr.simulation.mixture import GaussianMixture
 from gm2fr.Histogram1D import Histogram1D
 from gm2fr.Histogram2D import Histogram2D
-import gm2fr.utilities as utilities
+import gm2fr.io as io
+import gm2fr.constants as const
 
 import matplotlib.pyplot as plt
 import gm2fr.style as style
@@ -42,7 +43,7 @@ class Simulator:
     if jointDistribution is None and (kinematicsDistribution is None or timeDistribution is None):
       raise ValueError("Invalid input distributions.")
 
-    path = f"{utilities.path}/simulation/data/{name}"
+    path = f"{io.gm2fr_path}/simulation/data/{name}"
     if not os.path.isdir(path):
       os.mkdir(path)
       print(f"Creating simulation directory 'gm2fr/simulation/data/{name}'.")
@@ -91,14 +92,14 @@ class Simulator:
     if self.kinematicsUnits == "frequency":
       frequencies = kinematics
     elif self.kinematicsUnits == "momentum":
-      frequencies = utilities.momentumToFrequency(kinematics)
+      frequencies = const.info["p"].toF(kinematics)
     elif self.kinematicsUnits == "offset":
-      frequencies = utilities.offsetToFrequency(kinematics)
+      frequencies = const.info["dp_p0"].toF(kinematics)
     else:
       raise ValueError(f"Kinematics variable '{self.kinematicsUnits}' not recognized.")
 
     # Mask unphysical frequencies.
-    mask = (frequencies >= utilities.min["f"]) & (frequencies <= utilities.max["f"])
+    mask = (frequencies >= const.info["f"].min) & (frequencies <= const.info["f"].max)
 
     return offsets[mask], frequencies[mask]
 
@@ -160,7 +161,7 @@ class Simulator:
     self.joint = Histogram2D(self.profile.edges, self.frequencies.edges)
 
     # Maximum number of turns up to the chosen end time.
-    self.maxTurns = self.end // (1 / utilities.max["f"] * 1E3) + 1
+    self.maxTurns = self.end // (1 / const.info["f"].max * 1E3) + 1
     self.minTurns = -self.maxTurns if self.backward else 0
 
     # Break up the total number of muons into batches, for memory efficiency.
@@ -193,12 +194,12 @@ class Simulator:
       self.joint.fill(offsets * 1E3, frequencies)
 
       # Calculate the cyclotron periods, in microseconds.
-      periods = utilities.frequencyToPeriod(frequencies) * 1E-3
+      periods = 1 / frequencies * const.kHz_us
 
       if decay == "exponential":
 
         # Draw a random decay time for each muon.
-        lifetimes = utilities.frequencyToGamma(frequencies) * utilities.lifetime
+        lifetimes = const.info["tau"].fromF(frequencies)
         decays = np.random.exponential(scale = lifetimes)
 
         # Update the mean lifetime with this batch of muons.
@@ -300,15 +301,15 @@ class Simulator:
     )
 
     # Prepare the truth-level radial TGraph.
-    radial = root.TGraph()
-    radial.SetName("radial")
-    rnp.fill_graph(
-      radial,
-      np.stack(
-        (utilities.frequencyToRadius(self.frequencies.centers), self.frequencies.heights),
-        axis = -1
-      )
-    )
+    # radial = root.TGraph()
+    # radial.SetName("radial")
+    # rnp.fill_graph(
+    #   radial,
+    #   np.stack(
+    #     (utilities.frequencyToRadius(self.frequencies.centers), self.frequencies.heights),
+    #     axis = -1
+    #   )
+    # )
 
     # Save simulation histograms in ROOT format.
     rootFile = root.TFile(f"{self.directory}/simulation.root", "RECREATE")
@@ -316,7 +317,7 @@ class Simulator:
     self.profile.toRoot("profile", ";Injection Time (ns);Entries").Write()
     self.joint.toRoot("joint", ";Injection Time (ns);Frequency (kHz)").Write()
     self.signal.toRoot("signal", ";Time (us);Arbitrary Units").Write()
-    radial.Write()
+    # radial.Write()
     rootFile.Close()
 
   # ============================================================================
@@ -338,7 +339,7 @@ class Simulator:
     plt.close()
 
     self.joint.transpose().plot()
-    plt.xlim(utilities.min["f"], utilities.max["f"])
+    plt.xlim(const.info["f"].min, const.info["f"].max)
     style.ylabel("Injection Time (ns)")
     style.xlabel("Frequency (kHz)")
     plt.savefig(f"{self.directory}/joint.pdf")

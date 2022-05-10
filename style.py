@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import matplotlib.colors
 from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 import gm2fr.constants as const

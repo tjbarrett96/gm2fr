@@ -3,7 +3,6 @@ from gm2fr.Histogram2D import Histogram2D
 import gm2fr.calculations as calc
 import gm2fr.constants as const
 
-import gm2fr.style as style
 import numpy as np
 
 import matplotlib.pyplot as plt

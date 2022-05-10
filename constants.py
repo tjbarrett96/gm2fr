@@ -34,7 +34,7 @@ kHz_us = 1E-3
 
 # Class that groups information pertaining to different quantities, e.g. momentum, frequency, etc.
 class Quantity:
-  
+
   def __init__(
     self,
     label, # readable label string to appear in plots, e.g. "Equilibrium Radius"
@@ -97,6 +97,8 @@ info["c_e"].fromF = lambda f, n = 0.108: 2 * n * (1 - n) * (info["beta"].magic *
 
 # Set the conversion functions to frequency (only useful for some variables).
 info["r"].toF = lambda r: info["beta"].magic * c / (2 * np.pi * r) # f = v/r, in kHz for r in mm
+info["p"].toF = lambda p, n = 0.108: info["f"].magic * (1 - (p / info["p"].magic - 1) / (1 - n))
+info["dp_p0"].toF = lambda dp_p0, n = 0.108: info["p"].toF(info["p"].magic * (1 + dp_p0 / 100), n)
 
 # Set the minimum and maximum values for stored radii, and convert to frequency.
 info["r"].min, info["r"].max = info["r"].magic - 45, info["r"].magic + 45

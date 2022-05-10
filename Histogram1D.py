@@ -1,13 +1,10 @@
 import numpy as np
 import array
-import scipy.linalg as linalg
-import scipy.sparse as sparse
 import scipy.interpolate as interp
 
 import matplotlib.pyplot as plt
 import gm2fr.style as style
 style.setStyle()
-# import gm2fr.utilities as util
 import gm2fr.io as io
 
 import ROOT as root

@@ -4,7 +4,6 @@ import array
 import matplotlib.pyplot as plt
 import gm2fr.style as style
 style.setStyle()
-# import gm2fr.utilities as util
 import gm2fr.io as io
 from gm2fr.Histogram1D import Histogram1D
 

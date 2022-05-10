@@ -1,7 +1,6 @@
 import sys
 import os
 import gm2fr.io as io
-import numpy as np
 from gm2fr.analysis.Results import Results
 
 # ==================================================================================================
