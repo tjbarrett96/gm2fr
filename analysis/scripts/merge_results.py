@@ -6,7 +6,7 @@ from gm2fr.analysis.Results import Results
 
 # ==================================================================================================
 
-def merge_results(parent_dir):
+def merge_results(parent_dir, filename = "results"):
 
   # Get a list of sub-directories contained in the parent directory.
   folders = [folder for folder in os.listdir(parent_dir) if os.path.isdir(f"{parent_dir}/{folder}")]
@@ -22,11 +22,11 @@ def merge_results(parent_dir):
   indices = [(index if index is not None else -1) for index in io.find_indices(folders)]
   merged_results.table["index"] = indices
 
-  # Put the new 'index' column first.
+  # Put the new 'index' column first, and sort the rows by index value.
   column_order = ["index"] + [col for col in merged_results.table.columns if col != "index"]
-  merged_results.table = merged_results.table[column_order]
+  merged_results.table = merged_results.table[column_order].sort_values(by = "index")
 
-  merged_results.save(parent_dir, filename = "results_test")
+  merged_results.save(parent_dir, filename = filename)
 
 # ==================================================================================================
 

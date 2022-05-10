@@ -4,123 +4,116 @@ import re
 import numpy as np
 import os
 import gm2fr.io as io
+from merge_results import merge_results
 
 from gm2fr.analysis.Analyzer import Analyzer
 
 # ==================================================================================================
 
-# Check for the dataset and (optional) scan arguments.
-if len(sys.argv) < 2 or len(sys.argv) > 9:
-  print("Arguments not recognized. Usage:")
-  print("python3 analyze_dataset.py [dataset] [all / calo / bunch / run / energy / threshold / row / column]")
-  exit()
-
-# Parse the dataset argument.
-dataset = sys.argv[1]
-
-# Create the output directory for the dataset if it doesn't already exist.
-if not os.path.isdir(f"{io.gm2fr_path}/analysis/results/{dataset}"):
-  os.mkdir(f"{io.gm2fr_path}/analysis/results/{dataset}")
-
-# The path to the dataset ROOT file.
-inputPath = f"{io.gm2fr_path}/data/FastRotation_{dataset}.root"
+# Dictionary mapping subset names to the name of the parent directory in the ROOT data file.
+subset_dir = {
+  "calo": "IndividualCalos",
+  "bunch": "BunchNumber",
+  "run": "RunNumber",
+  "energy": "EnergyBins",
+  "threshold": "EnergyThreshold",
+  "row": "CrystalRow",
+  "column": "CrystalColumn"
+}
 
 # ==================================================================================================
 
-# Parse the scan type argument(s).
-if len(sys.argv) == 2:
-  # Nominal (all calos) analysis if no scan specified.
-  scanTypes = ["nominal"]
-else:
-  # Take all remaining parameters as scan types.
-  scanTypes = [scan.lower() for scan in sys.argv[2:]]
+def analyze_dataset(dataset, subset = "nominal"):
 
-# If "all" is specified as a scan type, do them all.
-if "all" in scanTypes:
-  scanTypes = ["nominal", "calo", "bunch", "run", "energy", "threshold", "row", "column"]
+  # Validate the requested subset to analyze.
+  if subset not in ("nominal", *subset_dir.keys()):
+    print(f"Data subset type '{subset}' not recognized.")
+    return
 
-# ==================================================================================================
+  # Construct the standard path to the dataset ROOT file.
+  input_path = f"{io.gm2fr_path}/data/FastRotation_{dataset}.root"
 
-for scanType in scanTypes:
+  if subset == "nominal":
 
-  # Configure the paths to the histograms within the ROOT file, and the output directory tags.
-  if scanType == "nominal":
-    tags = ["Nominal"]
-    directories = ["FastRotation/AllCalos"]
-
-  elif scanType == "calo":
-    # Assuming there are 24 calorimeters in the file.
-    tags = [f"Calo{i}" for i in range(1, 25)]
-    directories = [f"FastRotation/IndividualCalos/{tag}" for tag in tags]
-
-  elif scanType == "bunch":
-    # Assuming there are 16 bunches in the file.
-    tags = [f"Bunch{i}" for i in range(0, 16)]
-    directories = [f"FastRotation/BunchNumber/{tag}" for tag in tags]
-
-  elif scanType == "run":
-    # Find which run numbers are in the file.
-    inputFile = root.TFile(inputPath)
-    numbers = util.findIndices([item.GetName() for item in inputFile.Get("FastRotation/RunNumber").GetListOfKeys()])
-    inputFile.Close()
-    tags = [f"Run{i}" for i in numbers]
-    directories = [f"FastRotation/RunNumber/{tag}" for tag in tags]
-
-  elif scanType == "energy":
-    # Find which energy bins are in the file.
-    inputFile = root.TFile(inputPath)
-    energies = util.findIndices([item.GetName() for item in inputFile.Get("FastRotation/EnergyBins").GetListOfKeys()])
-    inputFile.Close()
-    tags = [f"Energy{i}" for i in energies]
-    directories = [f"FastRotation/EnergyBins/Energy_{i}_to_{int(i) + 200}_MeV" for i in energies]
-
-  elif scanType == "threshold":
-    # Find which energy thresholds are in the file.
-    inputFile = root.TFile(inputPath)
-    energies = util.findIndices([item.GetName() for item in inputFile.Get("FastRotation/EnergyThreshold").GetListOfKeys()])
-    inputFile.Close()
-    tags = [f"Threshold{i}" for i in energies]
-    directories = [f"FastRotation/EnergyThreshold/Energy_gt_{i}_MeV" for i in energies]
-
-  elif scanType == "row":
-    # Assuming there are 6 crystal rows in the file.
-    tags = [f"Row{i}" for i in range(0, 6)]
-    directories = [f"FastRotation/CrystalRow/{tag}" for tag in tags]
-
-  elif scanType == "column":
-    # Assuming there are 9 crystal columns in the file.
-    tags = [f"Column{i}" for i in range(0, 9)]
-    directories = [f"FastRotation/CrystalColumn/{tag}" for tag in tags]
+    # For the nominal analysis, there are no input subdirectories and no output group folder.
+    input_folders = ["FastRotation/AllCalos"]
+    subset_indices = []
+    output_group = None
+    output_folders = ["Nominal"]
 
   else:
-    print(f"Scan type {scanType} not recognized.")
-    exit()
 
-  # Assemble the lists of histogram paths for each signal in the scan.
-  signals = [f"{inputDir}/hHitTime" for inputDir in directories]
-  pileupSignals = [f"{inputDir}/hPileupTime" for inputDir in directories]
+    # Get a list of subdirectories inside the input parent directory for this subset.
+    input_file = root.TFile(input_path)
+    input_folders = [
+      f"FastRotation/{subset_dir[subset]}/{item.GetName()}"
+      for item in input_file.Get(f"FastRotation/{subset_dir[subset]}").GetListOfKeys()
+    ]
+    input_file.Close()
 
-  for signal, pileup_signal, tag in zip(signals, pileupSignals, tags):
+    # Look in each subdirectory name for an identifying numerical index (e.g. calo number).
+    subset_indices = io.find_indices(input_folders)
 
-    if scanType != "nominal":
-      tag = f"{dataset}/By{scanType.capitalize()}/{tag}"
-    else:
-      tag = f"{dataset}/Nominal"
+    # Construct the output group name (e.g. ByCalo) and output folders (e.g. [Calo1, Calo2, ...]).
+    output_group = f"By{subset.capitalize()}"
+    output_folders = [f"{subset.capitalize()}{index}" for index in subset_indices]
+
+  # Run the analysis on each part of the subset (e.g. each calo).
+  for input_folder, subset_index, output_folder in zip(input_folders, subset_indices, output_folders):
+
+    # Special exclusions of subsets which don't behave well.
+    if subset in ("energy", "threshold") and subset_index < 500:
+      continue
 
     analyzer = Analyzer(
-      inputPath,
-      signal,
-      pileup_signal,
-      tag,
-      # group = f"{dataset}/By{scanType.capitalize()}" if scanType != "nominal" else f"{dataset}",
-      units = "ns",
-      fr_method = "nine" if scanType == "nominal" else "five",
-      n = 0.108 if dataset not in ["1B", "1C"] else 0.120
+      filename = input_path,
+      signal_label = f"{input_folder}/hHitTime",
+      pileup_label = f"{input_folder}/hPileupTime",
+      output_label = f"{dataset}/{(output_group + '/') if output_group is not None else ''}{output_folder}",
+      fr_method = "nine" if subset == "nominal" else "five",
+      n = 0.108 if dataset not in ("1B", "1C") else 0.120,
+      units = "ns"
     )
 
     analyzer.analyze(
       start = 4,
-      end = 250 if scanType != "run" else 150,
+      end = 250 if subset != "run" else 150,
       bg_model = "sinc",
-      plots = 2 if scanType == "nominal" else 1
+      plots = 2 if subset == "nominal" else 1
     )
+
+  # Concatenate the results over the subset into a single group results file.
+  if output_group is not None:
+    merge_results(
+      parent_dir = f"{io.gm2fr_path}/analysis/results/{dataset}/{output_group}",
+      filename = f"{dataset}_{subset}_results"
+    )
+
+# ==================================================================================================
+
+if __name__ == "__main__":
+
+  # Check for the dataset and (optional) scan arguments.
+  if len(sys.argv) < 2:
+    print("Arguments not recognized. Usage:")
+    print("python3 analyze_dataset.py <dataset> [subset: nominal (default) / calo / bunch / run / energy / threshold / row / column / all]")
+    exit()
+
+  # Parse the dataset argument.
+  dataset = sys.argv[1]
+
+  # Parse the subset argument(s).
+  if len(sys.argv) == 2:
+    # Nominal (all calos) analysis if no scan specified.
+    subsets = ["nominal"]
+  else:
+    # Take all remaining parameters as subset types.
+    subsets = [subset.lower() for subset in sys.argv[2:]]
+
+  # If one of the arguments was "all", then analyze all supported subset types.
+  if "all" in subsets:
+    subsets = ["nominal"] + list(subset_dir.keys())
+
+  # Run the analysis on all requested subsets.
+  for subset in subsets:
+    analyze_dataset(dataset, subset)

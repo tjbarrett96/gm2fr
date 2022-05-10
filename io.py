@@ -19,7 +19,6 @@ def find_index(string):
 
 def find_indices(sequence):
   """Returns a list of numerical indices extracted from a sequence of strings, skipping non-matches."""
-  # return [index for index in (find_index(item) for item in sequence) if index is not None]
   return [find_index(item) for item in sequence]
 
 # ==================================================================================================
@@ -28,7 +27,7 @@ def make_if_absent(path):
   """Creates a directory at the given path if it does not already exist."""
   if not os.path.isdir(path):
     print(f"\nCreating output directory '{path}'.")
-    os.mkdir(path)
+    os.makedirs(path)
 
 # ==================================================================================================
 
