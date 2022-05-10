@@ -147,7 +147,7 @@ class Analyzer:
 
     optimize_t0 = (t0 is None)
     if optimize_t0:
-      
+
       coarse_t0_optimizer = Optimizer(self.transform, bg_model, coarse_t0_width * 1E-3, coarse_t0_steps)
       t0 = coarse_t0_optimizer.optimize()
 
@@ -238,7 +238,6 @@ class Analyzer:
             style.Entry(std, rf"\sigma_{{{const.info[unit].symbol}}}", std_err, const.info[unit].units)
           )
           plt.xlim(const.info[unit].min, const.info[unit].max)
-          plt.legend()
           style.labelAndSave(const.info[unit].formatLabel(), "Arbitrary Units", pdf)
 
       pdf.close()

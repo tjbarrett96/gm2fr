@@ -37,7 +37,7 @@ def analyze_dataset(dataset, subset = "nominal"):
 
     # For the nominal analysis, there are no input subdirectories and no output group folder.
     input_folders = ["FastRotation/AllCalos"]
-    subset_indices = []
+    subset_indices = [None]
     output_group = None
     output_folders = ["Nominal"]
 

@@ -107,11 +107,23 @@ def errorbar(x, y, yErr, xErr = None, ls = "-", ms = 3, **kwargs):
 
 # ==================================================================================================
 
+# Show a legend on the current plot, containing only unique labels without duplicates.
+def make_unique_legend():
+  # Get the artist handles and text labels for everything in the current plot.
+  handles, labels = plt.gca().get_legend_handles_labels()
+  # Make a dictionary mapping labels to handles; this ensures each label only appears with one handle.
+  labels_to_handles = {label: handle for label, handle in zip(labels, handles)}
+  # Make a legend, as long as there are some labels to show.
+  if len(labels_to_handles) > 0:
+    plt.legend(handles = labels_to_handles.values(), labels = labels_to_handles.keys())
+
+# ==================================================================================================
+
 # Shortcut for labeling axes, adding legend, saving the figure, and clearing the plot.
 def labelAndSave(xLabel, yLabel, output):
   xlabel(xLabel)
   ylabel(yLabel)
-  plt.legend()
+  make_unique_legend()
   if isinstance(output, PdfPages):
     output.savefig()
   else:
