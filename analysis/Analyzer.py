@@ -183,6 +183,8 @@ class Analyzer:
         endTimes = [5, 100, 300]
         for endTime in endTimes:
           self.fr_signal.plot(errors = False, start = 4, end = endTime, skip = int(np.clip(endTime - 4, 1, 10)))
+          if endTime - 4 > 10:
+            plt.xlim(0, None)
           style.labelAndSave(r"Time ($\mu$s)", "Arbitrary Units", pdf)
         pdf.close()
 

@@ -1,6 +1,7 @@
 import numpy as np
 import array
 import scipy.interpolate as interp
+import scipy.stats as stats
 
 import matplotlib.pyplot as plt
 import gm2fr.style as style
@@ -30,6 +31,9 @@ class Histogram1D:
 
     # Determine the shape for the bin height and error arrays.
     shape = (self.length,)
+
+    self.pdf = None
+    self.spline = None
 
     # Initialize the bin heights: from an argument if supplied, or else zeros.
     if heights is not None:
@@ -108,6 +112,19 @@ class Histogram1D:
     result = self.copy()
     result.heights = -result.heights
     return result
+
+  # ================================================================================================
+
+  def draw(self, choices = 1, update = False):
+
+    # Create a probability distribution out of this histogram, if it hasn't already been made.
+    if self.pdf is None or update:
+      # Interpolate the histogram with 10x smaller bin widths, for smoothness.
+      interpolated = self.interpolate(self.width / 10)
+      self.pdf = stats.rv_histogram((interpolated.heights, interpolated.edges))
+
+    # Sample the smoothed probability distribution for this histogram.
+    return self.pdf.rvs(size = choices)
 
   # ================================================================================================
 

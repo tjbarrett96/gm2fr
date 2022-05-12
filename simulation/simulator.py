@@ -60,7 +60,7 @@ class Simulator:
   def draw_times_frequencies(self, muons):
 
     def draw(distribution, choices = 1):
-      if isinstance(distribution, GaussianMixture):
+      if isinstance(distribution, (GaussianMixture, Histogram1D)):
         return distribution.draw(choices)
       elif isinstance(distribution, (root.TH1, root.TH2)):
         return rnp.random_sample(distribution, choices)
