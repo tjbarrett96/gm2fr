@@ -43,15 +43,15 @@ correlation = [10/50**2, 0, 0]
 simulation = Simulator(
   "gaussian_quadratic",
   overwrite = True,
-  kinematicsDistribution = frequency,
-  timeDistribution = injection,
-  kinematicsUnits = "frequency",
-  timeUnits = "nanoseconds",
+  kinematics_dist = frequency,
+  time_dist = injection,
+  kinematics_type = "f",
+  time_units = 1E-9,
   correlation = correlation
 )
 
 # Run the simulation, using the specified number of muons.
-simulation.simulate(muons = 1E8, end = 200)
+simulation.simulate(muons = 1E7, end = 200, normalize = False)
 
 # Save and plot the results.
 simulation.save()

@@ -65,7 +65,7 @@ info = {
   "p": Quantity("Momentum", "p", "GeV"),
   "gamma": Quantity("Boost Factor", r"\gamma", None),
   "beta": Quantity("Speed", r"\beta", "$c$"),
-  "dp_p0": Quantity("Fractional Momentum Offset", r"\Delta p/p_0", r"\%" if plt.rcParams["text.usetex"] else "%"),
+  "dp_p0": Quantity("Fractional Momentum Offset", r"\Delta p/p_0", None),
   "T": Quantity("Period", "T", "ns"),
   "tau": Quantity("Lifetime", r"\tau", r"$\mu$s"),
   "c_e": Quantity("Electric Field Correction", "C_E", "ppb")
@@ -91,14 +91,15 @@ info["T"].fromF = lambda f: 1 / (f * 1E3) * 1E9 # T = 1/f, in ns
 info["p"].fromF = lambda f, n = 0.108: info["p"].magic * (1 + (1 - n) * (1 - f / info["f"].magic))
 info["gamma"].fromF = lambda f, n = 0.108: info["p"].fromF(f, n) / (m_mu_GeV * info["beta"].magic)
 info["tau"].fromF = lambda f, n = 0.108: info["gamma"].fromF(f, n) * lifetime
-info["dp_p0"].fromF = lambda f, n = 0.108: (info["p"].fromF(f, n) - info["p"].magic) / info["p"].magic * 100
+info["dp_p0"].fromF = lambda f, n = 0.108: (info["p"].fromF(f, n) - info["p"].magic) / info["p"].magic
 info["beta"].fromF = lambda f, n = 0.108: np.sqrt(1 - 1 / info["gamma"].fromF(f, n)**2)
 info["c_e"].fromF = lambda f, n = 0.108: 2 * n * (1 - n) * (info["beta"].magic * info["x"].fromF(f) / info["r"].magic)**2 * 1E9
 
 # Set the conversion functions to frequency (only useful for some variables).
+info["f"].toF = lambda f: f
 info["r"].toF = lambda r: info["beta"].magic * c / (2 * np.pi * r) # f = v/r, in kHz for r in mm
 info["p"].toF = lambda p, n = 0.108: info["f"].magic * (1 - (p / info["p"].magic - 1) / (1 - n))
-info["dp_p0"].toF = lambda dp_p0, n = 0.108: info["p"].toF(info["p"].magic * (1 + dp_p0 / 100), n)
+info["dp_p0"].toF = lambda dp_p0, n = 0.108: info["p"].toF(info["p"].magic * (1 + dp_p0), n)
 
 # Set the minimum and maximum values for stored radii, and convert to frequency.
 info["r"].min, info["r"].max = info["r"].magic - 45, info["r"].magic + 45
