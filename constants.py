@@ -111,6 +111,32 @@ for quantity in info.keys():
   info[quantity].min = info[quantity].fromF(info["f"].max)
   info[quantity].max = info[quantity].fromF(info["f"].min)
 
+# # Add corresponding width quantities.
+for quantity in list(info.keys()):
+  info[f"sig_{quantity}"] = Quantity(
+    f"{info[quantity].label} Width",
+    rf"\sigma_{{{info[quantity].symbol}}}",
+    info[quantity].units
+  )
+
+# Add extra variables.
+info["start"] = Quantity("Start Time", "t_s", r"$\mu$s")
+info["end"] = Quantity("End Time", "t_m", r"$\mu$s")
+info["df"] = Quantity("Frequency Spacing", r"\Delta f", "kHz")
+info["t0"] = Quantity("Reference Time", "t_0", "ns")
+info["bg_chi2ndf"] = Quantity(r"Background Fit $\chi^2$/ndf", r"$\chi^2$/ndf", None)
+info["bg_pval"] = Quantity("Background Fit $p$-value", "p", None)
+info["wg_chi2ndf"] = Quantity(r"Wiggle Fit $\chi^2$/ndf", r"$\chi^2$/ndf", None)
+info["wg_pval"] = Quantity("Wiggle Fit $p$-value", "p", None)
+info["wg_N"] = Quantity("Wiggle Normalization", "N", None)
+info["wg_tau"] = Quantity("Wiggle Lifetime", r"\tau_\mu", r"$\mu$s")
+info["wg_A"] = Quantity("Wiggle Asymmetry", "A", None)
+info["wg_phi_a"] = Quantity("Wiggle Phase", r"\phi_a", "rad")
+info["wg_tau_cbo"] = Quantity("Wiggle CBO Lifetime", r"\tau_{CBO}", r"$\mu$s")
+info["wg_A_cbo"] = Quantity("Wiggle CBO Amplitude", "A_{CBO}", None)
+info["wg_f_cbo"] = Quantity("Wiggle CBO Frequency", "f_{CBO}", "MHz")
+info["wg_phi_cbo"] = Quantity("Wiggle CBO Phase", r"\phi_{CBO}", "rad")
+
 # ==================================================================================================
 
 # Given a NumPy array of a quantity, find the index mask for physical (storable) values.

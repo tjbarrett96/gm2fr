@@ -64,7 +64,7 @@ def emulate_dataset(dataset):
     time_units = 1E-6
   )
 
-  simulation.simulate(muons = 1E8, decay = "uniform", detector = (results["t0"] * 1E3) / results["T"])
+  simulation.simulate(muons = 1E9, decay = "uniform", detector = (results["t0"] * 1E3) / results["T"])
   simulation.save()
   simulation.plot()
 

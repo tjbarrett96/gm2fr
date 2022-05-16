@@ -195,21 +195,22 @@ class Analyzer:
 
       plotBegin = time.time()
 
+      output_variables = ["f", "x", "dp_p0", "tau", "gamma", "c_e"]
+
       # Determine which units to plot a distribution for.
       axesToPlot = []
       if plots > 0:
         axesToPlot = ["f", "x", "dp_p0"]
         if plots > 1:
-          axesToPlot = list(const.info.keys())
+          axesToPlot = output_variables.copy()
           axesToPlot.remove("c_e")
-          axesToPlot.remove("beta")
 
       pdf = style.makePDF(f"{self.output_path}/AllDistributions.pdf")
       rootFile = root.TFile(f"{self.output_path}/transform.root", "RECREATE")
 
       # Compile the results list of (name, value) pairs from each object.
       results = Results({"start": start, "end": end, "df": df, "t0": t0, "err_t0": fine_t0_optimizer.err_t0 if fine_t0_optimizer is not None else 0})
-      for unit in const.info.keys():
+      for unit in output_variables:
 
         hist = corr_transform.copy().map(const.info[unit].fromF)
         mean, mean_err = hist.mean(error = True)

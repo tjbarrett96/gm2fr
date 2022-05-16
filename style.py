@@ -28,7 +28,7 @@ def setStyle(latex = False):
   plt.rcParams["axes.formatter.use_mathtext"] = True
 
   # Marker and line options.
-  plt.rcParams["lines.markersize"] = 4
+  plt.rcParams["lines.markersize"] = 5
   plt.rcParams["lines.linewidth"] = 1
 
   # Draw grid.
@@ -101,8 +101,8 @@ def colorbar(label = None, pad = 0.01, fraction = 0.10, aspect = 18, **kwargs):
 # ==================================================================================================
 
 # Override plt.errorbar with automatic formatting.
-def errorbar(x, y, yErr, xErr = None, ls = "-", ms = 3, **kwargs):
-  return plt.errorbar(x, y, yErr, xErr, fmt = f"o{ls}", ms = ms, capsize = 2, lw = 1, elinewidth = 0.5, mew = 0.5, **kwargs)
+def errorbar(x, y, yErr, xErr = None, ls = "-", ms = 4, **kwargs):
+  return plt.errorbar(x, y, yErr, xErr, fmt = f"o{ls}", ms = ms, capsize = 2, lw = 0.75, elinewidth = 0.5, mew = 0.5, **kwargs)
 
 # ==================================================================================================
 
