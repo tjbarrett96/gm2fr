@@ -47,14 +47,6 @@ def plot_dataset(dataset, subset, variable):
 
 # ==================================================================================================
 
-def list_run_datasets(run):
-  return [
-    dataset for dataset in os.listdir(f"{io.gm2fr_path}/analysis/results")
-    if re.match(f"{run}[A-Z]{{0,1}}\Z", dataset)
-  ]
-
-# ==================================================================================================
-
 def parse_dataset_arg(arg):
   tokens = arg.split(",")
   datasets = []
@@ -63,7 +55,7 @@ def parse_dataset_arg(arg):
       number = token[0]
       letter = token[1] if len(token) > 1 else None
       if letter == "*":
-        datasets += list_run_datasets(number)
+        datasets += io.list_run_datasets(number)
       else:
         datasets.append(token)
   return sorted(list(set(datasets)))

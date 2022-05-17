@@ -105,8 +105,7 @@ class Optimizer:
       if self.iteration < 5:
         self.seed = self.t0
         self.iteration += 1
-        self.optimize()
-        return
+        return self.optimize()
 
     # Get the value of the minimum chi2 from the fit.
     ndf = self.fits[0].model.ndf

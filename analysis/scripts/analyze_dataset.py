@@ -81,8 +81,10 @@ def analyze_dataset(dataset, subset = "nominal"):
   # Concatenate the results over the subset into a single group results file.
   if output_group is not None:
     merge_results(
-      parent_dir = f"{io.gm2fr_path}/analysis/results/{dataset}/{output_group}",
-      filename = f"{dataset}_{subset}_results"
+      folders = [f"{io.results_path}/{dataset}/{output_group}/{output_folder}" for output_folder in output_folders],
+      output_dir = f"{io.results_path}/{dataset}/{output_group}",
+      output_name = f"{dataset}_{subset}_results",
+      indices = subset_indices
     )
 
 # ==================================================================================================

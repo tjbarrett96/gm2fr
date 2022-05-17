@@ -7,6 +7,7 @@ import numpy as np
 
 # Path to the top of the gm2fr project directory.
 gm2fr_path = os.path.dirname(gm2fr.__file__)
+results_path = f"{gm2fr_path}/analysis/results"
 
 # ==================================================================================================
 
@@ -70,3 +71,8 @@ def is_numeric_pair(obj):
 def is_array(obj, d = None):
   """Checks if an object is a d-dimensional NumPy array."""
   return isinstance(obj, np.ndarray) and (obj.ndim == d if d is not None else True)
+
+# ==================================================================================================
+
+def list_run_datasets(run):
+  return [dataset for dataset in os.listdir(results_path) if re.match(f"{run}[A-Z]{{0,1}}\Z", dataset)]

@@ -51,15 +51,26 @@ class Results:
     np.save(f"{path}/{filename}.npy", array)
 
     longestName = max([len(name) for name in array.dtype.names])
-    onesPlaces = max(int(np.log10(np.nanmax(self.table.to_numpy()))), 0) + 1
+    numeric_columns = [name for name in array.dtype.names if np.issubdtype(array[name].dtype, np.number)]
+    onesPlaces = max(int(np.log10(np.nanmax(self.table[numeric_columns].to_numpy()))), 0) + 1
     maxLength = max(longestName, onesPlaces + 1 + decimals)
+    separator = "  "
+
+    formats = []
+    for name in array.dtype.names:
+      if np.issubdtype(array[name].dtype, np.floating):
+        formats.append(f"%{maxLength}.{decimals}f")
+      elif np.issubdtype(array[name].dtype, np.integer):
+        formats.append(f"%{maxLength}d")
+      else:
+        formats.append(f"%{maxLength}s")
 
     np.savetxt(
       f"{path}/{filename}.txt",
       array,
-      fmt = f"%{maxLength}.{decimals}f",
-      header = "  ".join(f"{{:>{maxLength}}}".format(name) for name in array.dtype.names),
-      delimiter = "  ",
+      fmt = formats,
+      header = separator.join(f"{{:>{maxLength}}}".format(name) for name in array.dtype.names),
+      delimiter = separator,
       comments = ""
     )
 
