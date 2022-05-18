@@ -15,7 +15,7 @@ style.setStyle()
 
 # Dictionary mapping subset names to axis labels.
 subset_labels = {
-  # "nominal": "Dataset", TODO: nominal results across datasets needs dedicated results file for simplicity
+  "nominal": "Dataset", #TODO: nominal results across datasets needs dedicated results file for simplicity
   "calo": "Calorimeter",
   "bunch": "Bunch Number",
   "run": "Run Number",
@@ -38,12 +38,22 @@ def plot_dataset(dataset, subset, variable):
     return
 
   # TODO: add optional dashed line of same color for nominal result (no extra label)
-  plot_trend(
-    x = "index",
-    y = variable,
-    filename = f"{io.gm2fr_path}/analysis/results/{dataset}/By{subset.capitalize()}/{dataset}_{subset}_results.npy",
-    label = dataset
-  )
+  if subset == "nominal":
+    plot_trend(
+      x = [dataset],
+      y = variable,
+      filename = f"{io.results_path}/{dataset}/Nominal/results.npy",
+      label = f"Run {dataset[0]}",
+      color = f"C{int(dataset[0]) - 1}"
+    )
+  else:
+    plot_trend(
+      x = "index",
+      y = variable,
+      filename = f"{io.results_path}/{dataset}/By{subset.capitalize()}/{dataset}_{subset}_results.npy",
+      label = dataset,
+      ls = "-" if subset != "run" else ""
+    )
 
 # ==================================================================================================
 
@@ -80,9 +90,6 @@ if __name__ == "__main__":
       style.xlabel(subset_labels[subset])
       style.ylabel(const.info[variable].formatLabel())
 
-      # Extend the x-limits rightward by 10% and place the legend vertically.
-      xLow, xHigh = plt.xlim()
-      plt.xlim(xLow, xHigh + 0.1 * (xHigh - xLow))
-      plt.legend(loc = "center right")
+      style.make_unique_legend(extend_x = 0.15, loc = "center right")
 
       plt.show()

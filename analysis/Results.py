@@ -48,7 +48,7 @@ class Results:
   def save(self, path, filename = "results", decimals = 5):
 
     array = self.array()
-    np.save(f"{path}/{filename}.npy", array)
+    np.save(f"{path}/{filename}.npy", array, allow_pickle = True)
 
     longestName = max([len(name) for name in array.dtype.names])
     numeric_columns = [name for name in array.dtype.names if np.issubdtype(array[name].dtype, np.number)]
@@ -78,4 +78,4 @@ class Results:
 
   @staticmethod
   def load(path):
-    return Results(np.load(path))
+    return Results(np.load(path, allow_pickle = True))

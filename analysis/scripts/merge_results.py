@@ -24,6 +24,7 @@ def merge_results(folders, output_dir = None, output_name = None, indices = None
   column_order = ["index"] + [col for col in merged_results.table.columns if col != "index"]
   merged_results.table = merged_results.table[column_order].sort_values(by = "index")
 
+  # Save (if output specified) and return merged Results object.
   if output_dir is not None:
     merged_results.save(output_dir, output_name if output_name is not None else "merged_results")
   return merged_results
@@ -34,18 +35,21 @@ if __name__ == "__main__":
 
   if len(sys.argv) != 2:
 
-    print("python3 merge_results.py <parent_directory / run_number>")
+    print("Usage: python3 merge_results.py <parent_directory / run_number>")
     exit()
 
   else:
 
     folders, output_dir, output_name, indices = None, None, None, None
+
+    # If the argument is an integer, merge the Nominal results from all datasets in that run number.
     if re.match(r"\d+\Z", sys.argv[1]):
       run_number = int(sys.argv[1])
       indices = io.list_run_datasets(run_number)
       folders = [f"{io.results_path}/{dataset}/Nominal" for dataset in indices]
       output_dir = io.results_path
       output_name = f"Run{run_number}_nominal_results"
+    # Otherwise, interpret the argument as a parent directory, and merge results from all subdirectories.
     else:
       parent_dir = sys.argv[1]
       folders = [f"{parent_dir}/{folder}" for folder in os.listdir(parent_dir) if os.path.isdir(f"{parent_dir}/{folder}")]

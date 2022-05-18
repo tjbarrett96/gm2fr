@@ -8,15 +8,16 @@ import gm2fr.constants as const
 
 # ==================================================================================================
 
-def plot_trend(x, y, filename, label = None, ls = "-"):
+def plot_trend(x, y, filename, label = None, ls = "-", color = None):
   # results = np.load(f"{io.gm2fr_path}/analysis/results/{filename}/results.npy")
-  results = np.load(filename)
+  results = np.load(filename, allow_pickle = True)
   style.errorbar(
-    results[x],
+    results[x] if x in results.dtype.names else x,
     results[y],
     results[f"err_{y}"] if f"err_{y}" in results.dtype.names else None,
     ls = ls,
-    label = label
+    label = label,
+    color = color
   )
 
 # ==================================================================================================

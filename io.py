@@ -75,4 +75,4 @@ def is_array(obj, d = None):
 # ==================================================================================================
 
 def list_run_datasets(run):
-  return [dataset for dataset in os.listdir(results_path) if re.match(f"{run}[A-Z]{{0,1}}\Z", dataset)]
+  return [dataset for dataset in os.listdir(results_path) if re.match(f"{run}[A-Z]\Z", dataset)]
