@@ -1,5 +1,6 @@
 import sys
 import ROOT as root
+import numpy as np
 import gm2fr.io as io
 from merge_results import merge_results
 from gm2fr.analysis.Analyzer import Analyzer
@@ -19,7 +20,7 @@ subset_dir = {
 
 # ==================================================================================================
 
-def analyze_dataset(dataset, subset = "nominal"):
+def analyze_dataset(dataset, subset = "nominal", **analyze_args):
 
   # Validate the requested subset to analyze.
   if subset not in ("nominal", *subset_dir.keys()):
@@ -71,12 +72,8 @@ def analyze_dataset(dataset, subset = "nominal"):
       units = "ns"
     )
 
-    analyzer.analyze(
-      start = 4,
-      end = 250 if subset != "run" else 150,
-      bg_model = "sinc",
-      plots = 2 if subset == "nominal" else 1
-    )
+    # Assume default analysis parameters, and pass any extra keyword arguments.
+    analyzer.analyze(**analyze_args)
 
   # Concatenate the results over the subset into a single group results file.
   if output_group is not None:
@@ -114,4 +111,4 @@ if __name__ == "__main__":
 
   # Run the analysis on all requested subsets.
   for subset in subsets:
-    analyze_dataset(dataset, subset)
+    analyze_dataset(dataset, subset, plot_level = 2 if subset == "nominal" else 1)

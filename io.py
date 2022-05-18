@@ -32,6 +32,15 @@ def make_if_absent(path):
 
 # ==================================================================================================
 
+def is_iterable(obj):
+  try:
+    iterator = iter(obj)
+    return True
+  except TypeError:
+    return False
+
+# ==================================================================================================
+
 def force_list(obj):
   """Returns a single-element list containing the object, unless already a list."""
   return [obj] if type(obj) is not list else obj

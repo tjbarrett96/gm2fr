@@ -15,7 +15,7 @@ style.setStyle()
 
 # Dictionary mapping subset names to axis labels.
 subset_labels = {
-  "nominal": "Dataset", #TODO: nominal results across datasets needs dedicated results file for simplicity
+  "nominal": "Dataset",
   "calo": "Calorimeter",
   "bunch": "Bunch Number",
   "run": "Run Number",

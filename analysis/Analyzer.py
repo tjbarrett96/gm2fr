@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# import gm2fr.utilities as util
 import gm2fr.io as io
 import gm2fr.constants as const
 import gm2fr.calculations as calc
@@ -21,6 +20,8 @@ import ROOT as root
 import os
 import gm2fr.analysis
 import time
+import inspect
+import itertools
 
 # ==================================================================================================
 
@@ -114,7 +115,7 @@ class Analyzer:
   def analyze(
     self,
     start = 4, # Start time (us) for the cosine transform.
-    end = 200, # End time (in us) for the cosine transform.
+    end = 250, # End time (in us) for the cosine transform.
     t0 = None, # t0 time (in us) for the cosine transform.
     iterate = False,
     bg_model = "sinc", # Background fit model: "constant" / "parabola" / "sinc" / "error".
@@ -123,11 +124,12 @@ class Analyzer:
     coarse_t0_steps = 5, # Number of steps for the initial coarse t0 scan range.
     fine_t0_width = 1, # full range (in ns) for the subsequent fine t0 scan ranges.
     fine_t0_steps = 10, # Number of steps for the subsequent fine t0 scan ranges.
-    plots = 1, # Plotting option. 0 = nothing, 1 = main results, 2 = more details (slower).
+    plot_level = 1, # Plotting option. 0 = nothing, 1 = main plots, 2 = more plots (slower).
+    save_output = True,
     rebin = 1 # Integer rebinning group size for the fast rotation signal.
   ):
 
-    begin = time.time()
+    begin_time = time.time()
 
     fr_signal_masked = self.fr_signal.copy().mask((start, end))
 
@@ -135,8 +137,8 @@ class Analyzer:
 
     coarse_t0_optimizer = None
     fine_t0_optimizer = None
-
     optimize_t0 = (t0 is None)
+
     if optimize_t0:
 
       coarse_t0_optimizer = Optimizer(self.transform, bg_model, coarse_t0_width * 1E-3, coarse_t0_steps)
@@ -145,7 +147,7 @@ class Analyzer:
       fine_t0_optimizer = Optimizer(self.transform, bg_model, fine_t0_width * 1E-3, fine_t0_steps, seed = t0)
       t0 = fine_t0_optimizer.optimize()
 
-      if plots > 0:
+      if save_output and plot_level > 0:
         fine_t0_optimizer.plotChi2(f"{self.output_path}/BackgroundChi2.pdf")
 
     self.transform.setT0(t0, fine_t0_optimizer.err_t0 if fine_t0_optimizer is not None else 0)
@@ -160,21 +162,41 @@ class Analyzer:
       if iterate:
         iterator = Iterator(self.transform, self.bg_fit)
         corr_transform = iterator.iterate(optimize_t0)
-
-      if plots > 0 and iterator is not None:
-        iterator.plot(f"{self.output_path}/Iterations.pdf")
+        if save_output and plot_level > 0:
+          iterator.plot(f"{self.output_path}/Iterations.pdf")
 
     corrector = None
     if self.truth_filename is not None:
       corrector = Corrector(self.transform, corr_transform, self.truth_filename if self.truth_filename != "same" else self.filename)
       corrector.correct()
-      corrector.plot(self.output_path)
+      if save_output and plot_level > 0:
+        corrector.plot(self.output_path)
+
+    # Compile results.
+    results = Results({"start": start, "end": end, "df": df, "t0": t0, "err_t0": fine_t0_optimizer.err_t0 if fine_t0_optimizer is not None else 0})
+    histograms = dict()
+
+    output_variables = ["f", "x", "dp_p0", "tau", "gamma", "c_e"]
+    for unit in output_variables:
+      histograms[unit] = corr_transform.copy().map(const.info[unit].fromF)
+      mean, mean_err = histograms[unit].mean(error = True)
+      std, std_err = histograms[unit].std(error = True)
+      results.merge(Results(
+        {unit: mean, f"err_{unit}": mean_err, f"sig_{unit}": std, f"err_sig_{unit}": std_err}
+      ))
+
+    if self.bg_fit is not None:
+      results.merge(self.bg_fit.results())
+    if self.wiggle_fit is not None:
+      results.merge(self.wiggle_fit.results())
+
+    self.results.append(results)
 
     # Save the results to disk.
-    if self.output_path is not None:
+    if save_output and self.output_path is not None:
 
       # Plot the fast rotation signal, and wiggle fit (if present).
-      if plots >= 1:
+      if plot_level >= 1:
 
         self.fr_signal.save(f"{self.output_path}/signal.npz")
         self.fr_signal.save(f"{self.output_path}/signal.root", "signal")
@@ -193,15 +215,13 @@ class Analyzer:
           self.wiggle_fit.plotFine(self.output_path, endTimes)
           calc.plotFFT(self.raw_signal.centers, self.raw_signal.heights, f"{self.output_path}/RawSignalFFT.pdf")
 
-      plotBegin = time.time()
-
-      output_variables = ["f", "x", "dp_p0", "tau", "gamma", "c_e"]
+      plotbegin_time = time.time()
 
       # Determine which units to plot a distribution for.
       axesToPlot = []
-      if plots > 0:
+      if plot_level > 0:
         axesToPlot = ["f", "x", "dp_p0"]
-        if plots > 1:
+        if plot_level > 1:
           axesToPlot = output_variables.copy()
           axesToPlot.remove("c_e")
 
@@ -209,38 +229,24 @@ class Analyzer:
       rootFile = root.TFile(f"{self.output_path}/transform.root", "RECREATE")
 
       # Compile the results list of (name, value) pairs from each object.
-      results = Results({"start": start, "end": end, "df": df, "t0": t0, "err_t0": fine_t0_optimizer.err_t0 if fine_t0_optimizer is not None else 0})
-      for unit in output_variables:
 
-        hist = corr_transform.copy().map(const.info[unit].fromF)
-        mean, mean_err = hist.mean(error = True)
-        std, std_err = hist.std(error = True)
-        results.merge(Results(
-          {unit: mean, f"err_{unit}": mean_err, f"sig_{unit}": std, f"err_sig_{unit}": std_err}
-        ))
-
-        if unit in axesToPlot:
-          # Plot the truth-level distribution for comparison, if present.
-          # if truth is not None:
-          #   ref_predicted.plot(label = "Predicted")
-          hist.toRoot(f"transform_{unit}", f";{const.info[unit].formatLabel()};").Write()
-          hist.plot(label = None if self.truth_filename is None else "Result")
-          plt.axvline(const.info[unit].magic, ls = ":", c = "k", label = "Magic")
-          style.yZero()
-          style.databox(
-            style.Entry(mean, rf"\langle {const.info[unit].symbol} \rangle", mean_err, const.info[unit].units),
-            style.Entry(std, rf"\sigma_{{{const.info[unit].symbol}}}", std_err, const.info[unit].units)
-          )
-          plt.xlim(const.info[unit].min, const.info[unit].max)
-          style.labelAndSave(const.info[unit].formatLabel(), "Arbitrary Units", pdf)
+      for unit in axesToPlot:
+        # Plot the truth-level distribution for comparison, if present.
+        # if truth is not None:
+        #   ref_predicted.plot(label = "Predicted")
+        histograms[unit].toRoot(f"transform_{unit}", f";{const.info[unit].formatLabel()};").Write()
+        histograms[unit].plot(label = None if self.truth_filename is None else "Result")
+        plt.axvline(const.info[unit].magic, ls = ":", c = "k", label = "Magic")
+        style.yZero()
+        style.databox(
+          style.Entry(mean, rf"\langle {const.info[unit].symbol} \rangle", mean_err, const.info[unit].units),
+          style.Entry(std, rf"\sigma_{{{const.info[unit].symbol}}}", std_err, const.info[unit].units)
+        )
+        plt.xlim(const.info[unit].min, const.info[unit].max)
+        style.labelAndSave(const.info[unit].formatLabel(), "Arbitrary Units", pdf)
 
       pdf.close()
       rootFile.Close()
-
-      if self.bg_fit is not None:
-        results.merge(self.bg_fit.results())
-      if self.wiggle_fit is not None:
-        results.merge(self.wiggle_fit.results())
 
       # Include the differences from the reference distribution, if provided.
       # if truth_results is not None:
@@ -254,10 +260,9 @@ class Analyzer:
       #   diff_results.table.columns = [f"diff_{name}" for name in diff_results.table.columns]
       #   results.merge(diff_results)
 
-      self.results.append(results)
       self.results.save(self.output_path)
 
-      if plots > 0:
+      if plot_level > 0:
 
         if corrector is not None:
           corrector.truth_frequency.plot(errors = False, label = "Truth")
@@ -282,6 +287,28 @@ class Analyzer:
         corr_transform.save(f"{self.output_path}/transform.npz")
         # corr_transform.save(f"{self.output_path}/transform.root", "transform")
 
-        print(f"\nFinished plotting and saving results in {time.time() - plotBegin:.2f} seconds.")
+        print(f"\nFinished plotting and saving results in {time.time() - plotbegin_time:.2f} seconds.")
 
-    print(f"\nCompleted {self.output_label} in {time.time() - begin:.2f} seconds.")
+    print(f"\nCompleted {self.output_label} in {time.time() - begin_time:.2f} seconds.")
+
+  # ================================================================================================
+
+  def scan_parameters(self, **parameters):
+
+    # Ensure parameters are valid, and values are iterable objects.
+    analyzer_args = inspect.getargspec(self.analyze).args
+    if not all(parameter in analyzer_args for parameter in parameters):
+      print("Scan parameter(s) unrecognized.")
+      return
+    if not all(io.is_iterable(value) for value in parameters.values()):
+      print("Scan parameter values are not iterable.")
+      return
+
+    for parameter_set in itertools.product(*parameters.values()):
+      self.analyze(
+        **{parameter: parameter_set[i] for i, parameter in enumerate(parameters)},
+        save_output = False
+      )
+
+    if self.output_path is not None:
+      self.results.save(self.output_path)
