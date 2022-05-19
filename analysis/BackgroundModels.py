@@ -51,7 +51,7 @@ class Sinc(Model):
     result = np.zeros(shape = (len(self.seeds), len(f)))
 
     # The optimal parameters, and helper variable for brevity below.
-    a, fc, s = self.pOpt
+    a, fc, s = self.p_opt
     x = (f-fc)/s
 
     # df/da
@@ -96,7 +96,7 @@ class Error(Model):
     result = np.zeros(shape = (len(self.seeds), len(f)))
 
     # The optimal parameters, and helper variables for brevity below.
-    a, fc, s = self.pOpt
+    a, fc, s = self.p_opt
     z = -(f-fc)/s + 1j*s*self.b
     Dz = sp.dawsn(z)
 

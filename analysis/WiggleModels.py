@@ -32,7 +32,7 @@ class TwoParameter(Model):
     result = np.zeros(shape = (2, len(t)))
 
     # Optimal parameters.
-    N, tau = self.pOpt[:2]
+    N, tau = self.p_opt[:2]
 
     # df/dN
     result[0] = self.two(t, N, tau) / N
@@ -72,7 +72,7 @@ class FiveParameter(TwoParameter):
     result = np.zeros(shape = (5, len(t)))
 
     # Optimal parameters, and helper variable for the two-parameter result.
-    N, tau, A, fa, phi = self.pOpt[:5]
+    N, tau, A, fa, phi = self.p_opt[:5]
     two = super().function(t, N, tau)
 
     # df/dN and df/d(tau) same as before, with new part tacked on.
@@ -128,7 +128,7 @@ class NineParameter(FiveParameter):
     result = np.zeros(shape = (9, len(t)))
 
     # Optimal parameters, and helper variable for five-parameter result.
-    N, tau, A, fa, phi, tcbo, Acbo, fcbo, pcbo = self.pOpt[:9]
+    N, tau, A, fa, phi, tcbo, Acbo, fcbo, pcbo = self.p_opt[:9]
     five = super().function(t, N, tau, A, fa, phi)
 
     # First five derivatives same as before, with new part tacked on.

@@ -6,7 +6,7 @@ from gm2fr.Histogram1D import Histogram1D
 
 import matplotlib.pyplot as plt
 import gm2fr.style as style
-style.setStyle()
+style.set_style()
 
 # ==============================================================================
 
@@ -30,18 +30,18 @@ class Model:
     self.err = None
 
     # Fit results.
-    self.pOpt = None
-    self.pCov = None
-    self.pErr = None
+    self.p_opt = None
+    self.p_cov = None
+    self.p_err = None
     self.result = None
     self.residuals = None
 
     # Goodness-of-fit metrics.
     self.chi2 = None
     self.ndf = None
-    self.chi2ndf = None
-    self.err_chi2ndf = None
-    self.pval = None
+    self.chi2_ndf = None
+    self.err_chi2_ndf = None
+    self.p_value = None
 
   # ============================================================================
 
@@ -59,7 +59,7 @@ class Model:
   def eval(self, x):
     if isinstance(x, Histogram1D):
       x = x.centers
-    return self.function(x, *self.pOpt)
+    return self.function(x, *self.p_opt)
 
   # ============================================================================
 
@@ -77,7 +77,7 @@ class Model:
       self.cov = cov
 
     # Perform the fit.
-    self.pOpt, self.pCov = opt.curve_fit(
+    self.p_opt, self.p_cov = opt.curve_fit(
       self.function,
       self.x,
       self.y,
@@ -88,7 +88,7 @@ class Model:
       maxfev = 100_000
     )
 
-    self.pErr = np.sqrt(np.diag(self.pCov))
+    self.p_err = np.sqrt(np.diag(self.p_cov))
 
     # Evaluate the fit function over the data points.
     self.result = self.eval(self.x)
@@ -107,12 +107,12 @@ class Model:
         self.chi2 = np.sum((self.residuals / self.cov)**2)
 
       # Calculate the reduced chi-squared.
-      self.ndf = len(self.x) - len(self.pOpt)
-      self.chi2ndf = self.chi2 / self.ndf
-      self.err_chi2ndf = np.sqrt(2 / self.ndf) # std. dev. of reduced chi-squared distribution
+      self.ndf = len(self.x) - len(self.p_opt)
+      self.chi2_ndf = self.chi2 / self.ndf
+      self.err_chi2_ndf = np.sqrt(2 / self.ndf) # std. dev. of reduced chi-squared distribution
 
       # Calculate the two-sided p-value for this chi2 & ndf.
-      self.pval = calc.pval(self.chi2, self.ndf)
+      self.p_value = calc.p_value(self.chi2, self.ndf)
 
   # ============================================================================
 
@@ -120,12 +120,12 @@ class Model:
   def covariance(self, x: np.ndarray, scale = True):
 
     # Fit covariance in terms of parameter gradient and parameter covariance.
-    result = self.gradient(x).T @ self.pCov @ self.gradient(x)
+    result = self.gradient(x).T @ self.p_cov @ self.gradient(x)
 
     # Scale the (co)variance of the fit result by the reduced chi-squared,
     # to approximately incorporate the systematic uncertainty from a poor model.
-    if scale and self.chi2ndf > 1:
-      result *= self.chi2ndf
+    if scale and self.chi2_ndf > 1:
+      result *= self.chi2_ndf
 
     return result
 
@@ -161,16 +161,16 @@ class Model:
     results = {
       f"{prefix}_chi2": self.chi2,
       f"{prefix}_ndf": self.ndf,
-      f"{prefix}_chi2ndf": self.chi2ndf,
-      f"{prefix}_err_chi2ndf": self.err_chi2ndf,
-      f"{prefix}_pval": self.pval
+      f"{prefix}_chi2_ndf": self.chi2_ndf,
+      f"{prefix}_err_chi2_ndf": self.err_chi2_ndf,
+      f"{prefix}_pval": self.p_value
     }
 
     if parameters:
-      for i in range(len(self.pOpt)):
+      for i in range(len(self.p_opt)):
         name = f"p{i}" if self.names is None else self.names[i]
-        results[f"{prefix}_{name}"] = self.pOpt[i]
-        results[f"err_{prefix}_{name}"] = self.pErr[i]
+        results[f"{prefix}_{name}"] = self.p_opt[i]
+        results[f"err_{prefix}_{name}"] = self.p_err[i]
 
     return Results(results)
 
@@ -180,14 +180,14 @@ class Model:
 
     print(f"\nCompleted {self.name} fit.")
 
-    if self.chi2ndf is not None:
-      print(f"{'chi2/ndf':>12} = {self.chi2ndf:.4f} +/- {self.err_chi2ndf:.4f}")
-      print(f"{'p-value':>12} = {self.pval:.4f}")
+    if self.chi2_ndf is not None:
+      print(f"{'chi2/ndf':>12} = {self.chi2_ndf:.4f} +/- {self.err_chi2_ndf:.4f}")
+      print(f"{'p-value':>12} = {self.p_value:.4f}")
 
-    for i in range(len(self.pOpt)):
+    for i in range(len(self.p_opt)):
       name = f"p{i}" if self.names is None else self.names[i]
       unit = "" if self.units is None else self.units[i]
-      print(f"{name:>12} = {self.pOpt[i]:.4f} +/- {self.pErr[i]:.4f} {unit}")
+      print(f"{name:>12} = {self.p_opt[i]:.4f} +/- {self.p_err[i]:.4f} {unit}")
 
 # ==============================================================================
 
@@ -206,7 +206,7 @@ class Gaussian(Model):
     result = np.zeros(shape = (len(self.seeds), len(x)))
 
     # The optimized parameters, and the function evaluated there.
-    a, x0, s = self.pOpt
+    a, x0, s = self.p_opt
     fn = self.function(x, a, x0, s)
 
     # df/da

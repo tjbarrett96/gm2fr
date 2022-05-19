@@ -4,7 +4,7 @@ import gm2fr.constants as const
 from gm2fr.analysis.WiggleModels import *
 import matplotlib.pyplot as plt
 import gm2fr.style as style
-style.setStyle()
+style.set_style()
 
 # ==============================================================================
 
@@ -22,19 +22,19 @@ class WiggleFit:
   ):
 
     # Finely-binned signal data for the fast rotation signal.
-    self.fineSignal = signal.copy()
+    self.fine_signal = signal.copy()
 
     # Fit options.
     self.start = start
     self.end = end
     self.n = n
 
-    self.group = int((const.info["T"].magic * 1E-3) // self.fineSignal.width)
-    self.coarseSignal = self.fineSignal.copy().rebin(self.group, discard = True).mask((self.start, self.end))
+    self.group = int((const.info["T"].magic * 1E-3) // self.fine_signal.width)
+    self.coarse_signal = self.fine_signal.copy().rebin(self.group, discard = True).mask((self.start, self.end))
 
     # Ensure the errors are all non-zero.
-    self.fineSignal.errors[self.fineSignal.errors == 0] = 1
-    self.coarseSignal.errors[self.coarseSignal.errors == 0] = 1
+    self.fine_signal.errors[self.fine_signal.errors == 0] = 1
+    self.coarse_signal.errors[self.coarse_signal.errors == 0] = 1
 
     self.models = []
     if model == "two":
@@ -51,8 +51,8 @@ class WiggleFit:
     self.model = None
 
     # Fit results.
-    self.fitResult = None
-    self.fineResult = None
+    self.fit_result = None
+    self.fine_result = None
 
   # ============================================================================
 
@@ -66,12 +66,12 @@ class WiggleFit:
 
       # Update the new seeds with the latest fit's results.
       if self.model is not None:
-        model.seeds[:len(self.model.pOpt)] = self.model.pOpt
+        model.seeds[:len(self.model.p_opt)] = self.model.p_opt
 
-      model.fit(self.coarseSignal)
+      model.fit(self.coarse_signal)
 
       # Calculate the best fit and residuals.
-      self.fitResult = model.eval(self.coarseSignal.centers)
+      self.fit_result = model.eval(self.coarse_signal.centers)
 
       # Status update.
       model.print()
@@ -79,7 +79,7 @@ class WiggleFit:
       self.model = model
 
     # Evaluate the finely-binned fit result.
-    self.fineResult = self.model.eval(self.fineSignal) / self.group
+    self.fine_result = self.model.eval(self.fine_signal) / self.group
 
 # ==============================================================================
 
@@ -92,12 +92,12 @@ class WiggleFit:
       modTime = 102.5
 
       # Calculate the indices (exclusive) at which a wrap occurs.
-      breaks = np.nonzero(np.diff(self.coarseSignal.centers % modTime) < 0)[0] + 1
+      breaks = np.nonzero(np.diff(self.coarse_signal.centers % modTime) < 0)[0] + 1
 
       # Split the signal data into a list of chunks, one for each wrap.
-      times = np.split(self.coarseSignal.centers, breaks)
-      signals = np.split(self.coarseSignal.heights, breaks)
-      errors = np.split(self.coarseSignal.errors, breaks)
+      times = np.split(self.coarse_signal.centers, breaks)
+      signals = np.split(self.coarse_signal.heights, breaks)
+      errors = np.split(self.coarse_signal.errors, breaks)
 
       # Plot each wrapped chunk of the data and fit.
       for i, (time, signal, error) in enumerate(zip(times, signals, errors)):
@@ -113,8 +113,8 @@ class WiggleFit:
 
       # Annotate the fit quality.
       style.databox(
-        style.Entry(self.model.chi2ndf, r"\chi^2/\mathrm{ndf}"),
-        style.Entry(self.model.pval, "p")
+        style.Entry(self.model.chi2_ndf, r"\chi^2/\mathrm{ndf}"),
+        style.Entry(self.model.p_value, "p")
       )
 
       # Save and clear.
@@ -124,12 +124,12 @@ class WiggleFit:
 # ==============================================================================
 
   # Plot the raw positron signal.
-  def plotFine(self, output, endTimes):
+  def plot_fine(self, output, endTimes):
 
     if output is not None:
 
       # Plot the signal.
-      plt.plot(self.fineSignal.centers, self.fineSignal.heights)
+      plt.plot(self.fine_signal.centers, self.fine_signal.heights)
 
       # Label the axes.
       style.xlabel(r"Time ($\mu$s)")
@@ -139,7 +139,7 @@ class WiggleFit:
       plt.xlim(0, 5)
       plt.ylim(0, None)
 
-      pdf = style.makePDF(f"{output}/RawSignal.pdf")
+      pdf = style.make_pdf(f"{output}/RawSignal.pdf")
       pdf.savefig()
 
       # Save the figure over a range of time axis limits (in us).
@@ -149,7 +149,7 @@ class WiggleFit:
         plt.xlim(4, end)
 
         # Update the intensity limits.
-        view = self.fineSignal.heights[(self.fineSignal.centers >= 4) & (self.fineSignal.centers <= end)]
+        view = self.fine_signal.heights[(self.fine_signal.centers >= 4) & (self.fine_signal.centers <= end)]
         plt.ylim(0, np.max(view))
 
         # Save the figure.

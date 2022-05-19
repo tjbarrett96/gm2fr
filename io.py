@@ -5,7 +5,7 @@ import numpy as np
 
 # ==================================================================================================
 
-# Path to the top of the gm2fr project directory.
+# Paths to common locations in the gm2fr project directory.
 gm2fr_path = os.path.dirname(gm2fr.__file__)
 results_path = f"{gm2fr_path}/analysis/results"
 
@@ -19,7 +19,7 @@ def find_index(string):
 # ==================================================================================================
 
 def find_indices(sequence):
-  """Returns a list of numerical indices extracted from a sequence of strings, skipping non-matches."""
+  """Returns a list of numerical indices extracted from a sequence of strings."""
   return [find_index(item) for item in sequence]
 
 # ==================================================================================================
@@ -27,12 +27,12 @@ def find_indices(sequence):
 def make_if_absent(path):
   """Creates a directory at the given path if it does not already exist."""
   if not os.path.isdir(path):
-    print(f"\nCreating output directory '{path}'.")
     os.makedirs(path)
 
 # ==================================================================================================
 
 def is_iterable(obj):
+  """Checks whether or not the given object is an iterable container."""
   try:
     iterator = iter(obj)
     return True
@@ -55,13 +55,13 @@ def is_pair(obj):
 
 def is_number(obj):
   """Checks if an object is an integer or float."""
-  return isinstance(obj, (int, float)) or isinstance(obj, np.number)
+  return np.issubdtype(type(obj), np.number)
 
 # ==================================================================================================
 
 def is_integer(obj):
   """Checks if an object is an integer."""
-  return isinstance(obj, int) or isinstance(obj, np.integer)
+  return np.issubdtype(type(obj), np.integer)
 
 # ==================================================================================================
 
@@ -84,4 +84,5 @@ def is_array(obj, d = None):
 # ==================================================================================================
 
 def list_run_datasets(run):
+  """Lists all datasets from the given run number with results in the standard directory."""
   return [dataset for dataset in os.listdir(results_path) if re.match(f"{run}[A-Z]\Z", dataset)]

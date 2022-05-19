@@ -40,7 +40,7 @@ class Analyzer:
     truth_filename = None, # Truth .npz file from gm2fr simulation.
     fr_method = None,
     n = 0.108,
-    units = "us" # Time units: "us" or "ns".
+    time_units = 1E-6
   ):
 
     self.filename = filename
@@ -49,20 +49,15 @@ class Analyzer:
     self.output_label = output_label
     self.truth_filename = truth_filename
     self.n = n
+    self.time_units = time_units
 
-    # Get the path to the gm2fr/analysis/results directory.
-    gm2fr_results_path = f"{io.gm2fr_path}/analysis/results"
-    if not os.path.isdir(gm2fr_results_path):
-      raise RuntimeError("\nCould not find results directory gm2fr/analysis/results.")
-
-    self.output_path = f"{gm2fr_results_path}/{output_label}" if output_label is not None else None
+    self.output_path = f"{io.results_path}/{output_label}" if output_label is not None else None
     if self.output_path is not None:
       io.make_if_absent(self.output_path)
 
     self.raw_signal = None
     self.wiggle_fit = None
     self.fr_signal = None
-    self.units = units
     self.load_fr_signal(fr_method)
 
     self.results = Results()
@@ -78,8 +73,9 @@ class Analyzer:
         self.raw_signal.heights -= Histogram1D.load(self.filename, self.pileup_label).heights
       except:
         print(f"\nWarning: could not load pileup histogram; continuing without pileup correction.")
-    if self.units == "ns":
-      self.raw_signal.map(lambda t: t * 1E-3)
+
+    # Convert time units to microseconds.
+    self.raw_signal.map(lambda t: t * self.time_units / 1E-6)
 
     # Create the fast rotation signal using the ratio method.
     if method == "ratio":
@@ -93,15 +89,16 @@ class Analyzer:
         except:
           print(f"\nWarning: could not load pileup histogram; continuing without pileup correction.")
       self.fr_signal = numerator.divide(denominator, zero = 1)
-      if self.units == "ns":
-        self.fr_signal.map(lambda t: t * 1E-3)
+
+      # Convert time units to microseconds.
+      self.fr_signal.map(lambda t: t * self.time_units / 1E-6)
 
     # Create the fast rotation signal using a wiggle fit.
     elif method in ("two", "five", "nine"):
 
       self.wiggle_fit = WiggleFit(self.raw_signal, model = method, n = self.n)
       self.wiggle_fit.fit()
-      self.fr_signal = self.raw_signal.divide(self.wiggle_fit.fineResult)
+      self.fr_signal = self.raw_signal.divide(self.wiggle_fit.fine_result)
 
     # The signal is already a fast rotation signal, and requires no further processing.
     elif method is None:
@@ -148,9 +145,9 @@ class Analyzer:
       t0 = fine_t0_optimizer.optimize()
 
       if save_output and plot_level > 0:
-        fine_t0_optimizer.plotChi2(f"{self.output_path}/BackgroundChi2.pdf")
+        fine_t0_optimizer.plot_chi2(f"{self.output_path}/BackgroundChi2.pdf")
 
-    self.transform.setT0(t0, fine_t0_optimizer.err_t0 if fine_t0_optimizer is not None else 0)
+    self.transform.set_t0(t0, fine_t0_optimizer.err_t0 if fine_t0_optimizer is not None else 0)
     corr_transform = self.transform.optCosine.copy()
 
     self.bg_fit = None
@@ -178,7 +175,7 @@ class Analyzer:
 
     output_variables = ["f", "x", "dp_p0", "tau", "gamma", "c_e"]
     for unit in output_variables:
-      histograms[unit] = corr_transform.copy().map(const.info[unit].fromF)
+      histograms[unit] = corr_transform.copy().map(const.info[unit].from_frequency)
       mean, mean_err = histograms[unit].mean(error = True)
       std, std_err = histograms[unit].std(error = True)
       results.merge(Results(
@@ -201,19 +198,19 @@ class Analyzer:
         self.fr_signal.save(f"{self.output_path}/signal.npz")
         self.fr_signal.save(f"{self.output_path}/signal.root", "signal")
 
-        pdf = style.makePDF(f"{self.output_path}/FastRotation.pdf")
+        pdf = style.make_pdf(f"{self.output_path}/FastRotation.pdf")
         endTimes = [5, 100, 300]
         for endTime in endTimes:
           self.fr_signal.plot(errors = False, start = 4, end = endTime, skip = int(np.clip(endTime - 4, 1, 10)))
           if endTime - 4 > 10:
             plt.xlim(0, None)
-          style.labelAndSave(r"Time ($\mu$s)", "Arbitrary Units", pdf)
+          style.label_and_save(r"Time ($\mu$s)", "Arbitrary Units", pdf)
         pdf.close()
 
         if self.wiggle_fit is not None:
           self.wiggle_fit.plot(f"{self.output_path}/WiggleFit.pdf")
-          self.wiggle_fit.plotFine(self.output_path, endTimes)
-          calc.plotFFT(self.raw_signal.centers, self.raw_signal.heights, f"{self.output_path}/RawSignalFFT.pdf")
+          self.wiggle_fit.plot_fine(self.output_path, endTimes)
+          calc.plot_fft(self.raw_signal.centers, self.raw_signal.heights, f"{self.output_path}/RawSignalFFT.pdf")
 
       plotbegin_time = time.time()
 
@@ -225,7 +222,7 @@ class Analyzer:
           axesToPlot = output_variables.copy()
           axesToPlot.remove("c_e")
 
-      pdf = style.makePDF(f"{self.output_path}/AllDistributions.pdf")
+      pdf = style.make_pdf(f"{self.output_path}/AllDistributions.pdf")
       rootFile = root.TFile(f"{self.output_path}/transform.root", "RECREATE")
 
       # Compile the results list of (name, value) pairs from each object.
@@ -234,16 +231,16 @@ class Analyzer:
         # Plot the truth-level distribution for comparison, if present.
         # if truth is not None:
         #   ref_predicted.plot(label = "Predicted")
-        histograms[unit].toRoot(f"transform_{unit}", f";{const.info[unit].formatLabel()};").Write()
+        histograms[unit].to_root(f"transform_{unit}", f";{const.info[unit].formatLabel()};").Write()
         histograms[unit].plot(label = None if self.truth_filename is None else "Result")
         plt.axvline(const.info[unit].magic, ls = ":", c = "k", label = "Magic")
-        style.yZero()
+        style.draw_horizontal()
         style.databox(
           style.Entry(mean, rf"\langle {const.info[unit].symbol} \rangle", mean_err, const.info[unit].units),
           style.Entry(std, rf"\sigma_{{{const.info[unit].symbol}}}", std_err, const.info[unit].units)
         )
         plt.xlim(const.info[unit].min, const.info[unit].max)
-        style.labelAndSave(const.info[unit].formatLabel(), "Arbitrary Units", pdf)
+        style.label_and_save(const.info[unit].formatLabel(), "Arbitrary Units", pdf)
 
       pdf.close()
       rootFile.Close()
@@ -269,11 +266,11 @@ class Analyzer:
         self.transform.optCosine.plot(label = "Cosine Transform")
         self.transform.optSine.plot(label = "Sine Transform")
         self.transform.magnitude.plot(label = "Fourier Magnitude")
-        style.yZero()
+        style.draw_horizontal()
         plt.axvline(const.info["f"].magic, ls = ":", c = "k", label = "Magic")
-        style.labelAndSave("Frequency (kHz)", "Arbitrary Units", f"{self.output_path}/magnitude.pdf")
+        style.label_and_save("Frequency (kHz)", "Arbitrary Units", f"{self.output_path}/magnitude.pdf")
 
-        calc.plotFFT(fr_signal_masked.centers, fr_signal_masked.heights, f"{self.output_path}/FastRotationFFT.pdf")
+        calc.plot_fft(fr_signal_masked.centers, fr_signal_masked.heights, f"{self.output_path}/FastRotationFFT.pdf")
 
         # Plot the final background fit.
         if self.bg_fit is not None:

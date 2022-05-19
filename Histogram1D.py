@@ -5,7 +5,7 @@ import scipy.stats as stats
 
 import matplotlib.pyplot as plt
 import gm2fr.style as style
-style.setStyle()
+style.set_style()
 import gm2fr.io as io
 
 import ROOT as root
@@ -26,8 +26,8 @@ class Histogram1D:
     self.edges, self.centers, self.width, self.length = None, None, None, None
     self.heights, self.errors, self.cov = None, None, None
 
-    self.edges = Histogram1D.parseBinning(bins, range)
-    self.updateBins()
+    self.edges = Histogram1D.parse_binning(bins, range)
+    self.update_bins()
 
     # Determine the shape for the bin height and error arrays.
     shape = (self.length,)
@@ -52,12 +52,12 @@ class Histogram1D:
         raise ValueError(f"Covariance matrix does not match the size of the histogram.")
     else:
       self.cov = np.zeros(shape)
-    self.updateErrors()
+    self.update_errors()
 
   # ================================================================================================
 
   @staticmethod
-  def parseBinning(bins, range):
+  def parse_binning(bins, range):
     if io.is_number(bins) and io.is_numeric_pair(range):
       return np.linspace(range[0], range[1], bins + 1)
     elif io.is_array(bins, 1) and range is None:
@@ -68,7 +68,7 @@ class Histogram1D:
   # ================================================================================================
 
   # Compute bin centers, widths, and binning parameters for np.histogram.
-  def updateBins(self):
+  def update_bins(self):
 
     # Compute bin centers and widths.
     self.centers = (self.edges[1:] + self.edges[:-1]) / 2
@@ -94,7 +94,7 @@ class Histogram1D:
     change, _ = np.histogram(values, bins = self.bins, range = self.range)
     self.heights += change
     self.cov += change
-    self.updateErrors()
+    self.update_errors()
     return self
 
   # ================================================================================================
@@ -149,7 +149,7 @@ class Histogram1D:
         raise NotImplementedError()
     else:
       raise ValueError()
-    result.updateErrors()
+    result.update_errors()
     return result
 
   # ================================================================================================
@@ -186,7 +186,7 @@ class Histogram1D:
         result.cov = b**2 * a.cov
     else:
       raise ValueError()
-    result.updateErrors()
+    result.update_errors()
     return result
 
   # ================================================================================================
@@ -217,7 +217,7 @@ class Histogram1D:
         result.cov = a.cov / b**2
     else:
       raise ValueError()
-    result.updateErrors()
+    result.update_errors()
     return result
 
   # ================================================================================================
@@ -230,18 +230,18 @@ class Histogram1D:
       result.cov = b**2 * np.outer(a.heights, a.heights)**(b - 1) * a.cov
     else:
       raise NotImplementedError()
-    result.updateErrors()
+    result.update_errors()
     return result
 
   # ================================================================================================
 
-  def setHeights(self, heights):
+  def set_heights(self, heights):
     self.heights = heights.copy()
     return self
 
-  def setCov(self, cov):
+  def set_cov(self, cov):
     self.cov = cov.copy()
-    self.updateErrors()
+    self.update_errors()
     return self
 
   # ================================================================================================
@@ -261,7 +261,7 @@ class Histogram1D:
     centralDifferences = function(np.subtract.outer(self.centers, self.centers))
     result.heights = np.einsum("i, ki -> k", paddedHeights, fDifferences)
     result.cov = np.einsum(f"ki, {'lj, ij' if self.cov.ndim == 2 else 'li, i'} -> kl", centralDifferences, centralDifferences, self.cov)
-    result.updateErrors()
+    result.update_errors()
     return result
 
   # ================================================================================================
@@ -282,8 +282,8 @@ class Histogram1D:
     # else:
     #   self.cov = self.cov[sorted_indices][sorted_indices]
 
-    self.updateErrors()
-    self.updateBins()
+    self.update_errors()
+    self.update_bins()
     return self
 
   # ================================================================================================
@@ -335,7 +335,7 @@ class Histogram1D:
     scale = np.sum(self.heights * (self.width if area else 1))
     self.heights /= scale
     self.cov /= scale**2
-    self.updateErrors()
+    self.update_errors()
     return self
 
   # ================================================================================================
@@ -353,7 +353,7 @@ class Histogram1D:
       maxIndex = np.searchsorted(self.centers, range[1], side = "right")
 
       self.edges = self.edges[minIndex:(maxIndex + 1)]
-      self.updateBins()
+      self.update_bins()
 
       self.heights = self.heights[minIndex:maxIndex]
       self.errors = self.errors[minIndex:maxIndex]
@@ -369,7 +369,7 @@ class Histogram1D:
 
   # Split an array into equal-length blocks along an axis, then sum and recombine along that axis.
   @staticmethod
-  def splitSum(array, step, axis = 0, discard = False):
+  def split_sum(array, step, axis = 0, discard = False):
 
     length = array.shape[axis]
     even = (length % step == 0)
@@ -382,7 +382,9 @@ class Histogram1D:
       blocks = blocks[:-1]
     return np.concatenate([block.sum(axis, keepdims = True) for block in blocks], axis)
 
-  def updateErrors(self):
+  # ================================================================================================
+
+  def update_errors(self):
     if self.cov.ndim == 1:
       self.errors = np.sqrt(self.cov)
     elif self.cov.ndim == 2:
@@ -396,14 +398,14 @@ class Histogram1D:
   def rebin(self, step, discard = False):
 
     if io.is_integer(step) and step > 0:
-      self.heights = Histogram1D.splitSum(self.heights, step, 0, discard)
-      self.cov = Histogram1D.splitSum(self.cov, step, 0, discard)
+      self.heights = Histogram1D.split_sum(self.heights, step, 0, discard)
+      self.cov = Histogram1D.split_sum(self.cov, step, 0, discard)
       if self.cov.ndim == 2:
-        self.cov = Histogram1D.splitSum(self.cov, step, 1, discard)
-      self.updateErrors()
+        self.cov = Histogram1D.split_sum(self.cov, step, 1, discard)
+      self.update_errors()
 
       self.edges = self.edges[::step]
-      self.updateBins()
+      self.update_bins()
 
     else:
       raise ValueError(f"Cannot rebin histogram in groups of '{step}'.")
@@ -479,7 +481,7 @@ class Histogram1D:
   def save(self, filename, name = None, labels = ""):
     if filename.endswith(".root") and name is not None:
       file = root.TFile(filename, "RECREATE")
-      self.toRoot(name, labels).Write()
+      self.to_root(name, labels).Write()
       file.Close()
     elif filename.endswith(".npz"):
       np.savez(filename, **self.collect())
@@ -500,7 +502,7 @@ class Histogram1D:
 
   # ================================================================================================
 
-  def toRoot(self, name, labels = ""):
+  def to_root(self, name, labels = ""):
     edges = np.sort(self.edges)
     sortedIndices = np.argsort(self.centers)
     heights, errors = self.heights[sortedIndices], self.errors[sortedIndices]

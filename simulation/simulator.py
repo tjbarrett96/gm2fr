@@ -83,7 +83,7 @@ class Simulator:
 
     # Convert kinematics parameters to cyclotron frequencies.
     if self.kinematics_type in ("f", "p", "dp_p0"):
-      frequencies = const.info[self.kinematics_type].toF(kinematics)
+      frequencies = const.info[self.kinematics_type].to_frequency(kinematics)
     else:
       raise ValueError(f"Kinematics variable '{self.kinematics_type}' not recognized.")
 
@@ -264,32 +264,32 @@ class Simulator:
 
     # Save simulation histograms in ROOT format.
     rootFile = root.TFile(f"{self.directory}/simulation.root", "RECREATE")
-    self.frequencies.toRoot("frequencies", ";Frequency (kHz);Entries").Write()
-    self.profile.toRoot("profile", ";Injection Time (ns);Entries").Write()
-    self.joint.toRoot("joint", ";Injection Time (ns);Frequency (kHz)").Write()
-    self.signal.toRoot("signal", ";Time (us);Arbitrary Units").Write()
+    self.frequencies.to_root("frequencies", ";Frequency (kHz);Entries").Write()
+    self.profile.to_root("profile", ";Injection Time (ns);Entries").Write()
+    self.joint.to_root("joint", ";Injection Time (ns);Frequency (kHz)").Write()
+    self.signal.to_root("signal", ";Time (us);Arbitrary Units").Write()
     rootFile.Close()
 
   # ============================================================================
 
   def plot(self):
 
-    style.setStyle()
+    style.set_style()
 
     self.frequencies.plot()
-    style.labelAndSave("Frequency (kHz)", "Entries / 1 kHz", f"{self.directory}/frequencies.pdf")
+    style.label_and_save("Frequency (kHz)", "Entries / 1 kHz", f"{self.directory}/frequencies.pdf")
 
     self.profile.plot()
-    style.labelAndSave("Injection Time (ns)", "Entries / 1 ns", f"{self.directory}/profile.pdf")
+    style.label_and_save("Injection Time (ns)", "Entries / 1 ns", f"{self.directory}/profile.pdf")
 
     self.joint.transpose().plot()
     plt.xlim(const.info["f"].min, const.info["f"].max)
-    style.labelAndSave("Frequency (kHz)", "Injection Time (ns)", f"{self.directory}/joint.pdf")
+    style.label_and_save("Frequency (kHz)", "Injection Time (ns)", f"{self.directory}/joint.pdf")
 
-    pdf = style.makePDF(f"{self.directory}/signal.pdf")
+    pdf = style.make_pdf(f"{self.directory}/signal.pdf")
     endTimes = [5, 100, 300]
     for endTime in endTimes:
       start_time = 0 if not self.backward else -endTime
       self.signal.plot(errors = False, start = start_time, end = endTime, skip = int(np.clip(endTime - start_time, 1, 10)))
-      style.labelAndSave(r"Time ($\mu$s)", "Intensity / 1 ns", pdf)
+      style.label_and_save(r"Time ($\mu$s)", "Intensity / 1 ns", pdf)
     pdf.close()

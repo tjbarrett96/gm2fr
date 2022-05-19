@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 # ==================================================================================================
 
@@ -43,14 +42,14 @@ class Quantity:
     magic = None, # nominal ("magic") value for this quantity
     min = None, # minimum storable value for this quantity
     max = None, # maximum storable value for this quantity
-    toF = None, # function converting this quantity (in nominal units) to frequency (in kHz)
-    fromF = None # function converting frequency (in kHz) to this quantity (in nominal units)
+    to_frequency = None, # function converting this quantity (in nominal units) to frequency (in kHz)
+    from_frequency = None # function converting frequency (in kHz) to this quantity (in nominal units)
   ):
     self.label, self.symbol, self.units = label, symbol, units
     self.magic, self.min, self.max = magic, min, max
-    self.toF, self.fromF = toF, fromF
+    self.to_frequency, self.from_frequency = to_frequency, from_frequency
 
-  def formatLabel(self):
+  def format_label(self):
     return self.label + (f" ({self.units})" if self.units is not None else "")
 
 # ==================================================================================================
@@ -84,34 +83,35 @@ info["c_e"].magic = 0
 info["dp_p0"].magic = 0
 
 # Set the conversion functions from frequency.
-info["f"].fromF = lambda f: f
-info["r"].fromF = lambda f: info["beta"].magic * c / (2 * np.pi * f) # r = v/w, in mm for w in kHz
-info["x"].fromF = lambda f: info["r"].fromF(f) - info["r"].magic # x = r - r_0
-info["T"].fromF = lambda f: 1 / (f * 1E3) * 1E9 # T = 1/f, in ns
-info["p"].fromF = lambda f, n = 0.108: info["p"].magic * (1 + (1 - n) * (1 - f / info["f"].magic))
-info["gamma"].fromF = lambda f, n = 0.108: info["p"].fromF(f, n) / (m_mu_GeV * info["beta"].magic)
-info["tau"].fromF = lambda f, n = 0.108: info["gamma"].fromF(f, n) * lifetime
-info["dp_p0"].fromF = lambda f, n = 0.108: (info["p"].fromF(f, n) - info["p"].magic) / info["p"].magic
-info["beta"].fromF = lambda f, n = 0.108: np.sqrt(1 - 1 / info["gamma"].fromF(f, n)**2)
-info["c_e"].fromF = lambda f, n = 0.108: 2 * n * (1 - n) * (info["beta"].magic * info["x"].fromF(f) / info["r"].magic)**2 * 1E9
+info["f"].from_frequency = lambda f: f
+info["r"].from_frequency = lambda f: info["beta"].magic * c / (2 * np.pi * f) # r = v/w, in mm for w in kHz
+info["x"].from_frequency = lambda f: info["r"].from_frequency(f) - info["r"].magic # x = r - r_0
+info["T"].from_frequency = lambda f: 1 / (f * 1E3) * 1E9 # T = 1/f, in ns
+info["p"].from_frequency = lambda f, n = 0.108: info["p"].magic * (1 + (1 - n) * (1 - f / info["f"].magic))
+info["gamma"].from_frequency = lambda f, n = 0.108: info["p"].from_frequency(f, n) / (m_mu_GeV * info["beta"].magic)
+info["tau"].from_frequency = lambda f, n = 0.108: info["gamma"].from_frequency(f, n) * lifetime
+info["dp_p0"].from_frequency = lambda f, n = 0.108: (info["p"].from_frequency(f, n) - info["p"].magic) / info["p"].magic
+info["beta"].from_frequency = lambda f, n = 0.108: np.sqrt(1 - 1 / info["gamma"].from_frequency(f, n)**2)
+info["c_e"].from_frequency = lambda f, n = 0.108: 2*n*(1-n)*(info["beta"].magic * info["x"].from_frequency(f) / info["r"].magic)**2 * 1E9
 
 # Set the conversion functions to frequency (only useful for some variables).
-info["f"].toF = lambda f: f
-info["r"].toF = lambda r: info["beta"].magic * c / (2 * np.pi * r) # f = v/r, in kHz for r in mm
-info["p"].toF = lambda p, n = 0.108: info["f"].magic * (1 - (p / info["p"].magic - 1) / (1 - n))
-info["dp_p0"].toF = lambda dp_p0, n = 0.108: info["p"].toF(info["p"].magic * (1 + dp_p0), n)
+info["f"].to_frequency = lambda f: f
+info["r"].to_frequency = lambda r: info["beta"].magic * c / (2 * np.pi * r) # f = v/r, in kHz for r in mm
+info["p"].to_frequency = lambda p, n = 0.108: info["f"].magic * (1 - (p / info["p"].magic - 1) / (1 - n))
+info["dp_p0"].to_frequency = lambda dp_p0, n = 0.108: info["p"].to_frequency(info["p"].magic * (1 + dp_p0), n)
 
 # Set the minimum and maximum values for stored radii, and convert to frequency.
 info["r"].min, info["r"].max = info["r"].magic - 45, info["r"].magic + 45
-info["f"].min, info["f"].max = info["r"].toF(info["r"].max), info["r"].toF(info["r"].min)
+info["f"].min, info["f"].max = info["r"].to_frequency(info["r"].max), info["r"].to_frequency(info["r"].min)
+
 # Everything else is inversely proportional to frequency, so quantity_min ~ f_max and vice versa.
 for quantity in info.keys():
   if quantity in ("r", "f"):
     continue
-  info[quantity].min = info[quantity].fromF(info["f"].max)
-  info[quantity].max = info[quantity].fromF(info["f"].min)
+  info[quantity].min = info[quantity].from_frequency(info["f"].max)
+  info[quantity].max = info[quantity].from_frequency(info["f"].min)
 
-# # Add corresponding width quantities.
+# Add corresponding width quantities.
 for quantity in list(info.keys()):
   info[f"sig_{quantity}"] = Quantity(
     f"{info[quantity].label} Width",
@@ -124,9 +124,9 @@ info["start"] = Quantity("Start Time", "t_s", r"$\mu$s")
 info["end"] = Quantity("End Time", "t_m", r"$\mu$s")
 info["df"] = Quantity("Frequency Spacing", r"\Delta f", "kHz")
 info["t0"] = Quantity("Reference Time", "t_0", "ns")
-info["bg_chi2ndf"] = Quantity(r"Background Fit $\chi^2$/ndf", r"$\chi^2$/ndf", None)
+info["bg_chi2_ndf"] = Quantity(r"Background Fit $\chi^2$/ndf", r"$\chi^2$/ndf", None)
 info["bg_pval"] = Quantity("Background Fit $p$-value", "p", None)
-info["wg_chi2ndf"] = Quantity(r"Wiggle Fit $\chi^2$/ndf", r"$\chi^2$/ndf", None)
+info["wg_chi2_ndf"] = Quantity(r"Wiggle Fit $\chi^2$/ndf", r"$\chi^2$/ndf", None)
 info["wg_pval"] = Quantity("Wiggle Fit $p$-value", "p", None)
 info["wg_N"] = Quantity("Wiggle Normalization", "N", None)
 info["wg_tau"] = Quantity("Wiggle Lifetime", r"\tau_\mu", r"$\mu$s")

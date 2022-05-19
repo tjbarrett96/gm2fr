@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import gm2fr.style as style
-style.setStyle()
+style.set_style()
 import gm2fr.constants as const
 import gm2fr.calculations as calc
 import scipy.interpolate as interp
@@ -20,8 +20,8 @@ class Iterator:
     self.transform = transform
 
     self.iterations = [0]
-    self.chi2ndf = [bgFit.model.chi2ndf]
-    self.err_chi2ndf = [bgFit.model.err_chi2ndf]
+    self.chi2_ndf = [bgFit.model.chi2_ndf]
+    self.err_chi2_ndf = [bgFit.model.err_chi2_ndf]
     self.t0 = [transform.t0]
     self.err_t0 = [transform.err_t0]
 
@@ -33,10 +33,10 @@ class Iterator:
 
   def iterate(self, optimize = True, fineWidth = 0.001, fineSteps = 10):
 
-    tol_chi2ndf = 0.0001
+    tol_chi2_ndf = 0.0001
     tol_t0 = 0.001 * 1E-3
 
-    tempTransform = self.transform.combineAtT0(self.t0[-1], self.err_t0[-1])
+    tempTransform = self.transform.combine_at_t0(self.t0[-1], self.err_t0[-1])
 
     for i in range(1, self.limit + 1):
       print(f"\nWorking on background iteration {i}.")
@@ -58,17 +58,17 @@ class Iterator:
         newScan = Optimizer(self.transform, newModel, fineWidth, fineSteps, seed = self.t0[-1])
         newScan.optimize()
         opt_t0 = newScan.t0
-        tempTransform = self.transform.combineAtT0(opt_t0, newScan.err_t0)
+        tempTransform = self.transform.combine_at_t0(opt_t0, newScan.err_t0)
 
       self.newBGFit = BackgroundFit(tempTransform, opt_t0, self.transform.start, newModel).fit()
       self.newBGFit.model.print()
 
       if i == 1:
         # On first iteration, allow chi-squared to increase within 1-sigma.
-        self.success = self.newBGFit.model.chi2ndf < self.chi2ndf[0] + self.err_chi2ndf[0]
+        self.success = self.newBGFit.model.chi2_ndf < self.chi2_ndf[0] + self.err_chi2_ndf[0]
       else:
         # On subsequent iterations, only proceed if the chi-squared improves.
-        self.success = self.newBGFit.model.chi2ndf < self.chi2ndf[-1]
+        self.success = self.newBGFit.model.chi2_ndf < self.chi2_ndf[-1]
 
       # Terminate if no improvement.
       if not self.success:
@@ -77,24 +77,24 @@ class Iterator:
 
       # Update the result.
       self.result = self.transform.optCosine.subtract(self.newBGFit.result)
-      self.chi2ndf.append(self.newBGFit.model.chi2ndf)
-      self.err_chi2ndf.append(self.newBGFit.model.err_chi2ndf)
+      self.chi2_ndf.append(self.newBGFit.model.chi2_ndf)
+      self.err_chi2_ndf.append(self.newBGFit.model.err_chi2_ndf)
       self.t0.append(opt_t0)
       self.err_t0.append(newScan.err_t0 if newScan is not None else 0)
       self.iterations.append(i)
 
       # If the change in the chi-squared is within tolerance, finish iterating.
-      if abs(self.chi2ndf[-1] - self.chi2ndf[-2]) < tol_chi2ndf:
+      if abs(self.chi2_ndf[-1] - self.chi2_ndf[-2]) < tol_chi2_ndf:
         break
 
-    self.transform.setT0(self.t0[-1], self.err_t0[-1])
+    self.transform.set_t0(self.t0[-1], self.err_t0[-1])
     return self.result
 
 # ==================================================================================================
 
   def plot(self, output = None):
 
-    style.errorbar(self.iterations, self.chi2ndf, self.err_chi2ndf, c = "C0")
+    style.errorbar(self.iterations, self.chi2_ndf, self.err_chi2_ndf, c = "C0")
     style.xlabel("Background Iteration")
     style.ylabel(r"$\chi^2$/ndf")
 

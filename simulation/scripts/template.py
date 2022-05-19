@@ -3,7 +3,7 @@ from gm2fr.simulation.simulator import Simulator
 
 import matplotlib.pyplot as plt
 import gm2fr.style as style
-style.setStyle()
+style.set_style()
 
 # Create a Gaussian mixture distribution for the muon revolution frequencies.
 # This is a probability distribution modeled as a sum of individual Gaussians.

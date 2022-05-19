@@ -3,7 +3,7 @@ import gm2fr.constants as const
 import scipy.stats
 import matplotlib.pyplot as plt
 import gm2fr.style as style
-style.setStyle()
+style.set_style()
 
 # ==================================================================================================
 
@@ -19,12 +19,11 @@ def s(f, ts, tm, t0 = 0):
 def c(f, ts, tm, t0 = 0):
   # use trig identity for cos(a) - cos(b) to avoid indeterminate form
   return np.sin(np.pi * f * (tm + ts - 2 * t0) * const.kHz_us) * sinc(np.pi * f, (tm - ts) * const.kHz_us)
-  # -1?
 
 # ==================================================================================================
 
 # Calculate the two-sided p-value from the specified chi-squared distribution.
-def pval(chi2, ndf):
+def p_value(chi2, ndf):
 
   # Difference between the observed chi-squared and expectation value.
   diff = abs(chi2 - ndf)
@@ -32,8 +31,7 @@ def pval(chi2, ndf):
   # Probability of a more extreme value on the left side of the mean.
   left = scipy.stats.chi2.cdf(ndf - diff, ndf)
 
-  # Probability of a more extreme value on the right side of the mean.
-  # (sf = 1 - cdf)
+  # Probability of a more extreme value on the right side of the mean. (sf = 1 - cdf)
   right = scipy.stats.chi2.sf(ndf + diff, ndf)
 
   # Total probability of a more extreme value than what was observed.
@@ -48,7 +46,7 @@ def fft(time, data):
   return frequencies, transform
 
 # Plot an FFT of the supplied signal.
-def plotFFT(t, y, output = None):
+def plot_fft(t, y, output = None):
 
   # Calculate the FFT magnitude.
   f, transform = fft(t, y)
@@ -81,5 +79,5 @@ def B(t, t0, f = const.info["f"].magic):
 
 # ==================================================================================================
 
-def npTransform(trig, f, S, t):
+def np_transform(trig, f, S, t):
   return np.einsum("i, ki -> k", S, trig(2 * np.pi * np.outer(f, t) * const.kHz_us))

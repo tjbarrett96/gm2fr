@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from gm2fr.analysis.BackgroundModels import *
 import gm2fr.constants as const
 import gm2fr.style as style
-style.setStyle()
+style.set_style()
 from gm2fr.Histogram1D import Histogram1D
 
 # ==============================================================================
@@ -94,7 +94,7 @@ class BackgroundFit:
       fitLabel = "Background Fit"
     )
 
-    style.yZero()
+    style.draw_horizontal()
 
     # Plot the central (non-background) region of the transform.
     style.errorbar(
@@ -108,8 +108,8 @@ class BackgroundFit:
     # Annotate the t_0 value and fit quality.
     style.databox(
       style.Entry(self.t0 * 1E3, "t_0", None, "ns"),
-      style.Entry(self.model.chi2ndf, r"\chi^2/\mathrm{ndf}", None, None),
-      style.Entry(self.model.pval, "p", None, None)
+      style.Entry(self.model.chi2_ndf, r"\chi^2/\mathrm{ndf}", None, None),
+      style.Entry(self.model.p_value, "p", None, None)
     )
 
     # Make the axis labels and legend.

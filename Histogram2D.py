@@ -3,7 +3,7 @@ import array
 
 import matplotlib.pyplot as plt
 import gm2fr.style as style
-style.setStyle()
+style.set_style()
 import gm2fr.io as io
 from gm2fr.Histogram1D import Histogram1D
 
@@ -12,28 +12,28 @@ import root_numpy as rnp
 
 class Histogram2D:
 
-  # ============================================================================
+  # ================================================================================================
 
-  def __init__(self, xBins, yBins, xRange = None, yRange = None, heights = None, errors = None):
+  def __init__(self, x_bins, y_bins, x_range = None, y_range = None, heights = None, errors = None):
 
     # Binning parameters for internal usage of np.histogram.
     self.bins, self.range = [None, None], [None, None]
 
     # Initialize the histogram bin variables.
-    self.edges, self.xEdges, self.yEdges = [None, None], None, None
-    self.centers, self.xCenters, self.yCenters = [None, None], None, None
-    self.widths, self.xWidth, self.yWidth = [None, None], None, None
-    self.lengths, self.xLength, self.yLength = [None, None], None, None
+    self.edges, self.x_edges, self.y_edges = [None, None], None, None
+    self.centers, self.x_centers, self.y_centers = [None, None], None, None
+    self.widths, self.x_width, self.y_width = [None, None], None, None
+    self.lengths, self.x_length, self.y_length = [None, None], None, None
     self.heights, self.errors = None, None
 
-    self.edges[0] = Histogram1D.parseBinning(xBins, xRange)
-    self.edges[1] = Histogram1D.parseBinning(yBins, yRange)
-    self.updateBins()
+    self.edges[0] = Histogram1D.parse_binning(x_bins, x_range)
+    self.edges[1] = Histogram1D.parse_binning(y_bins, y_range)
+    self.update_bins()
 
     # Determine the shape for the bin height and error arrays.
     shape = tuple(self.lengths)
 
-    def copyIfPresent(array):
+    def copy_if_present(array):
       if array is not None:
         if array.shape == shape:
           return array.copy()
@@ -43,13 +43,13 @@ class Histogram2D:
         return np.zeros(shape)
 
     # Initialize the bin heights: from an argument if supplied, or else zeros.
-    self.heights = copyIfPresent(heights)
-    self.errors = copyIfPresent(errors)
+    self.heights = copy_if_present(heights)
+    self.errors = copy_if_present(errors)
 
-  # ============================================================================
+  # ================================================================================================
 
   # Compute bin centers, widths, and binning parameters for np.histogram.
-  def updateBins(self, axis = None):
+  def update_bins(self, axis = None):
 
     if axis is None:
       axes = [0, 1]
@@ -74,13 +74,13 @@ class Histogram2D:
         self.range[i] = None
 
     if 0 in axes:
-      self.xEdges = self.edges[0]
-      self.xCenters, self.xWidth, self.xLength = self.centers[0], self.widths[0], self.lengths[0]
+      self.x_edges = self.edges[0]
+      self.x_centers, self.x_width, self.x_length = self.centers[0], self.widths[0], self.lengths[0]
     if 1 in axes:
-      self.yEdges = self.edges[1]
-      self.yCenters, self.yWidth, self.yLength = self.centers[1], self.widths[1], self.lengths[1]
+      self.y_edges = self.edges[1]
+      self.y_centers, self.y_width, self.y_length = self.centers[1], self.widths[1], self.lengths[1]
 
-  # ============================================================================
+  # ================================================================================================
 
   # Add new entries to the histogram.
   def fill(self, xValues, yValues):
@@ -92,7 +92,7 @@ class Histogram2D:
     self.errors = np.sqrt(self.heights)
     # self.errors[self.errors == 0] = 1
 
-  # ============================================================================
+  # ================================================================================================
 
   # Clear the histogram contents.
   def clear(self):
@@ -100,7 +100,7 @@ class Histogram2D:
     self.errors.fill(0)
     return self
 
-  # ============================================================================
+  # ================================================================================================
 
   # Override the *= operator to scale the bin entries in-place.
   def __imul__(self, scale):
@@ -114,7 +114,7 @@ class Histogram2D:
       raise ValueError("Cannot multiply histogram by given scale.")
     return self
 
-  # ============================================================================
+  # ================================================================================================
 
   # Override the * operator.
   def __mul__(a, b):
@@ -122,7 +122,7 @@ class Histogram2D:
     result *= b
     return result
 
-  # ============================================================================
+  # ================================================================================================
 
   # Override the += operator to add bin entries in-place, assuming statistical independence.
   def __iadd__(self, other):
@@ -130,7 +130,7 @@ class Histogram2D:
     self.errors = np.sqrt(self.errors**2 + other.errors**2)
     return self
 
-  # ============================================================================
+  # ================================================================================================
 
   # Transform this histogram's bin edges according to the supplied function.
   def map(self, x = None, y = None):
@@ -139,10 +139,10 @@ class Histogram2D:
       if function is None:
         continue
       self.edges[axis] = function(self.edges[axis])
-      self.updateBins(axis)
+      self.update_bins(axis)
     return self
 
-  # ============================================================================
+  # ================================================================================================
 
   # Calculate the mean along each axis.
   def mean(self, axis = 1, empty = np.nan):
@@ -166,7 +166,7 @@ class Histogram2D:
 
     return Histogram1D(self.edges[otherAxis], heights = means, cov = errors**2)
 
-  # ============================================================================
+  # ================================================================================================
 
   # Calculate the standard deviation along each axis.
   def std(self, axis = 1):
@@ -193,34 +193,34 @@ class Histogram2D:
 
     return Histogram1D(self.edges[otherAxis], heights = std, cov = errors**2)
 
-  # ============================================================================
+  # ================================================================================================
 
   def normalize(self, area = True):
-    scale = np.sum(self.heights * (self.xWidth * self.yWidth if area else 1))
+    scale = np.sum(self.heights * (self.x_width * self.y_width if area else 1))
     self.heights /= scale
     self.errors /= scale
     return self
 
-  # ============================================================================
+  # ================================================================================================
 
   def transpose(self):
     self.edges[0], self.edges[1] = self.edges[1], self.edges[0]
     self.heights = self.heights.T
     self.errors = self.errors.T
-    self.updateBins()
+    self.update_bins()
     return self
 
-  # ============================================================================
+  # ================================================================================================
 
   def copy(self):
-    return Histogram2D(self.xEdges, self.yEdges, heights = self.heights, errors = self.errors)
+    return Histogram2D(self.x_edges, self.y_edges, heights = self.heights, errors = self.errors)
 
-  # ============================================================================
+  # ================================================================================================
 
   # TODO: don't discard original data, just make a new view (so we can re-mask)
-  def mask(self, xRange = None, yRange = None):
+  def mask(self, x_range = None, y_range = None):
 
-    ranges = [xRange, yRange]
+    ranges = [x_range, y_range]
     for axis, range in enumerate(ranges):
       if range is None:
         continue
@@ -229,7 +229,7 @@ class Histogram2D:
         max = np.searchsorted(self.centers[axis], range[1], side = "right")
 
         self.edges[axis] = self.edges[axis][min:(max + 1)]
-        self.updateBins(axis)
+        self.update_bins(axis)
 
         self.heights = self.heights[min:max] if axis == 0 else self.heights[:, min:max]
         self.errors = self.errors[min:max] if axis == 0 else self.errors[:, min:max]
@@ -238,7 +238,7 @@ class Histogram2D:
 
     return self
 
-  # ============================================================================
+  # ================================================================================================
 
   # Merge integer groups of bins along the x- or y-axes.
   def rebin(self, xStep = None, yStep = None, discard = False):
@@ -248,33 +248,33 @@ class Histogram2D:
       if step is None:
         continue
       if io.is_integer(step) and step > 0:
-        self.heights = Histogram1D.splitSum(self.heights, step, axis, discard)
-        self.errors = np.sqrt(Histogram1D.splitSum(self.errors**2, step, axis, discard))
+        self.heights = Histogram1D.split_sum(self.heights, step, axis, discard)
+        self.errors = np.sqrt(Histogram1D.split_sum(self.errors**2, step, axis, discard))
         self.edges[axis] = self.edges[axis][::step]
-        self.updateBins(axis)
+        self.update_bins(axis)
       else:
         raise ValueError(f"Histogram rebinning '{step}' invalid.")
 
     return self
 
-  # ============================================================================
+  # ================================================================================================
 
   # Plot this histogram.
   def plot(self, **kwargs):
     return style.colormesh(
-      self.xEdges,
-      self.yEdges,
+      self.x_edges,
+      self.y_edges,
       np.where(self.heights == 0, np.nan, self.heights),
       **kwargs
     )
 
-  # ============================================================================
+  # ================================================================================================
 
   # Save this histogram to disk.
   def save(self, filename, name = None, labels = ""):
     if filename.endswith(".root") and name is not None:
       file = root.TFile(filename, "RECREATE")
-      self.toRoot(name, labels).Write()
+      self.to_root(name, labels).Write()
       file.Close()
     elif filename.endswith(".npz"):
       np.savez(filename, **self.collect())
@@ -285,13 +285,13 @@ class Histogram2D:
   def collect(self, path = None):
     prefix = "" if path is None else f"{path}/"
     return {
-      f"{prefix}xEdges": self.xEdges,
-      f"{prefix}yEdges": self.yEdges,
+      f"{prefix}x_edges": self.x_edges,
+      f"{prefix}y_edges": self.y_edges,
       f"{prefix}heights": self.heights,
       f"{prefix}errors": self.errors
     }
 
-  # ============================================================================
+  # ================================================================================================
 
   # Load a histogram previously saved to disk.
   @staticmethod
@@ -300,7 +300,7 @@ class Histogram2D:
       rootFile = root.TFile(filename)
       histogram = rootFile.Get(label)
       heights, edges = rnp.hist2array(histogram, return_edges = True)
-      xEdges, yEdges = edges[0], edges[1]
+      x_edges, y_edges = edges[0], edges[1]
       errors = np.array([
         [histogram.GetBinError(i + 1, j + 1) for j in range(histogram.GetNbinsY())]
         for i in range(histogram.GetNbinsX())
@@ -309,22 +309,22 @@ class Histogram2D:
     elif filename.endswith(".npz"):
       prefix = "" if label is None else f"{label}/"
       data = np.load(filename)
-      xEdges = data[f'{prefix}xEdges']
-      yEdges = data[f'{prefix}yEdges']
+      x_edges = data[f'{prefix}x_edges']
+      y_edges = data[f'{prefix}y_edges']
       heights = data[f'{prefix}heights'],
       errors = data[f'{prefix}errors'],
     else:
       raise ValueError(f"Could not load histogram from '{filename}' with label '{label}'.")
-    return Histogram2D(xEdges, yEdges, heights = heights, errors = errors)
+    return Histogram2D(x_edges, y_edges, heights = heights, errors = errors)
 
-  # ============================================================================
+  # ================================================================================================
 
   # Convert this Histogram2D to a TH2F.
-  def toRoot(self, name, labels = ""):
+  def to_root(self, name, labels = ""):
     histogram = root.TH2F(
       name, labels,
-      self.xLength, array.array("f", list(self.xEdges)),
-      self.yLength, array.array("f", list(self.yEdges))
+      self.x_length, array.array("f", list(self.x_edges)),
+      self.y_length, array.array("f", list(self.y_edges))
     )
     rnp.array2hist(self.heights, histogram, errors = self.errors)
     histogram.ResetStats()

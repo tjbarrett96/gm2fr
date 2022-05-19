@@ -5,7 +5,7 @@ import gm2fr.constants as const
 import numpy as np
 import matplotlib.pyplot as plt
 import gm2fr.style as style
-style.setStyle()
+style.set_style()
 import time
 
 # ==================================================================================================
@@ -24,26 +24,26 @@ class Optimizer:
     self.transform = transform
     self.model = model
 
-    self.seed = seed if seed is not None else self.getSeed()
+    self.seed = seed if seed is not None else self.get_seed()
     self.steps = steps
     self.width = width
     self.times = None
 
     self.fits = None
-    self.chi2ndf = None
+    self.chi2_ndf = None
 
     self.t0 = None
     self.err_t0 = None
 
     self.iteration = 0
 
-    self.pOpt = None
-    self.opt_chi2ndf = None
+    self.p_opt = None
+    self.opt_chi2_ndf = None
 
   # ================================================================================================
 
   # Estimate the t_0 time from the fast rotation signal.
-  def getSeed(self):
+  def get_seed(self):
 
     # Get the fast rotation times and heights from the histogram.
     time, signal = self.transform.signal.centers, self.transform.signal.heights
@@ -75,18 +75,18 @@ class Optimizer:
     self.fits = [None] * len(self.times)
 
     for i in range(len(self.times)):
-      tempTransform = self.transform.combineAtT0(self.times[i])
+      tempTransform = self.transform.combine_at_t0(self.times[i])
       self.fits[i] = BackgroundFit(tempTransform, t0 = self.times[i], start = self.transform.start, model = self.model)
       self.fits[i].fit()
 
     # Extract an array of the reduced chi-squareds from the fits.
-    self.chi2ndf = np.array([fit.model.chi2ndf for fit in self.fits])
+    self.chi2_ndf = np.array([fit.model.chi2_ndf for fit in self.fits])
 
     # Fit the chi2/ndf to a parabola and estimate the minimum.
-    self.pOpt = np.polyfit(self.times, self.chi2ndf, 2)
-    a, b, c = self.pOpt # ax^2 + bx + c
+    self.p_opt = np.polyfit(self.times, self.chi2_ndf, 2)
+    a, b, c = self.p_opt # ax^2 + bx + c
     self.t0 = -b / (2 * a)
-    self.opt_chi2ndf = np.polyval(self.pOpt, self.t0)
+    self.opt_chi2_ndf = np.polyval(self.p_opt, self.t0)
 
     # If the parabola is concave-down, probably the background fits are not very good.
     # Try widening the frequency window to give more data points for the fits to use.
@@ -109,11 +109,11 @@ class Optimizer:
 
     # Get the value of the minimum chi2 from the fit.
     ndf = self.fits[0].model.ndf
-    min_chi2 = self.opt_chi2ndf * ndf
+    min_chi2 = self.opt_chi2_ndf * ndf
 
     # Find the t_0 values where chi2 = chi2_min + 1 on either side.
     # This means chi2(t0) = chi2_min + 1, so the roots of chi2(t0) - (chi2_min + 1) = 0.
-    c -= (self.opt_chi2ndf * ndf + 1) / ndf
+    c -= (self.opt_chi2_ndf * ndf + 1) / ndf
     leftTime = (-b - np.sqrt(b**2 - 4*a*c)) / (2*a) # quadratic formula
     rightTime = (-b + np.sqrt(b**2 - 4*a*c)) / (2*a) # quadratic formula
     leftMargin = self.t0 - leftTime
@@ -129,14 +129,14 @@ class Optimizer:
 
   # ================================================================================================
 
-  def plotChi2(self, output):
+  def plot_chi2(self, output):
 
     # Plot the chi2/ndf.
-    plt.plot(self.times * 1000, self.chi2ndf, 'o-')
+    plt.plot(self.times * 1000, self.chi2_ndf, 'o-')
 
     # Plot the quadratic fit.
     smooth_times = np.linspace(self.times[0], self.times[-1], 50)
-    plt.plot(smooth_times * 1000, np.polyval(self.pOpt, smooth_times), '--')
+    plt.plot(smooth_times * 1000, np.polyval(self.p_opt, smooth_times), '--')
 
     # Show the one-sigma t0 bounds as a shaded rectangle.
     plt.axvspan(
@@ -167,14 +167,14 @@ class Optimizer:
 
   # ================================================================================================
 
-  def plotFits(self, output):
+  def plot_fits(self, output):
 
     # Temporarily turn off LaTeX rendering for faster plots.
     latex = plt.rcParams["text.usetex"]
     plt.rcParams["text.usetex"] = False
 
     # Initialize the multi-page PDF file for scan plots.
-    pdf = style.makePDF(output)
+    pdf = style.make_pdf(output)
 
     # Plot each background fit, updating the initialized plot each time.
     for i in range(len(self.fits)):

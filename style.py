@@ -6,7 +6,7 @@ import gm2fr.constants as const
 # ==================================================================================================
 
 # Set the default plotting options.
-def setStyle(latex = False):
+def set_style(latex = False):
 
   # LaTeX options.
   if latex:
@@ -122,7 +122,7 @@ def make_unique_legend(extend_x = 0, **kwargs):
 # ==================================================================================================
 
 # Shortcut for labeling axes, adding legend, saving the figure, and clearing the plot.
-def labelAndSave(xLabel, yLabel, output):
+def label_and_save(xLabel, yLabel, output):
   xlabel(xLabel)
   ylabel(yLabel)
   make_unique_legend()
@@ -204,16 +204,16 @@ def imshow(
 # ==================================================================================================
 
 # Draw a horizontal line at y = 0.
-def yZero(ls = ":", c = "k"):
+def draw_horizontal(ls = ":", c = "k"):
   return plt.axhline(0, linestyle = ls, color = c)
 
 # Draw a vertical line at x = 0.
-def xZero(ls = ":", c = "k"):
+def draw_vertical(ls = ":", c = "k"):
   return plt.axvline(0, linestyle = ls, color = c)
 
 # ==================================================================================================
 
-def xStats(avg, std, units = None, color = "k"):
+def x_stats(avg, std, units = None, color = "k"):
 
   # Remember the current y-limits.
   yMin, yMax = plt.ylim()
@@ -240,7 +240,7 @@ def xStats(avg, std, units = None, color = "k"):
 
 # ==================================================================================================
 
-def yStats(
+def y_stats(
   x,
   y,
   weights = None,
@@ -291,5 +291,7 @@ def yStats(
   label = f"${avg:.2f} \pm {std:.2f}$" + f" {units}" if units is not None else ""
   return line, fill, label
 
-def makePDF(path):
+# ==================================================================================================
+
+def make_pdf(path):
   return PdfPages(path)

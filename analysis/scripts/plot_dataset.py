@@ -9,7 +9,7 @@ import analyze_dataset
 
 import matplotlib.pyplot as plt
 import gm2fr.style as style
-style.setStyle()
+style.set_style()
 
 # ==================================================================================================
 
