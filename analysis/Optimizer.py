@@ -75,7 +75,7 @@ class Optimizer:
     self.fits = [None] * len(self.times)
 
     for i in range(len(self.times)):
-      tempTransform = self.transform.combine_at_t0(self.times[i])
+      tempTransform = self.transform.get_cosine_at_t0(self.times[i])
       self.fits[i] = BackgroundFit(tempTransform, t0 = self.times[i], start = self.transform.start, model = self.model)
       self.fits[i].fit()
 

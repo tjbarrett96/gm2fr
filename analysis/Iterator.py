@@ -20,13 +20,14 @@ class Iterator:
     self.transform = transform
 
     self.iterations = [0]
+    self.fits = [bgFit]
     self.chi2_ndf = [bgFit.model.chi2_ndf]
     self.err_chi2_ndf = [bgFit.model.err_chi2_ndf]
     self.t0 = [transform.t0]
     self.err_t0 = [transform.err_t0]
 
     self.limit = limit
-    self.result = transform.optCosine.subtract(bgFit.result)
+    self.result = transform.opt_cosine.subtract(bgFit.result)
     self.success = False
 
 # ==================================================================================================
@@ -36,7 +37,7 @@ class Iterator:
     tol_chi2_ndf = 0.0001
     tol_t0 = 0.001 * 1E-3
 
-    tempTransform = self.transform.combine_at_t0(self.t0[-1], self.err_t0[-1])
+    tempTransform = self.transform.get_cosine_at_t0(self.t0[-1], self.err_t0[-1])
 
     for i in range(1, self.limit + 1):
       print(f"\nWorking on background iteration {i}.")
@@ -47,7 +48,7 @@ class Iterator:
       background.normalize()
       background = background.convolve(
         lambda f: calc.sinc(2*np.pi*f, (self.transform.start - self.t0[-1]) * const.kHz_us)
-      ).multiply(-self.transform.scale * background.width)
+      ).multiply(-background.width)
 
       template = interp.CubicSpline(background.centers, background.heights)
       newModel = Template(template)
@@ -58,7 +59,7 @@ class Iterator:
         newScan = Optimizer(self.transform, newModel, fineWidth, fineSteps, seed = self.t0[-1])
         newScan.optimize()
         opt_t0 = newScan.t0
-        tempTransform = self.transform.combine_at_t0(opt_t0, newScan.err_t0)
+        tempTransform = self.transform.get_cosine_at_t0(opt_t0, newScan.err_t0)
 
       self.newBGFit = BackgroundFit(tempTransform, opt_t0, self.transform.start, newModel).fit()
       self.newBGFit.model.print()
@@ -76,12 +77,13 @@ class Iterator:
         break
 
       # Update the result.
-      self.result = self.transform.optCosine.subtract(self.newBGFit.result)
+      self.result = self.transform.opt_cosine.subtract(self.newBGFit.result)
       self.chi2_ndf.append(self.newBGFit.model.chi2_ndf)
       self.err_chi2_ndf.append(self.newBGFit.model.err_chi2_ndf)
       self.t0.append(opt_t0)
       self.err_t0.append(newScan.err_t0 if newScan is not None else 0)
       self.iterations.append(i)
+      self.fits.append(self.newBGFit)
 
       # If the change in the chi-squared is within tolerance, finish iterating.
       if abs(self.chi2_ndf[-1] - self.chi2_ndf[-2]) < tol_chi2_ndf:

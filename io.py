@@ -9,6 +9,7 @@ import numpy as np
 gm2fr_path = os.path.dirname(gm2fr.__file__)
 results_path = f"{gm2fr_path}/analysis/results"
 data_path = f"{gm2fr_path}/data"
+sim_path = f"{gm2fr_path}/simulation/data"
 
 # ==================================================================================================
 

@@ -55,12 +55,12 @@ class Corrector:
     self.background = self.A_rho.convolve(lambda x: calc.sinc(2*np.pi*x, (self.transform.start - self.transform.t0) * const.kHz_us)).multiply(-self.scale * self.truth_frequency.width)
     self.wiggle = self.truth_frequency.copy().clear().set_heights(self.scale * calc.s(self.truth_frequency.centers, self.transform.start, self.transform.end, self.transform.t0))
 
-    A_interpolated = self.A.interpolate(self.transform.optCosine.centers, spline = False)
+    A_interpolated = self.A.interpolate(self.transform.opt_cosine.centers, spline = False)
     A_interpolated.heights[abs(A_interpolated.heights) < 0.03] = 0
 
     # Calculate the predicted transform and corrected transform.
     self.predicted_transform = self.peak
-    self.corrected_transform = self.transform.optCosine.copy().divide(A_interpolated, zero = 1)
+    self.corrected_transform = self.transform.opt_cosine.copy().divide(A_interpolated, zero = 1)
     if distortion:
       self.predicted_transform = self.predicted_transform.add(self.distortion)
       self.corrected_transform = self.corrected_transform.subtract(self.distortion.interpolate(self.corrected_transform.centers))

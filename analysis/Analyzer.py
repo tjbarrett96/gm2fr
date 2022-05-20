@@ -119,6 +119,7 @@ class Analyzer:
     iterate = False,
     bg_model = "sinc", # Background fit model: "constant" / "parabola" / "sinc" / "error".
     df = 2, # Frequency interval (in kHz) for the cosine transform.
+    freq_width = 150,
     coarse_t0_width = 20, # full range (in ns) for the initial coarse t0 scan range.
     coarse_t0_steps = 5, # Number of steps for the initial coarse t0 scan range.
     fine_t0_width = 1, # full range (in ns) for the subsequent fine t0 scan ranges.
@@ -132,7 +133,7 @@ class Analyzer:
 
     fr_signal_masked = self.fr_signal.copy().mask((start, end))
 
-    self.transform = Transform(fr_signal_masked, df)
+    self.transform = Transform(fr_signal_masked, df, freq_width)
 
     coarse_t0_optimizer = None
     fine_t0_optimizer = None
@@ -150,17 +151,18 @@ class Analyzer:
         fine_t0_optimizer.plot_chi2(f"{self.output_path}/{self.output_prefix}BackgroundChi2.pdf")
 
     self.transform.set_t0(t0, fine_t0_optimizer.err_t0 if fine_t0_optimizer is not None else 0)
-    corr_transform = self.transform.optCosine.copy()
+    corr_transform = self.transform.opt_cosine.copy()
 
     self.bg_fit = None
     if bg_model is not None:
-      self.bg_fit = BackgroundFit(self.transform.optCosine, t0, start, bg_model, scale = self.transform.scale).fit()
-      corr_transform = self.transform.optCosine.subtract(self.bg_fit.result)
+      self.bg_fit = BackgroundFit(self.transform.opt_cosine, t0, start, bg_model).fit()
+      corr_transform = self.transform.opt_cosine.subtract(self.bg_fit.result)
 
       iterator = None
       if iterate:
         iterator = Iterator(self.transform, self.bg_fit)
         corr_transform = iterator.iterate(optimize_t0)
+        self.bg_fit = iterator.fits[-1]
         if save_output and plot_level > 0:
           iterator.plot(f"{self.output_path}/{self.output_prefix}Iterations.pdf")
 
@@ -175,7 +177,7 @@ class Analyzer:
     results = Results({"start": start, "end": end, "df": df, "t0": t0, "err_t0": fine_t0_optimizer.err_t0 if fine_t0_optimizer is not None else 0})
     histograms = dict()
 
-    output_variables = ["f", "x", "dp_p0", "tau", "gamma", "c_e"]
+    output_variables = ["f", "x", "dp_p0", "T", "tau", "gamma", "c_e"]
     for unit in output_variables:
       histograms[unit] = corr_transform.copy().map(const.info[unit].from_frequency)
       mean, mean_err = histograms[unit].mean(error = True)
@@ -265,8 +267,8 @@ class Analyzer:
 
         if corrector is not None:
           corrector.truth_frequency.plot(errors = False, label = "Truth")
-        self.transform.optCosine.plot(label = "Cosine Transform")
-        self.transform.optSine.plot(label = "Sine Transform")
+        self.transform.opt_cosine.plot(label = "Cosine Transform")
+        self.transform.opt_sine.plot(label = "Sine Transform")
         self.transform.magnitude.plot(label = "Fourier Magnitude")
         style.draw_horizontal()
         plt.axvline(const.info["f"].magic, ls = ":", c = "k", label = "Magic")

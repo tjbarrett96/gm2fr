@@ -19,15 +19,16 @@ class Transform:
     self.scale = 1 / (np.mean(signal.width) * const.kHz_us)
 
     f = np.arange(const.info["f"].magic - width / 2, const.info["f"].magic + width / 2 + df, df)
-    self.rawCosine = Histogram1D(f)
-    self.rawSine = Histogram1D(f)
-    self.crossCov = None
+    self.raw_cosine = Histogram1D(f)
+    self.raw_sine = Histogram1D(f)
+    self.cross_cov = None
     self.magnitude = None
+    self.omega = 2 * np.pi * self.raw_cosine.centers
 
     self.t0 = None
     self.err_t0 = None
-    self.optCosine = None
-    self.optSine = None
+    self.opt_cosine = None
+    self.opt_sine = None
 
     self.transform()
 
@@ -36,86 +37,96 @@ class Transform:
   def transform(self):
 
     # Mask the fast rotation signal data between the start and end times.
-    # mask = (self.signal.centers >= self.start) & (self.signal.centers <= self.end)
-    # time = self.signal.centers[mask]
-    # signal = self.signal.heights[mask]
-    # errors = self.signal.errors[mask]
     time, signal, errors = self.signal.centers, self.signal.heights, self.signal.errors
 
     # Compute the cosine transform, and subtract the s(f) wiggle function.
-    cosTransform = calc.np_transform(np.cos, self.rawCosine.centers, signal, time)
-    cosTransform -= self.scale * calc.s(self.rawCosine.centers, self.start, self.end)
-    self.rawCosine.set_heights(cosTransform)
+    cosTransform = calc.np_transform(np.cos, self.raw_cosine.centers, signal, time)
+    cosTransform -= self.scale * calc.s(self.raw_cosine.centers, self.start, self.end)
+    self.raw_cosine.set_heights(cosTransform)
 
     # Compute the sine transform, and subtract the c(f) wiggle function.
-    sinTransform = calc.np_transform(np.sin, self.rawSine.centers, signal, time)
-    sinTransform -= self.scale * calc.c(self.rawSine.centers, self.start, self.end)
-    self.rawSine.set_heights(sinTransform)
+    sinTransform = calc.np_transform(np.sin, self.raw_sine.centers, signal, time)
+    sinTransform -= self.scale * calc.c(self.raw_sine.centers, self.start, self.end)
+    self.raw_sine.set_heights(sinTransform)
 
     # Compute the covariance matrix for both transforms.
-    fDiff = self.rawCosine.centers - self.rawCosine.centers[0]
+    fDiff = self.raw_cosine.centers - self.raw_cosine.centers[0]
     cov = 0.5 * lg.toeplitz(calc.np_transform(np.cos, fDiff, errors**2, time))
-    self.rawCosine.set_cov(cov)
-    self.rawSine.set_cov(cov)
+    self.raw_cosine.set_cov(cov)
+    self.raw_sine.set_cov(cov)
 
     # Compute the covariance matrix between the cosine and sine transforms.
     column = calc.np_transform(np.sin, fDiff, errors**2, time)
-    self.crossCov = -0.5 * lg.toeplitz(column, -column)
+    self.cross_cov = -0.5 * lg.toeplitz(column, -column)
+
+    # Scale down the transform by the discrete scale factor.
+    self.raw_cosine = self.raw_cosine.divide(self.scale)
+    self.raw_sine = self.raw_sine.divide(self.scale)
+    self.cross_cov /= self.scale**2
 
     # Compute the Fourier transform magnitude (i.e. square root of the sum in quadrature).
-    squareCrossCov = 4 * np.outer(self.rawCosine.heights, self.rawSine.heights) * self.crossCov
-    self.magnitude = self.rawCosine.power(2).add(self.rawSine.power(2), cov = squareCrossCov).power(0.5)
+    square_cross_cov = 4 * np.outer(self.raw_cosine.heights, self.raw_sine.heights) * self.cross_cov
+    self.magnitude = self.raw_cosine.power(2).add(self.raw_sine.power(2), cov = square_cross_cov).power(0.5)
 
   # ================================================================================================
 
-  def combine_at_t0(self, t0, err = 0, sine = False):
+  def get_t0_weights(self, t0, err = 0):
 
-    # Compute cos(omega * t0) and sin(omega * t0).
-    omega = 2 * np.pi * self.rawCosine.centers
-    cos_t0 = np.cos(omega * t0 * const.kHz_us)
-    sin_t0 = np.sin(omega * t0 * const.kHz_us)
+    # Compute cos(self.omega * t0) and sin(self.omega * t0).
+    cos_t0 = np.cos(self.omega * t0 * const.kHz_us)
+    sin_t0 = np.sin(self.omega * t0 * const.kHz_us)
 
     # Create histograms for the cosine and sine weight factors.
-    cosWeight = self.rawCosine.copy().clear().set_heights(cos_t0)
-    sinWeight = self.rawSine.copy().clear().set_heights(sin_t0)
+    cos_weight = self.raw_cosine.copy().clear().set_heights(cos_t0)
+    sin_weight = self.raw_sine.copy().clear().set_heights(sin_t0)
 
     # If a t0 uncertainty is provided, set the weight factors' covariance matrices.
     if err > 0:
-      cosWeight.set_cov(np.outer(omega * sin_t0, omega * sin_t0) * (err * const.kHz_us)**2)
-      sinWeight.set_cov(np.outer(omega * cos_t0, omega * cos_t0) * (err * const.kHz_us)**2)
+      cos_weight.set_cov(np.outer(self.omega * sin_t0, self.omega * sin_t0) * (err * const.kHz_us)**2)
+      sin_weight.set_cov(np.outer(self.omega * cos_t0, self.omega * cos_t0) * (err * const.kHz_us)**2)
 
-    if not sine:
+    return cos_t0, sin_t0, cos_weight, sin_weight
 
-      # Compute the t0-weighted cosine and sine transforms.
-      weightedCos = cosWeight.multiply(self.rawCosine)
-      weightedSin = sinWeight.multiply(self.rawSine)
+  # ================================================================================================
 
-      # Compute the covariance matrix between the weighted cosine and sine terms.
-      weightedCrossCov = np.outer(cosWeight.heights, sinWeight.heights) * self.crossCov
-      if err > 0:
-        wCrossCov = -np.outer(omega * sin_t0, omega * cos_t0) * (err * const.kHz_us)**2
-        weightedCrossCov += np.outer(self.rawCosine.heights, self.rawSine.heights) * wCrossCov
+  def get_cosine_at_t0(self, t0, err = 0):
 
-      return weightedCos.add(weightedSin, cov = weightedCrossCov)
+    cos_t0, sin_t0, cos_weight, sin_weight = self.get_t0_weights(t0, err)
 
-    else:
+    # Compute the t0-weighted cosine and sine transforms.
+    weighted_cos = cos_weight.multiply(self.raw_cosine)
+    weighted_sin = sin_weight.multiply(self.raw_sine)
 
-      # Compute the t0-weighted cosine and sine transforms.
-      weightedCos = sinWeight.multiply(self.rawCosine)
-      weightedSin = cosWeight.multiply(self.rawSine)
+    # Compute the covariance matrix between the weighted cosine and sine terms.
+    weighted_cross_cov = np.outer(cos_weight.heights, sin_weight.heights) * self.cross_cov
+    if err > 0:
+      w_cross_cov = -np.outer(self.omega * sin_t0, self.omega * cos_t0) * (err * const.kHz_us)**2
+      weighted_cross_cov += np.outer(self.raw_cosine.heights, self.raw_sine.heights) * w_cross_cov
 
-      # Compute the covariance matrix between the weighted cosine and sine terms.
-      weightedCrossCov = np.outer(sinWeight.heights, cosWeight.heights) * self.crossCov
-      if err > 0:
-        wCrossCov = -np.outer(omega * cos_t0, omega * sin_t0) * (err * const.kHz_us)**2
-        weightedCrossCov += np.outer(self.rawCosine.heights, self.rawSine.heights) * wCrossCov
+    return weighted_cos.add(weighted_sin, cov = weighted_cross_cov)
 
-      return weightedSin.subtract(weightedCos, cov = weightedCrossCov)
+  # ================================================================================================
+
+  def get_sine_at_t0(self, t0, err = 0):
+
+    cos_t0, sin_t0, cos_weight, sin_weight = self.get_t0_weights(t0, err)
+
+    # Compute the t0-weighted cosine and sine transforms.
+    weighted_cos = sin_weight.multiply(self.raw_cosine)
+    weighted_sin = cos_weight.multiply(self.raw_sine)
+
+    # Compute the covariance matrix between the weighted cosine and sine terms.
+    weighted_cross_cov = np.outer(sin_weight.heights, cos_weight.heights) * self.cross_cov
+    if err > 0:
+      w_cross_cov = -np.outer(self.omega * cos_t0, self.omega * sin_t0) * (err * const.kHz_us)**2
+      weighted_cross_cov += np.outer(self.raw_cosine.heights, self.raw_sine.heights) * w_cross_cov
+
+    return weighted_sin.subtract(weighted_cos, cov = weighted_cross_cov)
 
   # ================================================================================================
 
   def set_t0(self, t0, err = 0):
     self.t0 = t0
     self.err_t0 = err
-    self.optCosine = self.combine_at_t0(t0, err)
-    self.optSine = self.combine_at_t0(t0, err, sine = True)
+    self.opt_cosine = self.get_cosine_at_t0(t0, err)
+    self.opt_sine = self.get_sine_at_t0(t0, err)

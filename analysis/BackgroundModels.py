@@ -42,7 +42,7 @@ class Sinc(Model):
   # ============================================================================
 
   def function(self, f, a, fc, s):
-    return a * np.sinc((f-fc)/s * (1/np.pi))
+    return -a * np.sinc((f-fc)/s * (1/np.pi))
 
   # ============================================================================
 
@@ -58,10 +58,10 @@ class Sinc(Model):
     result[0] = self.function(f, a, fc, s) / a
 
     # df/d(fc)
-    result[1] = a * (np.cos(x)/x - np.sin(x)/x**2) * (-1/s)
+    result[1] = -a * (np.cos(x)/x - np.sin(x)/x**2) * (-1/s)
 
     # df/ds
-    result[2] = a * (np.cos(x)/x - np.sin(x)/x**2) * (-x/s)
+    result[2] = -a * (np.cos(x)/x - np.sin(x)/x**2) * (-x/s)
 
     return result
 
@@ -69,18 +69,17 @@ class Sinc(Model):
 
 class Error(Model):
 
-  def __init__(self, scale = 1, gap = 1):
+  def __init__(self, gap = 1):
     super().__init__()
     self.name = "error background"
     self.b = np.pi * gap * const.kHz_us
-    self.scale = scale
-    self.seeds = [1, const.info["f"].magic, 13]
+    self.seeds = [0.5, const.info["f"].magic, 14]
 
   # ============================================================================
 
   def function(self, f, a, fc, s):
 
-    result = self.scale * a * np.exp(-(s*self.b)**2) * np.imag(
+    result = -a / (np.pi*s) * np.exp(-(s*self.b)**2) * np.imag(
       np.exp(-2j*(f-fc)*self.b) * sp.dawsn(-(f-fc)/s + 1j*s*self.b)
     )
 
@@ -105,13 +104,13 @@ class Error(Model):
     result[0] = self.function(f, a, fc, s) / a
 
     # df/d(fc)
-    result[1] = a * np.exp(-(s*self.b)**2) * np.imag(
+    result[1] = -a / (np.pi*s) * np.exp(-(s*self.b)**2) * np.imag(
       np.exp(-2j*(f-fc)*self.b) * (2j*self.b*Dz + (1-2*z*Dz)/s)
     )
 
     # df/ds
-    result[2] = -self.function(f, a, fc, s) * 2*s*self.b**2 \
-      + a*np.exp(-(s*self.b)**2) * np.imag(
+    result[2] = -self.function(f, a, fc, s)/s - self.function(f, a, fc, s) * 2*s*self.b**2 \
+      - a / (np.pi*s) * np.exp(-(s*self.b)**2) * np.imag(
         np.exp(-2j*(f-fc)*self.b) * (1-2*z*Dz)*((f-fc)/s**2 + 1j*self.b)
       )
 
@@ -127,7 +126,6 @@ class Template(Model):
     self.template = template
     self.seeds = [1, 1, 0]
     # self.seeds = [1]
-    # self.seeds = [1, 1]
 
   def function(self, f, a, b, c):
     return a * self.template(b * (f - c))

@@ -24,37 +24,47 @@ subset_dir = {
 def analyze_dataset(dataset, subset = "nominal", **analyze_args):
 
   # Validate the requested subset to analyze.
-  if subset not in ("nominal", *subset_dir.keys()):
+  if subset not in ("nominal", "sim", *subset_dir.keys()):
     print(f"Data subset type '{subset}' not recognized.")
     return
 
-  # Construct the standard path to the dataset ROOT file.
-  input_path = f"{io.gm2fr_path}/data/FastRotation_{dataset}.root"
+  if subset != "sim":
 
-  if subset == "nominal":
+    # Construct the standard path to the dataset ROOT file.
+    input_path = f"{io.gm2fr_path}/data/FastRotation_{dataset}.root"
 
-    # For the nominal analysis, there are no input subdirectories and no output group folder.
-    input_folders = ["FastRotation/AllCalos"]
-    subset_indices = [None]
-    output_group = None
-    output_folders = ["Nominal"]
+    if subset == "nominal":
+
+      # For the nominal analysis, there are no input subdirectories and no output group folder.
+      input_folders = ["FastRotation/AllCalos"]
+      subset_indices = [None]
+      output_group = None
+      output_folders = ["Nominal"]
+
+    else:
+
+      # Get a list of subdirectories inside the input parent directory for this subset.
+      input_file = root.TFile(input_path)
+      input_folders = [
+        f"FastRotation/{subset_dir[subset]}/{item.GetName()}"
+        for item in input_file.Get(f"FastRotation/{subset_dir[subset]}").GetListOfKeys()
+      ]
+      input_file.Close()
+
+      # Look in each subdirectory name for an identifying numerical index (e.g. calo number).
+      subset_indices = io.find_indices(input_folders)
+
+      # Construct the output group name (e.g. ByCalo) and output folders (e.g. [Calo1, Calo2, ...]).
+      output_group = f"By{subset.capitalize()}"
+      output_folders = [f"{subset.capitalize()}{index}" for index in subset_indices]
 
   else:
 
-    # Get a list of subdirectories inside the input parent directory for this subset.
-    input_file = root.TFile(input_path)
-    input_folders = [
-      f"FastRotation/{subset_dir[subset]}/{item.GetName()}"
-      for item in input_file.Get(f"FastRotation/{subset_dir[subset]}").GetListOfKeys()
-    ]
-    input_file.Close()
-
-    # Look in each subdirectory name for an identifying numerical index (e.g. calo number).
-    subset_indices = io.find_indices(input_folders)
-
-    # Construct the output group name (e.g. ByCalo) and output folders (e.g. [Calo1, Calo2, ...]).
-    output_group = f"By{subset.capitalize()}"
-    output_folders = [f"{subset.capitalize()}{index}" for index in subset_indices]
+    input_path = f"{io.sim_path}/{dataset}_sim/simulation.root"
+    input_folders = [None]
+    subset_indices = [None]
+    output_group = None
+    output_folders = ["Simulation"]
 
   # Run the analysis on each part of the subset (e.g. each calo).
   for input_folder, subset_index, output_folder in zip(input_folders, subset_indices, output_folders):
@@ -65,12 +75,12 @@ def analyze_dataset(dataset, subset = "nominal", **analyze_args):
 
     analyzer = Analyzer(
       filename = input_path,
-      signal_label = f"{input_folder}/hHitTime",
-      pileup_label = f"{input_folder}/hPileupTime",
+      signal_label = f"{input_folder}/hHitTime" if subset != "sim" else "signal",
+      pileup_label = f"{input_folder}/hPileupTime" if subset != "sim" else None,
       output_label = f"{dataset}/{(output_group + '/') if output_group is not None else ''}{output_folder}",
-      fr_method = "nine" if subset == "nominal" else "five",
+      fr_method = "nine" if subset == "nominal" else ("five" if subset != "sim" else None),
       n = 0.108 if dataset not in ("1B", "1C") else 0.120,
-      time_units = 1E-9
+      time_units = 1E-9 if subset != "sim" else 1E-6
     )
 
     # Assume default analysis parameters, and pass any extra keyword arguments.
@@ -92,7 +102,7 @@ if __name__ == "__main__":
   # Check for the dataset and (optional) scan arguments.
   if len(sys.argv) < 2:
     print("Arguments not recognized. Usage:")
-    print("python3 analyze_dataset.py <dataset> [subset: nominal (default) / calo / bunch / run / energy / threshold / row / column / all]")
+    print("python3 analyze_dataset.py <dataset> [subset: nominal (default) / sim / calo / bunch / run / energy / threshold / row / column / all]")
     exit()
 
   # Parse the dataset argument.

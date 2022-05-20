@@ -56,7 +56,7 @@ def emulate_dataset(dataset):
   times.map(lambda t: t * (shrunken_width / time_width))
 
   simulation = Simulator(
-    f"../data/{dataset}_sim",
+    f"{dataset}_sim",
     overwrite = True,
     kinematics_dist = frequencies,
     kinematics_type = "f",

@@ -24,7 +24,7 @@ def set_style(latex = False):
   plt.rcParams["legend.fontsize"] = size * 0.75
 
   # Rules for switching to scientific notation in axis tick labels.
-  plt.rcParams["axes.formatter.limits"] = (-4, 5)
+  plt.rcParams["axes.formatter.limits"] = (-3, 5)
   plt.rcParams["axes.formatter.use_mathtext"] = True
 
   # Marker and line options.

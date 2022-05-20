@@ -77,7 +77,7 @@ class Histogram1D:
 
     # If all bins are the same width, update the bin and range format accordingly.
     # TODO: np.isclose is too small to catch bin widths from simulation
-    if np.all(np.isclose(self.width, self.width[0])):
+    if np.all(np.abs(self.width - self.width[0]) < 0.01 * self.width[0]):
       self.width = self.width[0]
       self.bins = len(self.centers)
       self.range = [self.edges[0], self.edges[-1]]
