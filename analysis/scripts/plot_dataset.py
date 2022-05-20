@@ -88,7 +88,7 @@ if __name__ == "__main__":
       for dataset in datasets:
         plot_dataset(dataset, subset, variable)
       style.xlabel(subset_labels[subset])
-      style.ylabel(const.info[variable].formatLabel())
+      style.ylabel(const.info[variable].format_label())
 
       style.make_unique_legend(extend_x = 0.15, loc = "center right")
 

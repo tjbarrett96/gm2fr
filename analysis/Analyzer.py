@@ -37,6 +37,7 @@ class Analyzer:
     signal_label = None, # Label for signal data inside each file.
     pileup_label = None, # Label for pileup data inside file.
     output_label = None, # Output directory name, within gm2fr/analysis/results.
+    output_prefix = "",
     truth_filename = None, # Truth .npz file from gm2fr simulation.
     fr_method = None,
     n = 0.108,
@@ -47,6 +48,7 @@ class Analyzer:
     self.signal_label = signal_label
     self.pileup_label = pileup_label
     self.output_label = output_label
+    self.output_prefix = output_prefix
     self.truth_filename = truth_filename
     self.n = n
     self.time_units = time_units
@@ -145,14 +147,14 @@ class Analyzer:
       t0 = fine_t0_optimizer.optimize()
 
       if save_output and plot_level > 0:
-        fine_t0_optimizer.plot_chi2(f"{self.output_path}/BackgroundChi2.pdf")
+        fine_t0_optimizer.plot_chi2(f"{self.output_path}/{self.output_prefix}BackgroundChi2.pdf")
 
     self.transform.set_t0(t0, fine_t0_optimizer.err_t0 if fine_t0_optimizer is not None else 0)
     corr_transform = self.transform.optCosine.copy()
 
     self.bg_fit = None
     if bg_model is not None:
-      self.bg_fit = BackgroundFit(self.transform.optCosine, t0, start, bg_model).fit()
+      self.bg_fit = BackgroundFit(self.transform.optCosine, t0, start, bg_model, scale = self.transform.scale).fit()
       corr_transform = self.transform.optCosine.subtract(self.bg_fit.result)
 
       iterator = None
@@ -160,7 +162,7 @@ class Analyzer:
         iterator = Iterator(self.transform, self.bg_fit)
         corr_transform = iterator.iterate(optimize_t0)
         if save_output and plot_level > 0:
-          iterator.plot(f"{self.output_path}/Iterations.pdf")
+          iterator.plot(f"{self.output_path}/{self.output_prefix}Iterations.pdf")
 
     corrector = None
     if self.truth_filename is not None:
@@ -195,10 +197,10 @@ class Analyzer:
       # Plot the fast rotation signal, and wiggle fit (if present).
       if plot_level >= 1:
 
-        self.fr_signal.save(f"{self.output_path}/signal.npz")
-        self.fr_signal.save(f"{self.output_path}/signal.root", "signal")
+        self.fr_signal.save(f"{self.output_path}/{self.output_prefix}signal.npz")
+        self.fr_signal.save(f"{self.output_path}/{self.output_prefix}signal.root", "signal")
 
-        pdf = style.make_pdf(f"{self.output_path}/FastRotation.pdf")
+        pdf = style.make_pdf(f"{self.output_path}/{self.output_prefix}FastRotation.pdf")
         endTimes = [5, 100, 300]
         for endTime in endTimes:
           self.fr_signal.plot(errors = False, start = 4, end = endTime, skip = int(np.clip(endTime - 4, 1, 10)))
@@ -208,9 +210,9 @@ class Analyzer:
         pdf.close()
 
         if self.wiggle_fit is not None:
-          self.wiggle_fit.plot(f"{self.output_path}/WiggleFit.pdf")
+          self.wiggle_fit.plot(f"{self.output_path}/{self.output_prefix}WiggleFit.pdf")
           self.wiggle_fit.plot_fine(self.output_path, endTimes)
-          calc.plot_fft(self.raw_signal.centers, self.raw_signal.heights, f"{self.output_path}/RawSignalFFT.pdf")
+          calc.plot_fft(self.raw_signal.centers, self.raw_signal.heights, f"{self.output_path}/{self.output_prefix}RawSignalFFT.pdf")
 
       plotbegin_time = time.time()
 
@@ -222,8 +224,8 @@ class Analyzer:
           axesToPlot = output_variables.copy()
           axesToPlot.remove("c_e")
 
-      pdf = style.make_pdf(f"{self.output_path}/AllDistributions.pdf")
-      rootFile = root.TFile(f"{self.output_path}/transform.root", "RECREATE")
+      pdf = style.make_pdf(f"{self.output_path}/{self.output_prefix}AllDistributions.pdf")
+      rootFile = root.TFile(f"{self.output_path}/{self.output_prefix}transform.root", "RECREATE")
 
       # Compile the results list of (name, value) pairs from each object.
 
@@ -231,7 +233,7 @@ class Analyzer:
         # Plot the truth-level distribution for comparison, if present.
         # if truth is not None:
         #   ref_predicted.plot(label = "Predicted")
-        histograms[unit].to_root(f"transform_{unit}", f";{const.info[unit].formatLabel()};").Write()
+        histograms[unit].to_root(f"transform_{unit}", f";{const.info[unit].format_label()};").Write()
         histograms[unit].plot(label = None if self.truth_filename is None else "Result")
         plt.axvline(const.info[unit].magic, ls = ":", c = "k", label = "Magic")
         style.draw_horizontal()
@@ -240,7 +242,7 @@ class Analyzer:
           style.Entry(std, rf"\sigma_{{{const.info[unit].symbol}}}", std_err, const.info[unit].units)
         )
         plt.xlim(const.info[unit].min, const.info[unit].max)
-        style.label_and_save(const.info[unit].formatLabel(), "Arbitrary Units", pdf)
+        style.label_and_save(const.info[unit].format_label(), "Arbitrary Units", pdf)
 
       pdf.close()
       rootFile.Close()
@@ -257,7 +259,7 @@ class Analyzer:
       #   diff_results.table.columns = [f"diff_{name}" for name in diff_results.table.columns]
       #   results.merge(diff_results)
 
-      self.results.save(self.output_path)
+      self.results.save(self.output_path, filename = f"{self.output_prefix}results")
 
       if plot_level > 0:
 
@@ -268,20 +270,20 @@ class Analyzer:
         self.transform.magnitude.plot(label = "Fourier Magnitude")
         style.draw_horizontal()
         plt.axvline(const.info["f"].magic, ls = ":", c = "k", label = "Magic")
-        style.label_and_save("Frequency (kHz)", "Arbitrary Units", f"{self.output_path}/magnitude.pdf")
+        style.label_and_save("Frequency (kHz)", "Arbitrary Units", f"{self.output_path}/{self.output_prefix}magnitude.pdf")
 
-        calc.plot_fft(fr_signal_masked.centers, fr_signal_masked.heights, f"{self.output_path}/FastRotationFFT.pdf")
+        calc.plot_fft(fr_signal_masked.centers, fr_signal_masked.heights, f"{self.output_path}/{self.output_prefix}FastRotationFFT.pdf")
 
         # Plot the final background fit.
         if self.bg_fit is not None:
-          self.bg_fit.plot(f"{self.output_path}/BackgroundFit.pdf")
+          self.bg_fit.plot(f"{self.output_path}/{self.output_prefix}BackgroundFit.pdf")
 
         # if self.newBGFit is not None:
         #   self.newBGFit.plot(f"{self.output_path}/TemplateFit.pdf")
 
           # corr_transform.bgFit.save(f"{self.output_path}/background.npz")
 
-        corr_transform.save(f"{self.output_path}/transform.npz")
+        corr_transform.save(f"{self.output_path}/{self.output_prefix}transform.npz")
         # corr_transform.save(f"{self.output_path}/transform.root", "transform")
 
         print(f"\nFinished plotting and saving results in {time.time() - plotbegin_time:.2f} seconds.")
@@ -308,4 +310,4 @@ class Analyzer:
       )
 
     if self.output_path is not None:
-      self.results.save(self.output_path)
+      self.results.save(self.output_path, filename = f"{self.output_prefix}results")

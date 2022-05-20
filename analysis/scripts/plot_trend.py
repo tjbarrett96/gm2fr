@@ -34,8 +34,8 @@ if __name__ == "__main__":
   for filename in filenames:
     plot_trend(x, y, filename, label = filename)
 
-  style.xlabel(const.info[x].formatLabel() if x in const.info.keys() else x)
-  style.ylabel(const.info[y].formatLabel() if y in const.info.keys() else y)
+  style.xlabel(const.info[x].format_label() if x in const.info.keys() else x)
+  style.ylabel(const.info[y].format_label() if y in const.info.keys() else y)
   plt.legend()
 
   plt.show()

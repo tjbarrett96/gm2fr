@@ -20,6 +20,7 @@ subset_dir = {
 
 # ==================================================================================================
 
+# TODO: add simulation flag which checks for emulated dataset and analyzes that
 def analyze_dataset(dataset, subset = "nominal", **analyze_args):
 
   # Validate the requested subset to analyze.
@@ -69,7 +70,7 @@ def analyze_dataset(dataset, subset = "nominal", **analyze_args):
       output_label = f"{dataset}/{(output_group + '/') if output_group is not None else ''}{output_folder}",
       fr_method = "nine" if subset == "nominal" else "five",
       n = 0.108 if dataset not in ("1B", "1C") else 0.120,
-      units = "ns"
+      time_units = 1E-9
     )
 
     # Assume default analysis parameters, and pass any extra keyword arguments.

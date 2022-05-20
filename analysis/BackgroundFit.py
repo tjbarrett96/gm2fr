@@ -22,7 +22,8 @@ class BackgroundFit:
     transform,
     t0,
     start,
-    model
+    model,
+    scale = 1
   ):
 
     # Keep a reference to the Transform object whose background we are fitting.
@@ -31,6 +32,7 @@ class BackgroundFit:
     # Key times used in the cosine transform: start, end, and t0.
     self.t0 = t0
     self.start = start
+    self.scale = scale
 
     # Fit data, with boundary mask applied.
     self.mask = const.unphysical(self.transform.centers)
@@ -53,7 +55,8 @@ class BackgroundFit:
     elif model == "sinc":
       self.model = Sinc(np.min(self.transform.heights), self.start - self.t0)
     elif model == "error":
-      self.model = Error(np.min(self.transform.heights), self.start - self.t0)
+      # self.model = Error(np.min(self.transform.heights), self.start - self.t0)
+      self.model = Error(self.scale, self.start - self.t0)
     elif isinstance(model, Template):
       self.model = copy.deepcopy(model)
     else:

@@ -73,13 +73,14 @@ class Error(Model):
     super().__init__()
     self.name = "error background"
     self.b = np.pi * gap * const.kHz_us
-    self.seeds = [scale, const.info["f"].magic, 12]
+    self.scale = scale
+    self.seeds = [1, const.info["f"].magic, 13]
 
   # ============================================================================
 
   def function(self, f, a, fc, s):
 
-    result = a * np.exp(-(s*self.b)**2) * np.imag(
+    result = self.scale * a * np.exp(-(s*self.b)**2) * np.imag(
       np.exp(-2j*(f-fc)*self.b) * sp.dawsn(-(f-fc)/s + 1j*s*self.b)
     )
 

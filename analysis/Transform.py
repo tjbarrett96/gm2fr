@@ -16,7 +16,7 @@ class Transform:
     self.signal = signal
     self.start = self.signal.centers[0]
     self.end = self.signal.centers[-1]
-    self.scale = 1 / (signal.width * const.kHz_us)
+    self.scale = 1 / (np.mean(signal.width) * const.kHz_us)
 
     f = np.arange(const.info["f"].magic - width / 2, const.info["f"].magic + width / 2 + df, df)
     self.rawCosine = Histogram1D(f)
