@@ -29,11 +29,8 @@ simulation/*/
 !analysis
 analysis/*/
 
-# Keep the analysis/scripts directory.
-!analysis/scripts
-
-# Keep the simulation/scripts directory.
-!simulation/scripts
+# Keep the scripts directory.
+!scripts
 
 # Keep an empty simulation/data folder, but not any contents.
 !simulation/data
