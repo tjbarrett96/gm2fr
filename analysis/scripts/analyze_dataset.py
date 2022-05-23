@@ -20,7 +20,6 @@ subset_dir = {
 
 # ==================================================================================================
 
-# TODO: add simulation flag which checks for emulated dataset and analyzes that
 def analyze_dataset(dataset, subset = "nominal", **analyze_args):
 
   # Validate the requested subset to analyze.
