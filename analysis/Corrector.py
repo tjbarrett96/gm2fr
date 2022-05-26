@@ -30,7 +30,6 @@ class Corrector:
     self.A_rho = None
     self.B_rho = None
 
-    self.scale = None
     self.peak = None
     self.distortion = None
     self.background = None
@@ -49,18 +48,19 @@ class Corrector:
 
     # Calculate the four main terms with appropriate scale factors.
     # Note: the factor of 1/2 in the peak scale comes from transforming rho(w) -> rho(f).
-    self.scale = 1 / (self.transform.signal.width * const.kHz_us)
-    self.peak = self.A_rho.multiply(self.scale / 2)
-    self.distortion = self.B_rho.convolve(lambda x: calc.c(x, self.transform.start, self.transform.end, self.transform.t0)).multiply(-self.scale * self.truth_frequency.width)
-    self.background = self.A_rho.convolve(lambda x: calc.sinc(2*np.pi*x, (self.transform.start - self.transform.t0) * const.kHz_us)).multiply(-self.scale * self.truth_frequency.width)
-    self.wiggle = self.truth_frequency.copy().clear().set_heights(self.scale * calc.s(self.truth_frequency.centers, self.transform.start, self.transform.end, self.transform.t0))
+    self.peak = self.A_rho.multiply(0.5)
+    self.distortion = self.B_rho.convolve(lambda x: calc.c(x, self.transform.start, self.transform.end, self.transform.t0)).multiply(-self.truth_frequency.width)
+    self.background = self.A_rho.convolve(lambda x: calc.sinc(2*np.pi*x, (self.transform.start - self.transform.t0) * const.kHz_us)).multiply(-self.truth_frequency.width)
+    self.wiggle = self.truth_frequency.copy().clear().set_heights(calc.s(self.truth_frequency.centers, self.transform.start, self.transform.end, self.transform.t0))
 
-    A_interpolated = self.A.interpolate(self.transform.opt_cosine.centers, spline = False)
-    A_interpolated.heights[abs(A_interpolated.heights) < 0.03] = 0
+    self.A_interpolated = self.A.interpolate(self.transform.opt_cosine.centers, spline = False)
+
+    # for f, w in zip(self.A_interpolated.centers, 1/self.A_interpolated.heights):
+    #   print(f, w)
 
     # Calculate the predicted transform and corrected transform.
     self.predicted_transform = self.peak
-    self.corrected_transform = self.transform.opt_cosine.copy().divide(A_interpolated, zero = 1)
+    self.corrected_transform = self.bg_transform.copy()
     if distortion:
       self.predicted_transform = self.predicted_transform.add(self.distortion)
       self.corrected_transform = self.corrected_transform.subtract(self.distortion.interpolate(self.corrected_transform.centers))
@@ -71,6 +71,13 @@ class Corrector:
       self.predicted_transform = self.predicted_transform.add(self.wiggle)
       self.corrected_transform = self.corrected_transform.subtract(self.wiggle.interpolate(self.corrected_transform.centers))
 
+    # Manual tweak: don't scale up small numbers (<5% of max value) by large factors (>6x). These are usually just mistakes.
+    # fix_mask = (abs(self.A_interpolated.heights) < 0.15) & (self.corrected_transform.heights < 0.05 * np.max(self.corrected_transform.heights))
+    fix_mask = (self.corrected_transform.heights < 0.01 * np.max(self.corrected_transform.heights))
+    self.A_interpolated.heights[fix_mask] = 0
+
+    self.corrected_transform = self.corrected_transform.divide(self.A_interpolated, zero = 1)
+
   # ================================================================================================
 
   def plot(self, output_path):
@@ -78,6 +85,7 @@ class Corrector:
     # Plot A(f) and B(f).
     style.draw_horizontal()
     self.A.plot(errors = True, label = "$A(f)$")
+    # self.A_interpolated.plot(errors = True, label = "Int. $A(f)$")
     self.B.plot(errors = True, label = "$B(f)$")
     plt.ylim(-1, 1)
     plt.xlim(const.info["f"].min, const.info["f"].max)
@@ -95,7 +103,7 @@ class Corrector:
     self.peak.plot(errors = True, label = "Peak")
     self.distortion.plot(errors = True, label = "Distortion")
     self.background.plot(errors = True, label = "Background")
-    self.wiggle.multiply(5).plot(errors = True, label = "Wiggle (5x)")
+    # self.wiggle.multiply(5).plot(errors = True, label = "Wiggle (5x)")
     plt.xlim(const.info["f"].min, const.info["f"].max)
     style.label_and_save("Frequency (kHz)", "Term", f"{output_path}/Terms.pdf")
 
@@ -104,7 +112,7 @@ class Corrector:
     self.bg_transform.plot(label = "Actual Transform")
     style.label_and_save("Frequency (kHz)", "Arbitrary Units", f"{output_path}/Predicted_vs_Actual.pdf")
 
-    self.truth_frequency.plot(errors = False, label = "True Distribution", scale = np.max(self.corrected_transform.heights) / np.max(self.truth_frequency.heights), ls = ":")
+    self.truth_frequency.plot(errors = False, label = "True Distribution", scale = np.max(self.bg_transform.heights) / np.max(self.truth_frequency.heights), ls = ":")
     self.bg_transform.plot(label = "Cosine Transform")
     style.label_and_save("Frequency (kHz)", "Arbitrary Units", f"{output_path}/Truth_vs_Actual.pdf")
 

@@ -65,6 +65,7 @@ info = {
   "gamma": Quantity("Boost Factor", r"\gamma", None),
   "beta": Quantity("Speed", r"\beta", "$c$"),
   "dp_p0": Quantity("Fractional Momentum Offset", r"\Delta p/p_0", None),
+  "dp_p0_%": Quantity("Fractional Momentum Offset", r"\Delta p/p_0", "%"),
   "T": Quantity("Period", "T", "ns"),
   "tau": Quantity("Lifetime", r"\tau", r"$\mu$s"),
   "c_e": Quantity("Electric Field Correction", "C_E", "ppb")
@@ -81,6 +82,7 @@ info["tau"].magic = info["gamma"].magic * lifetime # tau = gamma * tau_0, in us
 info["x"].magic = 0
 info["c_e"].magic = 0
 info["dp_p0"].magic = 0
+info["dp_p0_%"].magic = 0
 
 # Set the conversion functions from frequency.
 info["f"].from_frequency = lambda f: f
@@ -91,6 +93,7 @@ info["p"].from_frequency = lambda f, n = 0.108: info["p"].magic * (1 + (1 - n) *
 info["gamma"].from_frequency = lambda f, n = 0.108: info["p"].from_frequency(f, n) / (m_mu_GeV * info["beta"].magic)
 info["tau"].from_frequency = lambda f, n = 0.108: info["gamma"].from_frequency(f, n) * lifetime
 info["dp_p0"].from_frequency = lambda f, n = 0.108: (info["p"].from_frequency(f, n) - info["p"].magic) / info["p"].magic
+info["dp_p0_%"].from_frequency = lambda f, n = 0.108: info["dp_p0"].from_frequency(f, n) * 100
 info["beta"].from_frequency = lambda f, n = 0.108: np.sqrt(1 - 1 / info["gamma"].from_frequency(f, n)**2)
 info["c_e"].from_frequency = lambda f, n = 0.108: 2*n*(1-n)*(info["beta"].magic * info["x"].from_frequency(f) / info["r"].magic)**2 * 1E9
 
@@ -99,6 +102,7 @@ info["f"].to_frequency = lambda f: f
 info["r"].to_frequency = lambda r: info["beta"].magic * c / (2 * np.pi * r) # f = v/r, in kHz for r in mm
 info["p"].to_frequency = lambda p, n = 0.108: info["f"].magic * (1 - (p / info["p"].magic - 1) / (1 - n))
 info["dp_p0"].to_frequency = lambda dp_p0, n = 0.108: info["p"].to_frequency(info["p"].magic * (1 + dp_p0), n)
+info["dp_p0_%"].to_frequency = lambda dp_p0, n = 0.108: info["dp_p0"].to_frequency(dp_p0 / 100, n)
 
 # Set the minimum and maximum values for stored radii, and convert to frequency.
 info["r"].min, info["r"].max = info["r"].magic - 45, info["r"].magic + 45

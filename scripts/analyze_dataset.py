@@ -31,6 +31,7 @@ def analyze_dataset(dataset, subset = "nominal", **analyze_args):
 
     # Construct the standard path to the dataset ROOT file.
     input_path = f"{io.gm2fr_path}/data/FastRotation_{dataset}.root"
+    truth_filename = None
 
     if subset == "nominal":
 
@@ -59,11 +60,12 @@ def analyze_dataset(dataset, subset = "nominal", **analyze_args):
 
   else:
 
-    input_path = f"{io.sim_path}/{dataset}_sim/simulation.root"
+    input_path = f"{io.sim_path}/{dataset}_mc/data.npz"
     input_folders = [None]
     subset_indices = [None]
     output_group = None
     output_folders = ["Simulation"]
+    truth_filename = "same"
 
   # Run the analysis on each part of the subset (e.g. each calo).
   for input_folder, subset_index, output_folder in zip(input_folders, subset_indices, output_folders):
@@ -79,7 +81,8 @@ def analyze_dataset(dataset, subset = "nominal", **analyze_args):
       output_label = f"{dataset}/{(output_group + '/') if output_group is not None else ''}{output_folder}",
       fr_method = "nine" if subset == "nominal" else ("five" if subset != "sim" else None),
       n = 0.108 if dataset not in ("1B", "1C") else 0.120,
-      time_units = 1E-9 if subset != "sim" else 1E-6
+      time_units = 1E-9 if subset != "sim" else 1E-6,
+      truth_filename = truth_filename
     )
 
     # Assume default analysis parameters, and pass any extra keyword arguments.

@@ -153,6 +153,9 @@ class Analyzer:
     self.transform.set_t0(t0, fine_t0_optimizer.err_t0 if fine_t0_optimizer is not None else 0)
     corr_transform = self.transform.opt_cosine.copy()
 
+    # TODO: if truth supplied, subtract distortion term HERE, before background fit. then fit, then divide A(f).
+    # this should enable a better background fit!
+
     self.bg_fit = None
     if bg_model is not None:
       self.bg_fit = BackgroundFit(self.transform.opt_cosine, t0, start, bg_model).fit()
@@ -166,6 +169,8 @@ class Analyzer:
         if save_output and plot_level > 0:
           iterator.plot(f"{self.output_path}/{self.output_prefix}Iterations.pdf")
 
+    # TODO: compile results for truth AND corrected distribution, compare both to cosine transform
+    # want to know how wrong cosine is from truth, and also how well correction repaired the error
     corrector = None
     if self.truth_filename is not None:
       corrector = Corrector(self.transform, corr_transform, self.truth_filename if self.truth_filename != "same" else self.filename)
@@ -175,16 +180,28 @@ class Analyzer:
 
     # Compile results.
     results = Results({"start": start, "end": end, "df": df, "t0": t0, "err_t0": fine_t0_optimizer.err_t0 if fine_t0_optimizer is not None else 0})
-    histograms = dict()
+    transform_hists = dict()
+    truth_hists = dict()
+    corrected_hists = dict()
 
     output_variables = ["f", "x", "dp_p0", "T", "tau", "gamma", "c_e"]
-    for unit in output_variables:
-      histograms[unit] = corr_transform.copy().map(const.info[unit].from_frequency)
-      mean, mean_err = histograms[unit].mean(error = True)
-      std, std_err = histograms[unit].std(error = True)
-      results.merge(Results(
-        {unit: mean, f"err_{unit}": mean_err, f"sig_{unit}": std, f"err_sig_{unit}": std_err}
-      ))
+    histograms, histogram_dicts, prefixes = [corr_transform], [transform_hists], [""]
+    if corrector is not None:
+      histograms.append(corrector.truth_frequency)
+      histogram_dicts.append(truth_hists)
+      prefixes.append("truth_")
+      histograms.append(corrector.corrected_transform)
+      histogram_dicts.append(corrected_hists)
+      prefixes.append("corr_")
+
+    for hist, hist_dict, prefix in zip(histograms, histogram_dicts, prefixes):
+      for unit in output_variables:
+        hist_dict[unit] = hist.copy().map(const.info[unit].from_frequency)
+        mean, mean_err = hist_dict[unit].mean(error = True)
+        std, std_err = hist_dict[unit].std(error = True)
+        results.merge(Results(
+          {f"{prefix}{unit}": mean, f"{prefix}err_{unit}": mean_err, f"{prefix}sig_{unit}": std, f"{prefix}err_sig_{unit}": std_err}
+        ))
 
     if self.bg_fit is not None:
       results.merge(self.bg_fit.results())
@@ -235,8 +252,8 @@ class Analyzer:
         # Plot the truth-level distribution for comparison, if present.
         # if truth is not None:
         #   ref_predicted.plot(label = "Predicted")
-        histograms[unit].to_root(f"transform_{unit}", f";{const.info[unit].format_label()};").Write()
-        histograms[unit].plot(label = None if self.truth_filename is None else "Result")
+        transform_hists[unit].to_root(f"transform_{unit}", f";{const.info[unit].format_label()};").Write()
+        transform_hists[unit].plot(label = None if self.truth_filename is None else "Result")
         plt.axvline(const.info[unit].magic, ls = ":", c = "k", label = "Magic")
         style.draw_horizontal()
         style.databox(
@@ -250,7 +267,7 @@ class Analyzer:
       rootFile.Close()
 
       # Include the differences from the reference distribution, if provided.
-      # if truth_results is not None:
+      # if sults is not None:
       #   diff_results = truth_results.copy()
       #   columnsToDrop = [x for x in diff_results.table.columns if "err_" in x]
       #   diff_results.table.drop(columns = columnsToDrop, inplace = True)

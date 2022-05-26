@@ -51,7 +51,8 @@ class BackgroundFit:
     elif model == "parabola":
       self.model = Polynomial(2)
     elif model == "sinc":
-      self.model = Sinc(np.min(self.transform.heights), self.start - self.t0)
+      # self.model = Sinc(np.min(self.transform.heights), self.start - self.t0)
+      self.model = Sinc(1, self.start - self.t0)
     elif model == "error":
       # self.model = Error(np.min(self.transform.heights), self.start - self.t0)
       self.model = Error(self.start - self.t0)

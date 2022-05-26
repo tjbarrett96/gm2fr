@@ -38,6 +38,10 @@ class Sinc(Model):
     super().__init__()
     self.name = "sinc background"
     self.seeds = [scale, const.info["f"].magic, 1/(2*np.pi*gap*const.kHz_us)]
+    self.bounds = (
+      [0, const.info["f"].min, 0],
+      [np.inf, const.info["f"].max, np.inf]
+    )
 
   # ============================================================================
 

@@ -311,8 +311,8 @@ class Histogram2D:
       data = np.load(filename)
       x_edges = data[f'{prefix}x_edges']
       y_edges = data[f'{prefix}y_edges']
-      heights = data[f'{prefix}heights'],
-      errors = data[f'{prefix}errors'],
+      heights = data[f'{prefix}heights']
+      errors = data[f'{prefix}errors']
     else:
       raise ValueError(f"Could not load histogram from '{filename}' with label '{label}'.")
     return Histogram2D(x_edges, y_edges, heights = heights, errors = errors)

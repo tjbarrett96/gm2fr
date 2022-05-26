@@ -195,10 +195,11 @@ class Histogram1D:
   def divide(a, b, cov = None, err = None, zero = 0):
     result = a.copy()
     if isinstance(b, Histogram1D) and (b.edges == a.edges).all():
-      result.heights /= np.where(np.isclose(b.heights, 0), zero, b.heights)
-      result.cov = 1 / np.outer(b.heights, b.heights) * a.cov + np.outer(a.heights, a.heights) / np.outer(b.heights, b.heights)**2 * b.cov
+      fixed_heights = np.where(np.isclose(b.heights, 0), zero, b.heights)
+      result.heights /= fixed_heights
+      result.cov = 1 / np.outer(fixed_heights, fixed_heights) * a.cov + np.outer(a.heights, a.heights) / np.outer(fixed_heights, fixed_heights)**2 * b.cov
       if cov is not None:
-        temp = np.outer(1 / b.heights, a.heights / b.heights**2) * cov
+        temp = np.outer(1 / fixed_heights, a.heights / fixed_heights**2) * cov
         result.cov -= temp + temp.T
       if err is not None:
         raise ValueError("Argument 'err' is unused when both operands are Histogram1Ds.")
