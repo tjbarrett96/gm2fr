@@ -60,7 +60,7 @@ def analyze_dataset(dataset, subset = "nominal", **analyze_args):
 
   else:
 
-    input_path = f"{io.sim_path}/{dataset}_mc/data.npz"
+    input_path = f"{io.sim_path}/{dataset}_sim/data.npz"
     input_folders = [None]
     subset_indices = [None]
     output_group = None

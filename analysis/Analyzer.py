@@ -16,6 +16,9 @@ from gm2fr.analysis.Corrector import Corrector
 
 import ROOT as root
 
+import warnings
+warnings.filterwarnings("error")
+
 # Filesystem management.
 import os
 import gm2fr.analysis
@@ -230,8 +233,7 @@ class Analyzer:
     # Save the results to disk.
     if save_output:
       self.save()
-
-    self.plot(plot_level)
+      self.plot(plot_level)
 
     print(f"\nCompleted {self.output_label} in {time.time() - begin_time:.2f} seconds.")
 
@@ -328,7 +330,7 @@ class Analyzer:
   def scan_parameters(self, **parameters):
 
     # Ensure parameters are valid, and values are iterable objects.
-    analyzer_args = inspect.getargspec(self.analyze).args
+    analyzer_args = inspect.getfullargspec(self.analyze).args
     if not all(parameter in analyzer_args for parameter in parameters):
       print("Scan parameter(s) unrecognized.")
       return

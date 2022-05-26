@@ -46,7 +46,7 @@ def simulate_joint(filename, label, kinematics_type, time_units, smooth):
     rnp.array2hist(np.where(smooth_data < 0, 0, smooth_data), joint_dist)
 
   simulation = Simulator(
-    f"{filename}_mc",
+    f"{filename}_sim",
     overwrite = True,
     joint_dist = joint_dist,
     kinematics_type = kinematics_type,
