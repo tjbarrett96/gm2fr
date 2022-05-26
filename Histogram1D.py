@@ -262,6 +262,8 @@ class Histogram1D:
     centralDifferences = function(np.subtract.outer(self.centers, self.centers))
     result.heights = np.einsum("i, ki -> k", paddedHeights, fDifferences)
     result.cov = np.einsum(f"ki, {'lj, ij' if self.cov.ndim == 2 else 'li, i'} -> kl", centralDifferences, centralDifferences, self.cov)
+    result.heights *= np.mean(self.width)
+    result.cov *= np.mean(self.width)**2
     result.update_errors()
     return result
 
@@ -440,6 +442,10 @@ class Histogram1D:
 
   # Plot this histogram.
   def plot(self, errors = True, bar = False, start = None, end = None, skip = 1, label = None, scale = 1, ls = "-", **kwargs):
+
+    # If 'scale' is another histogram, set the plotting scale factor to match their largest values.
+    if isinstance(scale, Histogram1D):
+      scale = np.max(scale.heights) / np.max(self.heights)
 
     # Select points to plot, skipping by 'skip' and scaling by 'scale'.
     plot_centers = self.centers[::skip]

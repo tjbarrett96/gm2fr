@@ -38,7 +38,7 @@ class Analyzer:
     pileup_label = None, # Label for pileup data inside file.
     output_label = None, # Output directory name, within gm2fr/analysis/results.
     output_prefix = "",
-    truth_filename = None, # Truth .npz file from gm2fr simulation.
+    ref_filename = None, # Truth .npz file from gm2fr simulation.
     fr_method = None,
     n = 0.108,
     time_units = 1E-6
@@ -49,7 +49,7 @@ class Analyzer:
     self.pileup_label = pileup_label
     self.output_label = output_label
     self.output_prefix = output_prefix
-    self.truth_filename = truth_filename
+    self.ref_filename = ref_filename
     self.n = n
     self.time_units = time_units
 
@@ -60,10 +60,21 @@ class Analyzer:
     self.raw_signal = None
     self.wiggle_fit = None
     self.fr_signal = None
+    self.fr_signal_masked = None
     self.load_fr_signal(fr_method)
 
-    self.results = Results()
     self.transform = None
+    self.coarse_t0_optimizer = None
+    self.fine_t0_optimizer = None
+    self.bg_fit = None
+    self.bg_iterator = None
+    self.corrector = None
+
+    self.converted_transforms = dict()
+    self.converted_ref_distributions = dict()
+    self.converted_corrected_transforms = dict()
+
+    self.results = Results()
 
   # ================================================================================================
 
@@ -116,6 +127,7 @@ class Analyzer:
     start = 4, # Start time (us) for the cosine transform.
     end = 250, # End time (in us) for the cosine transform.
     t0 = None, # t0 time (in us) for the cosine transform.
+    err_t0 = 0,
     iterate = False,
     bg_model = "sinc", # Background fit model: "constant" / "parabola" / "sinc" / "error".
     df = 2, # Frequency interval (in kHz) for the cosine transform.
@@ -131,77 +143,82 @@ class Analyzer:
 
     begin_time = time.time()
 
-    fr_signal_masked = self.fr_signal.copy().mask((start, end))
+    # Compute the Fourier transform of the fast rotation signal, masked between the requested times.
+    self.fr_signal_masked = self.fr_signal.copy().mask((start, end))
+    self.transform = Transform(self.fr_signal_masked, df, freq_width)
 
-    self.transform = Transform(fr_signal_masked, df, freq_width)
-
-    coarse_t0_optimizer = None
-    fine_t0_optimizer = None
+    # Determine whether or not to optimize t0. If t0 value supplied, then use it; otherwise, optimize.
     optimize_t0 = (t0 is None)
 
     if optimize_t0:
 
-      coarse_t0_optimizer = Optimizer(self.transform, bg_model, coarse_t0_width * 1E-3, coarse_t0_steps)
-      t0 = coarse_t0_optimizer.optimize()
+      self.coarse_t0_optimizer = Optimizer(self.transform, bg_model, coarse_t0_width * 1E-3, coarse_t0_steps)
+      t0 = self.coarse_t0_optimizer.optimize()
 
-      fine_t0_optimizer = Optimizer(self.transform, bg_model, fine_t0_width * 1E-3, fine_t0_steps, seed = t0)
-      t0 = fine_t0_optimizer.optimize()
+      self.fine_t0_optimizer = Optimizer(self.transform, bg_model, fine_t0_width * 1E-3, fine_t0_steps, seed = t0)
+      t0 = self.fine_t0_optimizer.optimize()
+      err_t0 = self.fine_t0_optimizer.err_t0
 
-      if save_output and plot_level > 0:
-        fine_t0_optimizer.plot_chi2(f"{self.output_path}/{self.output_prefix}BackgroundChi2.pdf")
+    # Set the t0 value for the Fourier transform.
+    self.transform.set_t0(t0, err_t0)
 
-    self.transform.set_t0(t0, fine_t0_optimizer.err_t0 if fine_t0_optimizer is not None else 0)
+    # Copy the optimal cosine transform before the background correction.
     corr_transform = self.transform.opt_cosine.copy()
 
     # TODO: if truth supplied, subtract distortion term HERE, before background fit. then fit, then divide A(f).
     # this should enable a better background fit!
 
-    self.bg_fit = None
+    # Perform the background fit, and subtract it from the optimal cosine transform.
     if bg_model is not None:
       self.bg_fit = BackgroundFit(self.transform.opt_cosine, t0, start, bg_model).fit()
       corr_transform = self.transform.opt_cosine.subtract(self.bg_fit.result)
-
-      iterator = None
+      # If enabled, perform empirical iteration of the background fit.
       if iterate:
-        iterator = Iterator(self.transform, self.bg_fit)
-        corr_transform = iterator.iterate(optimize_t0)
-        self.bg_fit = iterator.fits[-1]
-        if save_output and plot_level > 0:
-          iterator.plot(f"{self.output_path}/{self.output_prefix}Iterations.pdf")
+        self.bg_iterator = Iterator(self.transform, self.bg_fit)
+        corr_transform = self.bg_iterator.iterate(optimize_t0)
+        self.bg_fit = self.bg_iterator.fits[-1]
 
-    # TODO: compile results for truth AND corrected distribution, compare both to cosine transform
-    # want to know how wrong cosine is from truth, and also how well correction repaired the error
-    corrector = None
-    if self.truth_filename is not None:
-      corrector = Corrector(self.transform, corr_transform, self.truth_filename if self.truth_filename != "same" else self.filename)
-      corrector.correct()
-      if save_output and plot_level > 0:
-        corrector.plot(self.output_path)
-
-    # Compile results.
-    results = Results({"start": start, "end": end, "df": df, "t0": t0, "err_t0": fine_t0_optimizer.err_t0 if fine_t0_optimizer is not None else 0})
-    transform_hists = dict()
-    truth_hists = dict()
-    corrected_hists = dict()
+    # If reference data is supplied, calculate and apply corrections.
+    if self.ref_filename is not None:
+      self.corrector = Corrector(self.transform, corr_transform, self.ref_filename if self.ref_filename != "same" else self.filename)
+      self.corrector.correct()
 
     output_variables = ["f", "x", "dp_p0", "T", "tau", "gamma", "c_e"]
-    histograms, histogram_dicts, prefixes = [corr_transform], [transform_hists], [""]
-    if corrector is not None:
-      histograms.append(corrector.truth_frequency)
-      histogram_dicts.append(truth_hists)
-      prefixes.append("truth_")
-      histograms.append(corrector.corrected_transform)
-      histogram_dicts.append(corrected_hists)
-      prefixes.append("corr_")
 
-    for hist, hist_dict, prefix in zip(histograms, histogram_dicts, prefixes):
+    # Compile results.
+    results = Results({"start": start, "end": end, "df": df, "t0": t0, "err_t0": err_t0})
+
+    # Convert final transform to other units.
+    output_variables = ["f", "x", "dp_p0", "T", "tau", "gamma", "c_e"]
+    masked_transform = corr_transform.copy().mask((const.info["f"].min, const.info["f"].max))
+    for unit in output_variables:
+      self.converted_transforms[unit] = masked_transform.copy().map(const.info[unit].from_frequency)
+
+    # Convert reference and corrected distributions, if they exist.
+    if self.corrector is not None:
+      masked_ref_distribution = self.corrector.ref_frequency.copy().mask((const.info["f"].min, const.info["f"].max))
+      masked_corr_transform = self.corrector.corrected_transform.copy().mask((const.info["f"].min, const.info["f"].max))
       for unit in output_variables:
-        hist_dict[unit] = hist.copy().map(const.info[unit].from_frequency)
-        mean, mean_err = hist_dict[unit].mean(error = True)
-        std, std_err = hist_dict[unit].std(error = True)
-        results.merge(Results(
-          {f"{prefix}{unit}": mean, f"{prefix}err_{unit}": mean_err, f"{prefix}sig_{unit}": std, f"{prefix}err_sig_{unit}": std_err}
-        ))
+        self.converted_ref_distributions[unit] = masked_ref_distribution.copy().map(const.info[unit].from_frequency)
+        self.converted_corrected_transforms[unit] = masked_corr_transform.copy().map(const.info[unit].from_frequency)
+
+    def add_all_transform_results(transform_dict, prefix = None):
+      prefix = "" if prefix is None else f"{prefix}_"
+      for unit, transform in transform_dict.items():
+        mean, mean_err = transform.mean(error = True)
+        std, std_err = transform.std(error = True)
+        results.merge(
+          Results({
+            f"{prefix}{unit}": mean,
+            f"{prefix}err_{unit}": mean_err,
+            f"{prefix}sig_{unit}": std,
+            f"{prefix}err_sig_{unit}": std_err
+          })
+        )
+
+    add_all_transform_results(self.converted_transforms)
+    add_all_transform_results(self.converted_ref_distributions, prefix = "ref")
+    add_all_transform_results(self.converted_corrected_transforms, prefix = "corr")
 
     if self.bg_fit is not None:
       results.merge(self.bg_fit.results())
@@ -211,103 +228,100 @@ class Analyzer:
     self.results.append(results)
 
     # Save the results to disk.
-    if save_output and self.output_path is not None:
+    if save_output:
+      self.save()
 
-      # Plot the fast rotation signal, and wiggle fit (if present).
-      if plot_level >= 1:
+    self.plot(plot_level)
 
-        self.fr_signal.save(f"{self.output_path}/{self.output_prefix}signal.npz")
-        self.fr_signal.save(f"{self.output_path}/{self.output_prefix}signal.root", "signal")
+    print(f"\nCompleted {self.output_label} in {time.time() - begin_time:.2f} seconds.")
 
-        pdf = style.make_pdf(f"{self.output_path}/{self.output_prefix}FastRotation.pdf")
-        endTimes = [5, 100, 300]
-        for endTime in endTimes:
-          self.fr_signal.plot(errors = False, start = 4, end = endTime, skip = int(np.clip(endTime - 4, 1, 10)))
-          if endTime - 4 > 10:
-            plt.xlim(0, None)
-          style.label_and_save(r"Time ($\mu$s)", "Arbitrary Units", pdf)
-        pdf.close()
+  # ================================================================================================
 
-        if self.wiggle_fit is not None:
-          self.wiggle_fit.plot(f"{self.output_path}/{self.output_prefix}WiggleFit.pdf")
-          self.wiggle_fit.plot_fine(self.output_path, endTimes)
-          calc.plot_fft(self.raw_signal.centers, self.raw_signal.heights, f"{self.output_path}/{self.output_prefix}RawSignalFFT.pdf")
+  def save(self):
 
-      plotbegin_time = time.time()
+    if self.output_path is not None:
 
-      # Determine which units to plot a distribution for.
-      axesToPlot = []
-      if plot_level > 0:
-        axesToPlot = ["f", "x", "dp_p0"]
-        if plot_level > 1:
-          axesToPlot = output_variables.copy()
-          axesToPlot.remove("c_e")
+      self.fr_signal.save(f"{self.output_path}/{self.output_prefix}signal.npz")
+      self.fr_signal.save(f"{self.output_path}/{self.output_prefix}signal.root", "signal")
 
-      pdf = style.make_pdf(f"{self.output_path}/{self.output_prefix}AllDistributions.pdf")
-      rootFile = root.TFile(f"{self.output_path}/{self.output_prefix}transform.root", "RECREATE")
+      root_file = root.TFile(f"{self.output_path}/{self.output_prefix}transform.root", "RECREATE")
+      numpy_dict = dict()
 
-      # Compile the results list of (name, value) pairs from each object.
+      for unit, transform in self.converted_transforms.items():
+        transform.to_root(f"transform_{unit}", f";{const.info[unit].format_label()};").Write()
+        for label, data in transform.collect(f"transform_{unit}").items():
+          numpy_dict[label] = data
 
-      for unit in axesToPlot:
-        # Plot the truth-level distribution for comparison, if present.
-        # if truth is not None:
-        #   ref_predicted.plot(label = "Predicted")
-        transform_hists[unit].to_root(f"transform_{unit}", f";{const.info[unit].format_label()};").Write()
-        transform_hists[unit].plot(label = None if self.truth_filename is None else "Result")
-        plt.axvline(const.info[unit].magic, ls = ":", c = "k", label = "Magic")
-        style.draw_horizontal()
-        style.databox(
-          style.Entry(mean, rf"\langle {const.info[unit].symbol} \rangle", mean_err, const.info[unit].units),
-          style.Entry(std, rf"\sigma_{{{const.info[unit].symbol}}}", std_err, const.info[unit].units)
-        )
-        plt.xlim(const.info[unit].min, const.info[unit].max)
-        style.label_and_save(const.info[unit].format_label(), "Arbitrary Units", pdf)
-
-      pdf.close()
-      rootFile.Close()
-
-      # Include the differences from the reference distribution, if provided.
-      # if sults is not None:
-      #   diff_results = truth_results.copy()
-      #   columnsToDrop = [x for x in diff_results.table.columns if "err_" in x]
-      #   diff_results.table.drop(columns = columnsToDrop, inplace = True)
-      #   # Set the ref_results column data to the difference from the results.
-      #   for (name, data) in diff_results.table.iteritems():
-      #     diff_results.table[name] = results.table[name] - diff_results.table[name]
-      #   # Change the column names with "diff" prefix.
-      #   diff_results.table.columns = [f"diff_{name}" for name in diff_results.table.columns]
-      #   results.merge(diff_results)
+      np.savez(f"{self.output_path}/{self.output_prefix}transform.npz", **numpy_dict)
+      root_file.Close()
 
       self.results.save(self.output_path, filename = f"{self.output_prefix}results")
 
-      if plot_level > 0:
+  # ================================================================================================
 
-        if corrector is not None:
-          corrector.truth_frequency.plot(errors = False, label = "Truth")
-        self.transform.opt_cosine.plot(label = "Cosine Transform")
-        self.transform.opt_sine.plot(label = "Sine Transform")
-        self.transform.magnitude.plot(label = "Fourier Magnitude")
+  def plot(self, level = 1):
+
+    if level > 0 and (self.output_path is not None):
+
+      pdf = style.make_pdf(f"{self.output_path}/{self.output_prefix}AllDistributions.pdf")
+
+      if level == 1:
+        units_to_plot = ["f", "x", "dp_p0"]
+      else:
+        units_to_plot = self.converted_transforms.keys()
+
+      for unit, transform in self.converted_transforms.items():
+        if unit not in units_to_plot:
+          continue
+        transform.plot()
+        plt.axvline(const.info[unit].magic, ls = ":", c = "k", label = "Magic")
         style.draw_horizontal()
-        plt.axvline(const.info["f"].magic, ls = ":", c = "k", label = "Magic")
-        style.label_and_save("Frequency (kHz)", "Arbitrary Units", f"{self.output_path}/{self.output_prefix}magnitude.pdf")
+        style.databox(
+          style.Entry(self.results.table.iloc[-1][unit], rf"\langle {const.info[unit].symbol} \rangle", self.results.table.iloc[-1][f"err_{unit}"], const.info[unit].units),
+          style.Entry(self.results.table.iloc[-1][f"sig_{unit}"], rf"\sigma_{{{const.info[unit].symbol}}}", self.results.table.iloc[-1][f"err_sig_{unit}"], const.info[unit].units)
+        )
+        style.set_physical_limits(unit)
+        style.label_and_save(const.info[unit].format_label(), "Arbitrary Units", pdf)
 
-        calc.plot_fft(fr_signal_masked.centers, fr_signal_masked.heights, f"{self.output_path}/{self.output_prefix}FastRotationFFT.pdf")
+      pdf.close()
 
-        # Plot the final background fit.
-        if self.bg_fit is not None:
-          self.bg_fit.plot(f"{self.output_path}/{self.output_prefix}BackgroundFit.pdf")
+      pdf = style.make_pdf(f"{self.output_path}/{self.output_prefix}FastRotation.pdf")
+      endTimes = [5, 100, 300]
+      for endTime in endTimes:
+        self.fr_signal.plot(errors = False, start = 4, end = endTime, skip = int(np.clip(endTime - 4, 1, 10)))
+        if endTime - 4 > 10:
+          plt.xlim(0, None)
+        style.label_and_save(r"Time ($\mu$s)", "Arbitrary Units", pdf)
+      pdf.close()
 
-        # if self.newBGFit is not None:
-        #   self.newBGFit.plot(f"{self.output_path}/TemplateFit.pdf")
+      if self.wiggle_fit is not None:
+        self.wiggle_fit.plot(f"{self.output_path}/{self.output_prefix}WiggleFit.pdf")
+        self.wiggle_fit.plot_fine(self.output_path, endTimes)
+        calc.plot_fft(self.raw_signal.centers, self.raw_signal.heights, f"{self.output_path}/{self.output_prefix}RawSignalFFT.pdf")
 
-          # corr_transform.bgFit.save(f"{self.output_path}/background.npz")
+      if self.fine_t0_optimizer is not None:
+        self.fine_t0_optimizer.plot_chi2(f"{self.output_path}/{self.output_prefix}BackgroundChi2.pdf")
 
-        corr_transform.save(f"{self.output_path}/{self.output_prefix}transform.npz")
-        # corr_transform.save(f"{self.output_path}/transform.root", "transform")
+      if self.bg_iterator is not None:
+        self.bg_iterator.plot(f"{self.output_path}/{self.output_prefix}Iterations.pdf")
 
-        print(f"\nFinished plotting and saving results in {time.time() - plotbegin_time:.2f} seconds.")
+      if self.corrector is not None:
+        self.corrector.plot(self.output_path)
 
-    print(f"\nCompleted {self.output_label} in {time.time() - begin_time:.2f} seconds.")
+      style.draw_horizontal()
+      if self.corrector is not None:
+        self.corrector.ref_frequency.plot(label = "Truth", color = "k", ls = "--", scale = self.transform.opt_cosine)
+      self.transform.opt_cosine.plot(label = "Cosine Transform")
+      self.transform.opt_sine.plot(label = "Sine Transform")
+      self.transform.magnitude.plot(label = "Fourier Magnitude")
+      plt.axvline(const.info["f"].magic, ls = ":", c = "k", label = "Magic")
+      style.label_and_save("Frequency (kHz)", "Arbitrary Units", f"{self.output_path}/{self.output_prefix}FourierMagnitude.pdf")
+
+      calc.plot_fft(self.fr_signal_masked.centers, self.fr_signal_masked.heights, f"{self.output_path}/{self.output_prefix}FastRotationFFT.pdf")
+
+      # Plot the final background fit.
+      if self.bg_fit is not None:
+        self.bg_fit.plot(f"{self.output_path}/{self.output_prefix}BackgroundFit.pdf")
 
   # ================================================================================================
 

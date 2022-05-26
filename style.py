@@ -24,7 +24,7 @@ def set_style(latex = False):
   plt.rcParams["legend.fontsize"] = size * 0.75
 
   # Rules for switching to scientific notation in axis tick labels.
-  plt.rcParams["axes.formatter.limits"] = (-3, 5)
+  plt.rcParams["axes.formatter.limits"] = (-2, 5)
   plt.rcParams["axes.formatter.use_mathtext"] = True
 
   # Marker and line options.
@@ -118,6 +118,11 @@ def make_unique_legend(extend_x = 0, **kwargs):
       xLow, xHigh = plt.xlim()
       plt.xlim(xLow, xHigh + extend_x * (xHigh - xLow))
     plt.legend(handles = labels_to_handles.values(), labels = labels_to_handles.keys(), **kwargs)
+
+# ==================================================================================================
+
+def set_physical_limits(unit = "f"):
+  plt.xlim(const.info[unit].min, const.info[unit].max)
 
 # ==================================================================================================
 

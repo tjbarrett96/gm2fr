@@ -18,7 +18,7 @@ def s(f, ts, tm, t0 = 0):
 # c(omega) "wiggle" function from finite Fourier transform
 def c(f, ts, tm, t0 = 0):
   # use trig identity for cos(a) - cos(b) to avoid indeterminate form
-  return np.sin(np.pi * f * (tm + ts - 2 * t0) * const.kHz_us) * sinc(np.pi * f, (tm - ts) * const.kHz_us)
+  return -np.sin(np.pi * f * (tm + ts - 2 * t0) * const.kHz_us) * sinc(np.pi * f, (tm - ts) * const.kHz_us)
 
 # ==================================================================================================
 
