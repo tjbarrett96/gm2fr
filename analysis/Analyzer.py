@@ -78,6 +78,8 @@ class Analyzer:
     self.converted_corrected_transforms = dict()
 
     self.results = Results()
+    self.transforms = []
+    self.bg_fits = []
 
   # ================================================================================================
 
@@ -229,6 +231,8 @@ class Analyzer:
       results.merge(self.wiggle_fit.results())
 
     self.results.append(results)
+    self.transforms.append(self.converted_transforms["f"])
+    self.bg_fits.append(self.bg_fit)
 
     # Save the results to disk.
     if save_output:
@@ -251,8 +255,7 @@ class Analyzer:
 
       for unit, transform in self.converted_transforms.items():
         transform.to_root(f"transform_{unit}", f";{const.info[unit].format_label()};").Write()
-        for label, data in transform.collect(f"transform_{unit}").items():
-          numpy_dict[label] = data
+        numpy_dict.update(transform.collect(f"transform_{unit}"))
 
       np.savez(f"{self.output_path}/{self.output_prefix}transform.npz", **numpy_dict)
       root_file.Close()
@@ -345,4 +348,16 @@ class Analyzer:
       )
 
     if self.output_path is not None:
+
       self.results.save(self.output_path, filename = f"{self.output_prefix}results")
+
+      numpy_dict = dict()
+      for i, transform in enumerate(self.transforms):
+        numpy_dict.update(transform.collect(f"index_{i}"))
+      np.savez(f"{self.output_path}/{self.output_prefix}transforms.npz", **numpy_dict)
+
+      bg_pdf = style.make_pdf(f"{self.output_path}/{self.output_prefix}BackgroundFits.pdf")
+      for bg_fit in self.bg_fits:
+        if bg_fit is not None:
+          bg_fit.plot(bg_pdf)
+      bg_pdf.close()

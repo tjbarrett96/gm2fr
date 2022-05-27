@@ -114,15 +114,9 @@ class BackgroundFit:
       style.Entry(self.model.p_value, "p", None, None)
     )
 
-    # Make the axis labels and legend.
-    style.xlabel("Frequency (kHz)")
-    style.ylabel("Arbitrary Units")
-    plt.legend()
-
     # Save to disk and clear the figure, if specified.
     if output is not None:
-      plt.savefig(output)
-      plt.clf()
+      style.label_and_save("Frequency (kHz)", "Arbitrary Units", output)
 
   # ============================================================================
 

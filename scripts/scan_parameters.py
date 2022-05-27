@@ -48,10 +48,10 @@ def scan_parameters(dataset, output_name, parameter_ranges, sim = False):
 if __name__ == "__main__":
 
   parser = argparse.ArgumentParser()
-  parser.add_argument("--dataset", required = True)
-  parser.add_argument("--label", required = True)
-  parser.add_argument("--sim", action = "store_true")
-  parser.add_argument("--parameters", required = True, action = "extend", nargs = "+")
+  parser.add_argument("--dataset", "-d", required = True)
+  parser.add_argument("--label", "-l", required = True)
+  parser.add_argument("--sim", "-s", action = "store_true")
+  parser.add_argument("--parameters", "-p", required = True, action = "extend", nargs = "+")
   args = parser.parse_args()
 
   parameter_ranges = dict()
