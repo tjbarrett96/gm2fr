@@ -122,7 +122,7 @@ class Optimizer:
 
     # Print an update, completing this round of optimization.
     print(f"\nCompleted background optimization in {(time.time() - begin):.2} seconds.")
-    print(f"{'best chi2/ndf':>16} = {(min_chi2 / ndf):.4f}")
+    print(f"{'best chi2/ndf':>16} = {(min_chi2 / ndf):.4f} +/- {self.fits[0].model.err_chi2_ndf:.4f}")
     print(f"{'new t0':>16} = {self.t0*1000:.4f} +/- {(self.err_t0 * 1000):.4f} ns")
 
     return self.t0

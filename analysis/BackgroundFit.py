@@ -22,7 +22,8 @@ class BackgroundFit:
     transform,
     t0,
     start,
-    model
+    model,
+    err_t0 = 0
   ):
 
     # Keep a reference to the Transform object whose background we are fitting.
@@ -30,6 +31,7 @@ class BackgroundFit:
 
     # Key times used in the cosine transform: start, end, and t0.
     self.t0 = t0
+    self.err_t0 = err_t0
     self.start = start
 
     # Fit data, with boundary mask applied.
@@ -109,8 +111,8 @@ class BackgroundFit:
 
     # Annotate the t_0 value and fit quality.
     style.databox(
-      style.Entry(self.t0 * 1E3, "t_0", None, "ns"),
-      style.Entry(self.model.chi2_ndf, r"\chi^2/\mathrm{ndf}", None, None),
+      style.Entry(self.t0 * 1E3, "t_0", self.err_t0 if self.err_t0 > 0 else None, "ns"),
+      style.Entry(self.model.chi2_ndf, r"\chi^2/\mathrm{ndf}", self.model.err_chi2_ndf, None),
       style.Entry(self.model.p_value, "p", None, None)
     )
 
