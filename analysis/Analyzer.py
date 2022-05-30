@@ -16,8 +16,8 @@ from gm2fr.analysis.Corrector import Corrector
 
 import ROOT as root
 
-import warnings
-warnings.filterwarnings("error")
+# import warnings
+# warnings.filterwarnings("error")
 
 # Filesystem management.
 import os
@@ -282,8 +282,8 @@ class Analyzer:
         plt.axvline(const.info[unit].magic, ls = ":", c = "k", label = "Magic")
         style.draw_horizontal()
         style.databox(
-          style.Entry(self.results.table.iloc[-1][unit], rf"\langle {const.info[unit].symbol} \rangle", self.results.table.iloc[-1][f"err_{unit}"], const.info[unit].units),
-          style.Entry(self.results.table.iloc[-1][f"sig_{unit}"], rf"\sigma_{{{const.info[unit].symbol}}}", self.results.table.iloc[-1][f"err_sig_{unit}"], const.info[unit].units)
+          style.Entry(self.results.get(unit, -1), rf"\langle {const.info[unit].symbol} \rangle", self.results.get(f"err_{unit}", -1), const.info[unit].units),
+          style.Entry(self.results.get(f"sig_{unit}", -1), rf"\sigma_{{{const.info[unit].symbol}}}", self.results.get(f"err_sig_{unit}", -1), const.info[unit].units)
         )
         style.set_physical_limits(unit)
         style.label_and_save(const.info[unit].format_label(), "Arbitrary Units", pdf)
@@ -305,7 +305,10 @@ class Analyzer:
         calc.plot_fft(self.raw_signal.centers, self.raw_signal.heights, f"{self.output_path}/{self.output_prefix}RawSignalFFT.pdf")
 
       if self.fine_t0_optimizer is not None:
-        self.fine_t0_optimizer.plot_chi2(f"{self.output_path}/{self.output_prefix}BackgroundChi2.pdf")
+        pdf = style.make_pdf(f"{self.output_path}/{self.output_prefix}BackgroundChi2.pdf")
+        self.coarse_t0_optimizer.plot_chi2(pdf)
+        self.fine_t0_optimizer.plot_chi2(pdf)
+        pdf.close()
 
       if self.bg_iterator is not None:
         self.bg_iterator.plot(f"{self.output_path}/{self.output_prefix}Iterations.pdf")

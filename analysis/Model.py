@@ -1,8 +1,11 @@
 import numpy as np
 import scipy.optimize as opt
+import scipy.sparse.linalg as linalg
 import gm2fr.calculations as calc
 from gm2fr.analysis.Results import Results
 from gm2fr.Histogram1D import Histogram1D
+
+from scipy.sparse.linalg import LinearOperator, spilu
 
 import matplotlib.pyplot as plt
 import gm2fr.style as style
@@ -76,17 +79,20 @@ class Model:
       self.y = y
       self.cov = cov
 
-    # Perform the fit.
-    self.p_opt, self.p_cov = opt.curve_fit(
-      self.function,
-      self.x,
-      self.y,
-      sigma = self.cov,
-      p0 = self.seeds,
-      bounds = self.bounds if self.bounds is not None else (-np.inf, np.inf),
-      absolute_sigma = True,
-      maxfev = 100_000
-    )
+    def wrapped_function(p):
+      residuals = self.y - self.function(self.x, *p)
+      if self.cov.ndim == 2:
+        M = np.diag(1 / np.diag(self.cov))
+        cov_inv_residuals, convergence = linalg.gmres(self.cov, residuals, M = M, restart = 100, atol = 1E-9)
+        return residuals.T @ cov_inv_residuals
+      else:
+        return residuals.T @ (residuals / self.cov**2)
+
+    opt_result = opt.minimize(wrapped_function, self.seeds, method = "BFGS")
+    self.p_opt, self.p_cov = opt_result.x, opt_result.hess_inv
+
+    # if not isinstance(self.p_cov, np.ndarray):
+    #   self.p_cov = self.p_cov.todense()
 
     self.p_err = np.sqrt(np.diag(self.p_cov))
 
@@ -100,11 +106,7 @@ class Model:
     if self.cov is not None:
 
       self.err = np.sqrt(np.diag(self.cov)) if self.cov.ndim == 2 else self.cov
-
-      if self.cov.ndim == 2:
-        self.chi2 = self.residuals.T @ np.linalg.solve(self.cov, self.residuals)
-      else:
-        self.chi2 = np.sum((self.residuals / self.cov)**2)
+      self.chi2 = opt_result.fun
 
       # Calculate the reduced chi-squared.
       self.ndf = len(self.x) - len(self.p_opt)
@@ -162,7 +164,7 @@ class Model:
       f"{prefix}_chi2": self.chi2,
       f"{prefix}_ndf": self.ndf,
       f"{prefix}_chi2_ndf": self.chi2_ndf,
-      f"{prefix}_err_chi2_ndf": self.err_chi2_ndf,
+      f"err_{prefix}_chi2_ndf": self.err_chi2_ndf,
       f"{prefix}_pval": self.p_value
     }
 

@@ -38,10 +38,6 @@ class Sinc(Model):
     super().__init__()
     self.name = "sinc background"
     self.seeds = [scale, const.info["f"].magic, 1/(2*np.pi*gap*const.kHz_us)]
-    self.bounds = (
-      [0, const.info["f"].min, 0],
-      [np.inf, const.info["f"].max, np.inf]
-    )
 
   # ============================================================================
 
@@ -129,16 +125,9 @@ class Template(Model):
     self.name = "template"
     self.template = template
     self.seeds = [1, 1, 0]
-    # self.seeds = [1]
 
   def function(self, f, a, b, c):
     return a * self.template(b * (f - c))
-
-  # def function(self, f, a):
-  #   return a * self.template(f)
-
-  # def function(self, f, a, b):
-  #   return a * self.template(b * f)
 
   def gradient(self, f):
     return np.zeros(shape = (len(self.seeds), len(f)))

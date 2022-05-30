@@ -154,16 +154,18 @@ class Optimizer:
     plt.axhline(1, c = "k", ls = ":")
 
     # Axis labels.
-    style.xlabel("$t_0$ (ns)")
-    style.ylabel(r"Background $\chi^2$/ndf")
+    # style.xlabel("$t_0$ (ns)")
+    # style.ylabel(r"Background $\chi^2$/ndf")
+    #
+    # # Axis range.
+    # yMin, yMax = plt.ylim()
+    # plt.ylim(max(0, min(1 - 0.1 * (yMax - yMin), yMin)), None)
+    #
+    # # Save the result to disk, and clear the figure.
+    # plt.savefig(output)
+    # plt.clf()
 
-    # Axis range.
-    yMin, yMax = plt.ylim()
-    plt.ylim(max(0, min(1 - 0.1 * (yMax - yMin), yMin)), None)
-
-    # Save the result to disk, and clear the figure.
-    plt.savefig(output)
-    plt.clf()
+    style.label_and_save("$t_0$ (ns)", r"Background $\chi^2$/ndf", output)
 
   # ================================================================================================
 

@@ -22,13 +22,7 @@ class Results:
 
   # ============================================================================
 
-  def append(self, result, index = None):
-
-    # If an index was specified and there's only one row, set the new index.
-    # if index is not None and len(result.table) == 1:
-    #   result.table.index = [index]
-
-    # Append the other table to this table.
+  def append(self, result):
     self.table = self.table.append(result.table)
 
   # ============================================================================
@@ -42,6 +36,16 @@ class Results:
     copy = Results()
     copy.table = self.table.copy(deep = True)
     return copy
+
+  # ============================================================================
+
+  # Get the entry from the specified column and row. By default, return the whole column.
+  def get(self, label, row = None):
+    row = 0 if len(self.table) == 1 else row
+    if row is not None:
+      return self.table.iloc[row][label]
+    else:
+      return self.table[label]
 
   # ============================================================================
 

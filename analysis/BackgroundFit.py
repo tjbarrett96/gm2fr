@@ -54,7 +54,7 @@ class BackgroundFit:
       self.model = Polynomial(2)
     elif model == "sinc":
       # self.model = Sinc(np.min(self.transform.heights), self.start - self.t0)
-      self.model = Sinc(1, self.start - self.t0)
+      self.model = Sinc(0.01, self.start - self.t0)
     elif model == "error":
       # self.model = Error(np.min(self.transform.heights), self.start - self.t0)
       self.model = Error(self.start - self.t0)
@@ -73,11 +73,12 @@ class BackgroundFit:
   # Perform the background fit.
   def fit(self):
 
-    try:
-      self.model.fit(self.x, self.y, self.cov)
-    except ValueError:
-      print("\nWarning: problem with background covariance matrix. Re-trying with only variances.")
-      self.model.fit(self.x, self.y, np.sqrt(np.diag(self.cov)))
+    # First, fit using only the diagonal of the covariance matrix, which is more stable.
+    self.model.fit(self.x, self.y, np.sqrt(np.diag(self.cov)))
+
+    # Update the fit parameter seeds using the above result, then use the full covariance matrix.
+    self.model.seeds = self.model.p_opt
+    self.model.fit(self.x, self.y, self.cov)
 
     self.result = Histogram1D(
       self.transform.edges,
@@ -111,7 +112,7 @@ class BackgroundFit:
 
     # Annotate the t_0 value and fit quality.
     style.databox(
-      style.Entry(self.t0 * 1E3, "t_0", self.err_t0 if self.err_t0 > 0 else None, "ns"),
+      style.Entry(self.t0 * 1E3, "t_0", self.err_t0 * 1E3 if self.err_t0 > 0 else None, "ns"),
       style.Entry(self.model.chi2_ndf, r"\chi^2/\mathrm{ndf}", self.model.err_chi2_ndf, None),
       style.Entry(self.model.p_value, "p", None, None)
     )

@@ -12,10 +12,6 @@ class TwoParameter(Model):
     self.names = ["N", "tau"]
     self.units = ["",  "us" ]
     self.seeds = [1,   64.4 ]
-    self.bounds = (
-      [0,      0 ],
-      [np.inf, 70]
-    )
 
   # ============================================================================
 
@@ -52,8 +48,6 @@ class FiveParameter(TwoParameter):
     self.names += ["A", "f_a", "phi_a"]
     self.units += ["",  "MHz", "rad"  ]
     self.seeds += [0.3, 0.229, np.pi  ]
-    self.bounds[0].extend([-1.0,      0.2288,    0      ])
-    self.bounds[1].extend([ 1.0,      0.2292,    2*np.pi])
 
   # ============================================================================
 
@@ -108,8 +102,6 @@ class NineParameter(FiveParameter):
     self.names += ["tau_cbo", "A_cbo", "f_cbo", "phi_cbo"]
     self.units += ["us",      "",      "MHz",   "rad"    ]
     self.seeds += [150,       0.005,   fcbo,    np.pi    ]
-    self.bounds[0].extend([0,   0,    0.300, 0      ])
-    self.bounds[1].extend([500, 0.01, 0.450, 2*np.pi])
 
   # ============================================================================
 

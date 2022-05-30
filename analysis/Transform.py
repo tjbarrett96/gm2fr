@@ -17,6 +17,7 @@ class Transform:
     self.start = self.signal.centers[0]
     self.end = self.signal.centers[-1]
     self.scale = 1 / (np.mean(signal.width) * const.kHz_us)
+    self.fft_resolution = self.scale / len(self.signal.heights)
 
     f = np.arange(const.info["f"].magic - width / 2, const.info["f"].magic + width / 2 + df, df)
     self.raw_cosine = Histogram1D(f)
@@ -46,7 +47,7 @@ class Transform:
 
     # Compute the sine transform, and subtract the c(f) wiggle function.
     sinTransform = calc.np_transform(np.sin, self.raw_sine.centers, signal, time)
-    sinTransform -= self.scale * calc.c(self.raw_sine.centers, self.start, self.end)
+    sinTransform += self.scale * calc.c(self.raw_sine.centers, self.start, self.end)
     self.raw_sine.set_heights(sinTransform)
 
     # Compute the covariance matrix for both transforms.

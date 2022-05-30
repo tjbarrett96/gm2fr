@@ -46,8 +46,8 @@ class Corrector:
   def correct(self, distortion = True, background = False):#, wiggle = False):
 
     # Take truth distribution, map time values to A and B coefficients, and average over time.
-    self.A = self.ref_joint.copy().map(x = lambda tau: calc.A(tau * 1E-3, self.transform.t0)).mean(axis = 0, empty = 0)
-    self.B = self.ref_joint.copy().map(x = lambda tau: calc.B(tau * 1E-3, self.transform.t0)).mean(axis = 0, empty = 0)
+    self.A = self.ref_joint.copy().map(y = lambda tau: calc.A(tau * 1E-3, self.transform.t0)).mean(axis = 0, empty = 0)
+    self.B = self.ref_joint.copy().map(y = lambda tau: calc.B(tau * 1E-3, self.transform.t0)).mean(axis = 0, empty = 0)
 
     self.A_rho = self.A.multiply(self.ref_frequency)
     self.B_rho = self.B.multiply(self.ref_frequency)
