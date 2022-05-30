@@ -294,11 +294,14 @@ class Histogram1D:
   # Calculate the mean.
   def mean(self, error = False):
 
-    total = np.sum(self.heights)
+    # Don't use negative weights to calculate the mean.
+    masked_heights = np.where(self.heights > 0, self.heights, 0)
+
+    total = np.sum(masked_heights)
     if total == 0:
       return np.nan, np.nan if error else np.nan
 
-    avg = np.average(self.centers, weights = self.heights)
+    avg = np.average(self.centers, weights = masked_heights)
     if not error:
       return avg
 
@@ -315,12 +318,15 @@ class Histogram1D:
   # Calculate the standard deviation.
   def std(self, error = False):
 
-    total = np.sum(self.heights)
+    # Don't use negative weights to calculate the standard deviation.
+    masked_heights = np.where(self.heights > 0, self.heights, 0)
+
+    total = np.sum(masked_heights)
     if total == 0:
       return np.nan, np.nan if error else np.nan
 
     avg = self.mean(False)
-    std = np.sqrt(np.average((self.centers - avg)**2, weights = self.heights))
+    std = np.sqrt(np.average((self.centers - avg)**2, weights = masked_heights))
     if not error:
       return std
 

@@ -35,7 +35,7 @@ class Corrector:
     self.peak = None
     self.distortion = None
     self.background = None
-    # self.wiggle = None
+    self.wiggle = None
 
     # Predicted transform from the above terms, and corrected transform after removing from result.
     self.predicted_transform = None
@@ -43,11 +43,11 @@ class Corrector:
 
   # ================================================================================================
 
-  def correct(self, distortion = True, background = False):#, wiggle = False):
+  def correct(self, distortion = True, background = False, wiggle = False):
 
     # Take truth distribution, map time values to A and B coefficients, and average over time.
-    self.A = self.ref_joint.copy().map(y = lambda tau: calc.A(tau * 1E-3, self.transform.t0)).mean(axis = 0, empty = 0)
-    self.B = self.ref_joint.copy().map(y = lambda tau: calc.B(tau * 1E-3, self.transform.t0)).mean(axis = 0, empty = 0)
+    self.A = self.ref_joint.copy().map(x = lambda tau: calc.A(tau * 1E-3, self.transform.t0)).mean(axis = 0, empty = 0)
+    self.B = self.ref_joint.copy().map(x = lambda tau: calc.B(tau * 1E-3, self.transform.t0)).mean(axis = 0, empty = 0)
 
     self.A_rho = self.A.multiply(self.ref_frequency)
     self.B_rho = self.B.multiply(self.ref_frequency)
@@ -66,9 +66,9 @@ class Corrector:
     )
 
     # Wiggle term.
-    # self.wiggle = self.ref_frequency.copy().clear().set_heights(
-    #   calc.s(self.ref_frequency.centers, self.transform.start, self.transform.end, self.transform.t0)
-    # )
+    self.wiggle = self.ref_frequency.copy().clear().set_heights(
+      calc.s(self.ref_frequency.centers, self.transform.start, self.transform.end, self.transform.t0)
+    )
 
     self.A_interpolated = self.A.interpolate(self.transform.opt_cosine.centers, spline = False)
 
@@ -81,9 +81,9 @@ class Corrector:
     if background:
       self.predicted_transform = self.predicted_transform.subtract(self.background)
       self.corrected_transform = self.corrected_transform.subtract(self.background.interpolate(self.corrected_transform.centers))
-    # if wiggle:
-    #   self.predicted_transform = self.predicted_transform.add(self.wiggle)
-    #   self.corrected_transform = self.corrected_transform.subtract(self.wiggle.interpolate(self.corrected_transform.centers))
+    if wiggle:
+      self.predicted_transform = self.predicted_transform.add(self.wiggle)
+      self.corrected_transform = self.corrected_transform.subtract(self.wiggle.interpolate(self.corrected_transform.centers))
 
     # Manual tweak: don't scale up small numbers (<5% of max value) by large factors (>6x). These are usually just mistakes.
     # fix_mask = (abs(self.A_interpolated.heights) < 0.15) & (self.corrected_transform.heights < 0.05 * np.max(self.corrected_transform.heights))
@@ -118,7 +118,7 @@ class Corrector:
     self.peak.plot(label = "Peak")
     self.distortion.plot(label = "Distortion")
     self.background.plot(label = "Background")
-    # self.wiggle.multiply(5).plot(errors = True, label = "Wiggle (5x)")
+    self.wiggle.multiply(5).plot(errors = True, label = "Wiggle (5x)")
     style.set_physical_limits()
     style.label_and_save("Frequency (kHz)", "Term", pdf)
 

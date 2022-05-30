@@ -247,6 +247,11 @@ class Simulator:
     if normalize:
       self.normalize()
 
+    # Move the injection times to the first detection.
+    time_map = lambda tau: tau + 1E6 / self.frequencies.mean() * self.detector
+    self.joint.map(x = time_map)
+    self.profile.map(time_map)
+
     print(f"Finished in {(time.time() - begin):.4f} seconds.")
 
   # ============================================================================
