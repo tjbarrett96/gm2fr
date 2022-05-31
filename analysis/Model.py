@@ -19,7 +19,6 @@ class Model:
 
     # Initial values and lower/upper bounds for all model parameters.
     self.seeds = None
-    self.bounds = None
 
     # Optional names and units for parameters.
     self.name = ""

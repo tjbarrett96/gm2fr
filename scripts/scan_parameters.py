@@ -32,7 +32,8 @@ def scan_parameters(dataset, output_name, parameter_ranges, sim = False):
       output_label = f"{dataset}/{output_name}",
       output_prefix = "sim_",
       n = 0.108 if dataset not in ("1B", "1C") else 0.120,
-      time_units = 1E-6
+      time_units = 1E-6,
+      ref_filename = "same"
     )
 
     nominal_results = np.load(f"{io.results_path}/{dataset}/Simulation/results.npy")

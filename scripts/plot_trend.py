@@ -19,6 +19,8 @@ def plot_trend(x, y, filename, label = None, ls = "-", color = None):
     label = label,
     color = color
   )
+  if f"ref_{y}" in results.dtype.names:
+    plt.axhline(results[f"ref_{y}"][0], ls = "--")
 
 # ==================================================================================================
 

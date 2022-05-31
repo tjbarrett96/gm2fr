@@ -4,6 +4,7 @@ import numpy as np
 import gm2fr.io as io
 from merge_results import merge_results
 from gm2fr.analysis.Analyzer import Analyzer
+import argparse, re
 
 # ==================================================================================================
 
@@ -20,7 +21,7 @@ subset_dir = {
 
 # ==================================================================================================
 
-def analyze_dataset(dataset, subset = "nominal", **analyze_args):
+def analyze_dataset(dataset, subset = "nominal", label = None, **analyze_args):
 
   # Validate the requested subset to analyze.
   if subset not in ("nominal", "sim", *subset_dir.keys()):
@@ -39,7 +40,7 @@ def analyze_dataset(dataset, subset = "nominal", **analyze_args):
       input_folders = ["FastRotation/AllCalos"]
       subset_indices = [None]
       output_group = None
-      output_folders = ["Nominal"]
+      output_folders = [label if label is not None else "Nominal"]
 
     else:
 
@@ -64,7 +65,7 @@ def analyze_dataset(dataset, subset = "nominal", **analyze_args):
     input_folders = [None]
     subset_indices = [None]
     output_group = None
-    output_folders = ["Simulation"]
+    output_folders = [label if label is not None else "Simulation"]
     ref_filename = "same"
 
   # Run the analysis on each part of the subset (e.g. each calo).
@@ -86,7 +87,7 @@ def analyze_dataset(dataset, subset = "nominal", **analyze_args):
     )
 
     # Assume default analysis parameters, and pass any extra keyword arguments.
-    analyzer.analyze(**analyze_args)
+    analyzer.analyze(plot_level = 2 if subset in ("nominal", "sim") else 1, **analyze_args)
 
   # Concatenate the results over the subset into a single group results file.
   if output_group is not None:
@@ -101,27 +102,35 @@ def analyze_dataset(dataset, subset = "nominal", **analyze_args):
 
 if __name__ == "__main__":
 
-  # Check for the dataset and (optional) scan arguments.
-  if len(sys.argv) < 2:
-    print("Arguments not recognized. Usage:")
-    print("python3 analyze_dataset.py <dataset> [subset: nominal (default) / sim / calo / bunch / run / energy / threshold / row / column / all]")
-    exit()
-
-  # Parse the dataset argument.
-  dataset = sys.argv[1]
-
-  # Parse the subset argument(s).
-  if len(sys.argv) == 2:
-    # Nominal (all calos) analysis if no scan specified.
-    subsets = ["nominal"]
-  else:
-    # Take all remaining parameters as subset types.
-    subsets = [subset.lower() for subset in sys.argv[2:]]
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--dataset", "-d", required = True)
+  parser.add_argument("--subsets", "-s", nargs = "*", default = [])
+  parser.add_argument("--label", "-l", default = None)
+  parser.add_argument("--parameters", "-p", nargs = "*", default = [])
+  args = parser.parse_args()
 
   # If one of the arguments was "all", then analyze all supported subset types.
-  if "all" in subsets:
-    subsets = ["nominal"] + list(subset_dir.keys())
+  if len(args.subsets) == 0:
+    args.subsets = ["nominal"]
+  elif "all" in args.subsets:
+    args.subsets = ["nominal", "sim"] + list(subset_dir.keys())
+
+  if (args.label is not None) and (len(args.subsets) > 1 or (args.subsets[0] not in ("nominal", "sim"))):
+    print("Can only use 'label' with subset 'nominal' or 'sim'.")
+    exit()
+
+  parameter_dict = dict()
+  for parameter_spec in args.parameters:
+    if re.match(r"\w+:[\d\.]+", parameter_spec):
+      name, value = parameter_spec.split(":")
+      parameter_dict[name] = float(value)
+    elif re.match(r"\w+:\w+", parameter_spec):
+      name, value = parameter_spec.split(":")
+      parameter_dict[name] = value
+    else:
+      print(f"Parameter specification '{parameter_spec}' not understood.")
+      exit()
 
   # Run the analysis on all requested subsets.
-  for subset in subsets:
-    analyze_dataset(dataset, subset, plot_level = 2 if subset == "nominal" else 1)
+  for subset in args.subsets:
+    analyze_dataset(args.dataset, subset, label = args.label, **parameter_dict)
