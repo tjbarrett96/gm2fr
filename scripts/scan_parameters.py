@@ -66,7 +66,10 @@ if __name__ == "__main__":
       parameter_ranges[name] = [item for item in value_list.split(",") if item != ""]
       if io.check_all(parameter_ranges.values(), lambda x: re.match(r"[\d\.]+"), x):
         parameter_ranges[name] = [float(item) for item in parameter_ranges[name]]
-    elif re.match(r"\w+:[\w\.]+", parameter):
+    elif re.match(r"\w+:[\d\.]+", parameter):
+      name, value = parameter.split(":")
+      parameter_ranges[name] = [float(value)]
+    elif re.match(r"\w+:\w+", parameter):
       name, value = parameter.split(":")
       parameter_ranges[name] = [value]
     else:
