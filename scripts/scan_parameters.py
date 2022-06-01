@@ -52,7 +52,7 @@ if __name__ == "__main__":
   parser.add_argument("--dataset", "-d", required = True)
   parser.add_argument("--label", "-l", required = True)
   parser.add_argument("--sim", "-s", action = "store_true")
-  parser.add_argument("--parameters", "-p", required = True, action = "extend", nargs = "+")
+  parser.add_argument("--parameters", "-p", required = True, nargs = "+")
   args = parser.parse_args()
 
   parameter_ranges = dict()
