@@ -133,7 +133,7 @@ class Histogram1D:
   # 'err' is the uncertainty in 'b', only used if 'b' is a scalar.
   def add(a, b, cov = None, err = None):
     result = a.copy()
-    if isinstance(b, Histogram1D) and (b.edges == a.edges).all():
+    if isinstance(b, Histogram1D) and np.isclose(a.edges, b.edges).all():
       result.heights += b.heights
       result.cov = a.cov + b.cov
       if cov is not None:
@@ -163,7 +163,7 @@ class Histogram1D:
   # a(self) * b
   def multiply(a, b, cov = None, err = None):
     result = a.copy()
-    if isinstance(b, Histogram1D) and (b.edges == a.edges).all():
+    if isinstance(b, Histogram1D) and np.isclose(a.edges, b.edges).all():
       result.heights *= b.heights
       result.cov = np.outer(b.heights, b.heights) * a.cov + np.outer(a.heights, a.heights) * b.cov
       if cov is not None:
@@ -194,7 +194,7 @@ class Histogram1D:
   # a(self) / b
   def divide(a, b, cov = None, err = None, zero = 0):
     result = a.copy()
-    if isinstance(b, Histogram1D) and (b.edges == a.edges).all():
+    if isinstance(b, Histogram1D) and np.isclose(a.edges, b.edges).all():
       fixed_heights = np.where(np.isclose(b.heights, 0), zero, b.heights)
       result.heights /= fixed_heights
       result.cov = 1 / np.outer(fixed_heights, fixed_heights) * a.cov + np.outer(a.heights, a.heights) / np.outer(fixed_heights, fixed_heights)**2 * b.cov

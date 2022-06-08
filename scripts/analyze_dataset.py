@@ -75,12 +75,15 @@ def analyze_dataset(dataset, subset = "nominal", label = None, **analyze_args):
     if subset in ("energy", "threshold") and subset_index < 500:
       continue
 
+    if "fr_method" not in analyze_args:
+      fr_method = "nine" if subset == "nominal" else ("five" if subset != "sim" else None)
+
     analyzer = Analyzer(
       filename = input_path,
       signal_label = f"{input_folder}/hHitTime" if subset != "sim" else "signal",
       pileup_label = f"{input_folder}/hPileupTime" if subset != "sim" else None,
       output_label = f"{dataset}/{(output_group + '/') if output_group is not None else ''}{output_folder}",
-      fr_method = "nine" if subset == "nominal" else ("five" if subset != "sim" else None),
+      fr_method = fr_method,
       n = 0.108 if dataset not in ("1B", "1C") else 0.120,
       time_units = 1E-9 if subset != "sim" else 1E-6,
       ref_filename = ref_filename
