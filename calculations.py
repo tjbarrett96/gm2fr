@@ -22,6 +22,59 @@ def c(f, ts, tm, t0 = 0):
 
 # ==================================================================================================
 
+def area(x, y, cov = None):
+
+  # # start with all weights 1/3 by default
+  # w = np.ones(len(x)) / 3
+  # # set odd-indexed weights to 4/3 (not including first or last)
+  # w[1:-1:2] *= 4
+  # # set even-indexed weights to 2/3 (not including first or last)
+  # w[2:-1:2] *= 2
+  # # if length is even, treat the last interval with a trapezoid rule
+  # if len(w) % 2 == 0:
+  #   # second-to-last index gets 1/3 weight from simpson, plus 1/2 from trapezoid
+  #   w[-2] = 1/3 + 1/2
+  #   # last index gets 1/2 weight from trapezoid
+  #   w[-1] = 1/2
+  #
+  # # interval widths
+  # dx = x[1:] - x[:-1]
+
+  # interval widths
+  dx = x[1:] - x[:-1]
+
+  # weights for each y value in the linear combination for Simpson's rule
+  w = np.zeros(len(x))
+
+  # step through the data points by 2, and add the corresponding weight for each point
+  for i in range(0, len(w)-2, 2):
+    a = (dx[i] + dx[i+1]) / 6
+    w[i] += a * (2 - dx[i+1] / dx[i])
+    w[i+1] += a * (dx[i] + dx[i+1])**2 / (dx[i] * dx[i+1])
+    w[i+2] += a * (2 - dx[i] / dx[i+1])
+
+  # if there's an even number of points, treat the last interval using a trapezoid rule
+  if len(w) % 2 == 0:
+    w[-2] += dx[-1] / 2
+    w[-1] += dx[-1] / 2
+
+  # Simpson's rule for area
+  result = np.dot(w, y)
+
+  # if cov(y_i, y_j) not provided, then done
+  if cov is None:
+    return result
+
+  # propagate errors through the linear combination used for integration
+  if cov.ndim == 1:
+    variance = np.sum(cov * w**2)
+  else:
+    variance = w.T @ cov @ w
+
+  return result, np.sqrt(variance)
+
+# ==================================================================================================
+
 # Calculate the two-sided p-value from the specified chi-squared distribution.
 def p_value(chi2, ndf):
 

@@ -188,13 +188,13 @@ class Analyzer:
       self.corrector = Corrector(self.transform, corr_transform, self.ref_filename if self.ref_filename != "same" else self.filename)
       self.corrector.correct()
 
-    output_variables = ["f", "x", "dp_p0", "T", "tau", "gamma", "c_e"]
+    # output_variables = ["f", "x", "dp_p0", "T", "tau", "gamma", "c_e"]
 
     # Compile results.
     results = Results({"start": start, "end": end, "df": df, "t0": t0, "err_t0": err_t0})
 
     # Convert final transform to other units.
-    output_variables = ["f", "x", "dp_p0", "T", "tau", "gamma", "c_e"]
+    output_variables = ["f", "x", "dp_p0", "T", "tau", "gamma"]
     masked_transform = corr_transform.copy().mask((const.info["f"].min, const.info["f"].max))
     for unit in output_variables:
       self.converted_transforms[unit] = masked_transform.copy().map(const.info[unit].from_frequency)
@@ -220,6 +220,15 @@ class Analyzer:
             f"{prefix}err_sig_{unit}": std_err
           })
         )
+        if unit == "x":
+          avg_x2, err_avg_x2 = transform.moment(2, central = False, error = True)
+          c_e = 2*self.n*(1-self.n)*(const.info["beta"].magic/const.info["r"].magic)**2*avg_x2*1E9
+          results.merge(
+            Results({
+              f"{prefix}c_e": c_e,
+              f"{prefix}err_c_e": (c_e / avg_x2) * err_avg_x2
+            })
+          )
 
     add_all_transform_results(self.converted_transforms)
     add_all_transform_results(self.converted_ref_distributions, prefix = "ref")
@@ -268,6 +277,8 @@ class Analyzer:
 
     if level > 0 and (self.output_path is not None):
 
+      begin_time = time.time()
+
       pdf = style.make_pdf(f"{self.output_path}/{self.output_prefix}AllDistributions.pdf")
 
       if level == 1:
@@ -290,6 +301,10 @@ class Analyzer:
 
       pdf.close()
 
+      print(f"Finished plotting distributions in {time.time() - begin_time:.2f} seconds.")
+      begin_time = time.time()
+
+      # ~1.3 seconds
       pdf = style.make_pdf(f"{self.output_path}/{self.output_prefix}FastRotation.pdf")
       endTimes = [5, 100, 300]
       for endTime in endTimes:
@@ -299,16 +314,29 @@ class Analyzer:
         style.label_and_save(r"Time ($\mu$s)", "Arbitrary Units", pdf)
       pdf.close()
 
+      print(f"Finished plotting FR signal in {time.time() - begin_time:.2f} seconds.")
+      begin_time = time.time()
+
       if self.wiggle_fit is not None:
+        #slowest: ~2 seconds
         self.wiggle_fit.plot(f"{self.output_path}/{self.output_prefix}WiggleFit.pdf")
+        #slow: ~1.5 seconds
         self.wiggle_fit.plot_fine(self.output_path, endTimes)
+        #fast: ~0.5 seconds
         calc.plot_fft(self.raw_signal.centers, self.raw_signal.heights, f"{self.output_path}/{self.output_prefix}RawSignalFFT.pdf")
 
+      print(f"Finished plotting wiggle fit in {time.time() - begin_time:.2f} seconds.")
+      begin_time = time.time()
+
+      # <1 second
       if self.fine_t0_optimizer is not None:
         pdf = style.make_pdf(f"{self.output_path}/{self.output_prefix}BackgroundChi2.pdf")
         self.coarse_t0_optimizer.plot_chi2(pdf)
         self.fine_t0_optimizer.plot_chi2(pdf)
         pdf.close()
+
+      print(f"Finished plotting optimizers in {time.time() - begin_time:.2f} seconds.")
+      begin_time = time.time()
 
       if self.bg_iterator is not None:
         self.bg_iterator.plot(f"{self.output_path}/{self.output_prefix}Iterations.pdf")
@@ -316,6 +344,7 @@ class Analyzer:
       if self.corrector is not None:
         self.corrector.plot(self.output_path)
 
+      # ~0.5 seconds
       style.draw_horizontal()
       if self.corrector is not None:
         self.corrector.ref_frequency.plot(label = "Truth", color = "k", ls = "--", scale = self.transform.opt_cosine)
@@ -324,6 +353,8 @@ class Analyzer:
       self.transform.magnitude.plot(label = "Fourier Magnitude")
       plt.axvline(const.info["f"].magic, ls = ":", c = "k", label = "Magic")
       style.label_and_save("Frequency (kHz)", "Arbitrary Units", f"{self.output_path}/{self.output_prefix}FourierMagnitude.pdf")
+
+      print(f"Finished plotting FFT magnitude in {time.time() - begin_time:.2f} seconds.")
 
       calc.plot_fft(self.fr_signal_masked.centers, self.fr_signal_masked.heights, f"{self.output_path}/{self.output_prefix}FastRotationFFT.pdf")
 

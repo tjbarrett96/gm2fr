@@ -131,6 +131,8 @@ class WiggleFit:
       # Plot the signal.
       plt.plot(self.fine_signal.centers, self.fine_signal.heights)
 
+      self.fine_signal.plot(errors = False, skip = 10)
+
       # Label the axes.
       style.xlabel(r"Time ($\mu$s)")
       style.ylabel("Intensity")

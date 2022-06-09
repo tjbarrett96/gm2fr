@@ -2,11 +2,13 @@ import numpy as np
 import array
 import scipy.interpolate as interp
 import scipy.stats as stats
+import scipy.integrate
 
 import matplotlib.pyplot as plt
 import gm2fr.style as style
 style.set_style()
 import gm2fr.io as io
+import gm2fr.calculations as calc
 
 import ROOT as root
 import root_numpy as rnp
@@ -270,20 +272,22 @@ class Histogram1D:
   # ================================================================================================
 
   # Transform this histogram's bin edges according to the supplied function.
-  # TODO: must sort bin edges in order of increasing value? but only if monotonic...
   def map(self, function):
 
     # Apply the function to the bin edges.
-    self.edges = function(self.edges)
+    new_edges = function(self.edges)
 
-    # Sort the bin edges in increasing order.
-    # sorted_indices = self.edges.argsort()
-    # self.edges = self.edges[sorted_indices]
-    # self.heights = self.heights[sorted_indices]
-    # if self.cov.ndim == 1:
-    #   self.cov = self.cov[sorted_indices]
-    # else:
-    #   self.cov = self.cov[sorted_indices][sorted_indices]
+    if np.all(np.diff(new_edges) > 0):
+      self.edges = new_edges
+    elif np.all(np.diff(new_edges) < 0):
+      self.edges = np.flip(new_edges)
+      self.heights = np.flip(self.heights)
+      if self.cov.ndim == 1:
+        self.cov = np.flip(self.cov)
+      else:
+        self.cov = np.fliplr(np.flipud(self.cov))
+    else:
+      raise ValueError("Cannot map bin edges using non-monotonic function.")
 
     self.update_errors()
     self.update_bins()
@@ -291,57 +295,50 @@ class Histogram1D:
 
   # ================================================================================================
 
-  # Calculate the mean.
-  def mean(self, error = False):
+  def moment(self, degree, central = True, error = False):
 
-    # Don't use negative weights to calculate the mean.
+    if not io.is_integer(degree) or degree < 1:
+      raise ValueError(f"Cannot calculate moment of degree '{degree}'.")
+
+    # clip any negative heights to zero
     masked_heights = np.where(self.heights > 0, self.heights, 0)
 
-    total = np.sum(masked_heights)
-    if total == 0:
-      return np.nan, np.nan if error else np.nan
+    # normalize the heights and covariance to unit area using Simpson's rule
+    area = calc.area(self.centers, masked_heights)
+    norm_heights = masked_heights / area
+    norm_cov = self.cov / area**2
 
-    avg = np.average(self.centers, weights = masked_heights)
-    if not error:
-      return avg
-
-    temp = self.centers - avg
-    if self.cov.ndim == 1:
-      err = 1/total * np.sqrt(np.sum(temp**2 * self.cov))
+    # determine moment factor (x - <x>)^n
+    if degree == 1 or not central:
+      moment_factor = self.centers**degree
     else:
-      err = 1/total * np.sqrt(temp.T @ self.cov @ temp)
+      moment_factor = (self.centers - self.mean())**degree
 
-    return avg, err
+    # get covariance of the integrand: scale covariance of heights with moment factor
+    if self.cov.ndim == 1:
+      scaled_cov = self.cov * moment_factor**2
+    else:
+      scaled_cov = self.cov * np.outer(moment_factor, moment_factor)
+
+    # integrate (x - <x>)^n * rho(x)
+    return calc.area(self.centers, moment_factor * norm_heights, cov = scaled_cov if error else None)
+
+  # ================================================================================================
+
+  # Calculate the mean.
+  def mean(self, error = False):
+    return self.moment(degree = 1, error = error)
 
   # ================================================================================================
 
   # Calculate the standard deviation.
   def std(self, error = False):
-
-    # Don't use negative weights to calculate the standard deviation.
-    masked_heights = np.where(self.heights > 0, self.heights, 0)
-
-    total = np.sum(masked_heights)
-    if total == 0:
-      return np.nan, np.nan if error else np.nan
-
-    avg = self.mean(False)
-    std = np.sqrt(np.average((self.centers - avg)**2, weights = masked_heights))
-    if not error:
-      return std
-
-    temp = (self.centers - avg)**2 - std**2
-    if self.cov.ndim == 1:
-      err = 1/(2*std*total) * np.sqrt(np.sum(temp**2 * self.cov))
-    else:
-      err = 1/(2*std*total) * np.sqrt(temp.T @ self.cov @ temp)
-
-    return std, err
+    return self.moment(degree = 2, error = error)
 
   # ================================================================================================
 
-  def normalize(self, area = True):
-    scale = np.sum(self.heights * (self.width if area else 1))
+  def normalize(self):
+    scale = calc.area(self.centers, self.heights)
     self.heights /= scale
     self.cov /= scale**2
     self.update_errors()
