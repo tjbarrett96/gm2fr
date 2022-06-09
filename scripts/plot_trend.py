@@ -13,10 +13,16 @@ def plot_trend(x, y, filename, label = None, ls = "-", color = None):
   # results = np.load(f"{io.gm2fr_path}/analysis/results/{filename}/results.npy")
   results = np.load(filename, allow_pickle = True)
 
+  if f"err_{y}" in results.dtype.names:
+    errors = results[f"err_{y}"]
+    errors = np.where(errors > 10 * np.median(errors), 0, errors)
+  else:
+    errors = None
+
   errorbar = style.errorbar(
     results[x] if x in results.dtype.names else x,
     results[y],
-    results[f"err_{y}"] if f"err_{y}" in results.dtype.names else None,
+    errors,
     ls = ls,
     label = label,
     color = color

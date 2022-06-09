@@ -29,6 +29,7 @@ class Model:
     self.x = None
     self.y = None
     self.cov = None
+    self.inv_cov = None
     self.err = None
 
     # Fit results.
@@ -37,6 +38,7 @@ class Model:
     self.p_err = None
     self.result = None
     self.residuals = None
+    self.opt_result = None
 
     # Goodness-of-fit metrics.
     self.chi2 = None
@@ -49,11 +51,11 @@ class Model:
 
   # Main model evaluation; to be overridden by subclass.
   def function(self):
-    pass
+    raise NotImplementedError("Subclass of Model must implement function().")
 
   # Gradient with respect to parameters; to be overridden by subclass.
   def gradient(self):
-    pass
+    raise NotImplementedError("Subclass of Model must implement gradient().")
 
   # ============================================================================
 
@@ -78,20 +80,24 @@ class Model:
       self.y = y
       self.cov = cov
 
+    if self.cov.ndim == 2 and np.linalg.cond(self.cov) < 10:
+      self.inv_cov = np.linalg.pinv(self.cov, hermitian = True)
+
     def wrapped_function(p):
       residuals = self.y - self.function(self.x, *p)
       if self.cov.ndim == 2:
-        M = np.diag(1 / np.diag(self.cov))
-        cov_inv_residuals, convergence = linalg.gmres(self.cov, residuals, M = M, restart = 100, atol = 1E-9)
-        return residuals.T @ cov_inv_residuals
+        if self.inv_cov is not None:
+          return residuals.T @ self.inv_cov @ residuals
+        else:
+          # try taking wider diagonal (set by fft resolution) and inverting that for M
+          M = np.diag(1 / np.diag(self.cov))
+          cov_inv_residuals, convergence = linalg.gmres(self.cov, residuals, M = M, restart = 100, atol = 1E-9)
+          return residuals.T @ cov_inv_residuals
       else:
         return residuals.T @ (residuals / self.cov**2)
 
-    opt_result = opt.minimize(wrapped_function, self.seeds, method = "BFGS")
-    self.p_opt, self.p_cov = opt_result.x, opt_result.hess_inv
-
-    # if not isinstance(self.p_cov, np.ndarray):
-    #   self.p_cov = self.p_cov.todense()
+    self.opt_result = opt.minimize(wrapped_function, self.seeds, method = "BFGS", options = {"norm": 2, "gtol": np.sqrt(len(self.seeds))})
+    self.p_opt, self.p_cov = self.opt_result.x, self.opt_result.hess_inv
 
     self.p_err = np.sqrt(np.diag(self.p_cov))
 
@@ -105,7 +111,7 @@ class Model:
     if self.cov is not None:
 
       self.err = np.sqrt(np.diag(self.cov)) if self.cov.ndim == 2 else self.cov
-      self.chi2 = opt_result.fun
+      self.chi2 = self.opt_result.fun
 
       # Calculate the reduced chi-squared.
       self.ndf = len(self.x) - len(self.p_opt)
