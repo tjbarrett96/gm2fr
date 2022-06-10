@@ -316,9 +316,9 @@ class Histogram1D:
 
     # get covariance of the integrand: scale covariance of heights with moment factor
     if self.cov.ndim == 1:
-      scaled_cov = self.cov * moment_factor**2
+      scaled_cov = norm_cov * moment_factor**2
     else:
-      scaled_cov = self.cov * np.outer(moment_factor, moment_factor)
+      scaled_cov = norm_cov * np.outer(moment_factor, moment_factor)
 
     # integrate (x - <x>)^n * rho(x)
     return calc.area(self.centers, moment_factor * norm_heights, cov = scaled_cov if error else None)
