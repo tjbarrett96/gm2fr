@@ -87,7 +87,7 @@ def is_array(obj, d = None):
 
 def list_run_datasets(run):
   """Lists all datasets from the given run number with results in the standard directory."""
-  return [dataset for dataset in os.listdir(results_path) if re.match(f"{run}[A-Z]\Z", dataset)]
+  return sorted([dataset for dataset in os.listdir(results_path) if re.match(f"{run}[A-Z]\Z", dataset)])
 
 # ==================================================================================================
 

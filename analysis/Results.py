@@ -6,7 +6,7 @@ import pandas as pd
 class Results:
 
   def __init__(self, data = None):
-    self.table = pd.DataFrame(data)
+    self.table = pd.DataFrame(data, index = [0] if isinstance(data, dict) else None)
 
   # ============================================================================
 
