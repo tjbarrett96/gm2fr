@@ -52,7 +52,8 @@ class Results:
 
     longestName = max([len(name) for name in array.dtype.names])
     numeric_columns = [name for name in array.dtype.names if np.issubdtype(array[name].dtype, np.number)]
-    onesPlaces = max(int(np.log10(np.nanmax(self.table[numeric_columns].to_numpy()))), 0) + 1
+    numeric_array = self.table[numeric_columns].to_numpy()
+    onesPlaces = max(int(np.log10(np.nanmax(numeric_array[np.isfinite(numeric_array)]))), 0) + 1
     maxLength = max(longestName, onesPlaces + 1 + decimals)
     separator = "  "
 
