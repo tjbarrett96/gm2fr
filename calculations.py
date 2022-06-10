@@ -1,6 +1,7 @@
 import numpy as np
 import gm2fr.constants as const
 import scipy.stats
+import scipy.sparse as sparse
 import matplotlib.pyplot as plt
 import gm2fr.style as style
 style.set_style()
@@ -23,22 +24,6 @@ def c(f, ts, tm, t0 = 0):
 # ==================================================================================================
 
 def area(x, y, cov = None):
-
-  # # start with all weights 1/3 by default
-  # w = np.ones(len(x)) / 3
-  # # set odd-indexed weights to 4/3 (not including first or last)
-  # w[1:-1:2] *= 4
-  # # set even-indexed weights to 2/3 (not including first or last)
-  # w[2:-1:2] *= 2
-  # # if length is even, treat the last interval with a trapezoid rule
-  # if len(w) % 2 == 0:
-  #   # second-to-last index gets 1/3 weight from simpson, plus 1/2 from trapezoid
-  #   w[-2] = 1/3 + 1/2
-  #   # last index gets 1/2 weight from trapezoid
-  #   w[-1] = 1/2
-  #
-  # # interval widths
-  # dx = x[1:] - x[:-1]
 
   # interval widths
   dx = x[1:] - x[:-1]
