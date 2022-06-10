@@ -333,7 +333,13 @@ class Histogram1D:
 
   # Calculate the standard deviation.
   def std(self, error = False):
-    return self.moment(degree = 2, error = error)
+    result = self.moment(degree = 2, error = error)
+    if error:
+      var, var_err = result
+      return np.sqrt(var), 1/(2*np.sqrt(var)) * var_err
+    else:
+      var = result
+      return np.sqrt(var)
 
   # ================================================================================================
 
