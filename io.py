@@ -92,4 +92,4 @@ def list_run_datasets(run):
 # ==================================================================================================
 
 def list_subdirectories(directory):
-  return [item for item in os.listdir(directory) if os.path.isdir(item)]
+  return [item for item in os.listdir(directory) if os.path.isdir(f"{directory}/{item}")]
