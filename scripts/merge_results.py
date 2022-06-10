@@ -17,7 +17,7 @@ def merge_results(folders, output_dir = None, output_name = None, indices = None
 
   # Look for numerical indices in each folder name, e.g. "Calo12" -> 12. Default to -1 if none found.
   if indices is None:
-    indices = [(index if index is not None else -1) for index in io.find_indices(folders)]
+    indices = [(index if index is not None else -1) for index in io.find_indices([os.path.basename(os.path.normpath(folder)) for folder in folders])]
   merged_results.table["index"] = indices
 
   # Put the new 'index' column first, and sort the rows by index value.
