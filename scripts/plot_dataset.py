@@ -39,6 +39,7 @@ def plot_dataset(dataset, subset, variable):
 
   # TODO: add optional dashed line of same color for nominal result (no extra label)
   if subset == "nominal":
+
     plot_trend(
       x = [dataset],
       y = variable,
@@ -46,7 +47,9 @@ def plot_dataset(dataset, subset, variable):
       label = f"Run {dataset[0]}",
       color = f"C{int(dataset[0]) - 1}"
     )
+    
   else:
+
     plot_trend(
       x = "index",
       y = variable,

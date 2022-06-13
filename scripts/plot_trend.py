@@ -19,8 +19,12 @@ def plot_trend(x, y, filename, label = None, ls = "-", color = None):
   else:
     errors = None
 
+  x_data = results[x] if x in results.dtype.names else x
+  if x == "t0": # patch the output for t0 being in microseconds
+    x_data *= 1E3
+
   errorbar = style.errorbar(
-    results[x] if x in results.dtype.names else x,
+    x_data,
     results[y],
     errors,
     ls = ls,
@@ -30,6 +34,8 @@ def plot_trend(x, y, filename, label = None, ls = "-", color = None):
 
   if f"ref_{y}" in results.dtype.names:
     plt.axhline(results[f"ref_{y}"][0], ls = "--", color = errorbar[0].get_color())
+
+  return x_data, results[y], errors
 
 # ==================================================================================================
 

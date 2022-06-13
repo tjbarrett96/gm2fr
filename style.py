@@ -208,13 +208,19 @@ def imshow(
 
 # ==================================================================================================
 
-# Draw a horizontal line at y = 0.
-def draw_horizontal(ls = ":", c = "k"):
-  return plt.axhline(0, linestyle = ls, color = c)
+# Draw a horizontal line.
+def draw_horizontal(y = 0, ls = ":", c = "k", **kwargs):
+  return plt.axhline(y, linestyle = ls, color = c, **kwargs)
 
-# Draw a vertical line at x = 0.
-def draw_vertical(ls = ":", c = "k"):
-  return plt.axvline(0, linestyle = ls, color = c)
+# Draw a vertical line.
+def draw_vertical(x = 0, ls = ":", c = "k", **kwargs):
+  return plt.axvline(x, linestyle = ls, color = c, **kwargs)
+
+def horizontal_spread(width, y = 0, color = "k", **kwargs):
+  return plt.axhspan(y - width/2, y + width/2, color = color, alpha = 0.1, **kwargs)
+
+def vertical_spread(width, x = 0, color = "k", **kwargs):
+  return plt.axvspan(x - width/2, x + width/2, color = color, alpha = 0.1, **kwargs)
 
 # ==================================================================================================
 
