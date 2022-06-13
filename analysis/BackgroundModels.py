@@ -102,10 +102,10 @@ class Error(Model):
     )
 
     # This model has a problem with blowing up while exploring parameter space.
-    # if (np.isinf(result)).any() or (np.isnan(result)).any():
-    #   return 0
-    # else:
-    return result
+    if (np.isinf(result)).any() or (np.isnan(result)).any():
+      return 0
+    else:
+      return result
 
   # ============================================================================
 
