@@ -46,10 +46,10 @@ class Optimizer:
   def get_seed(self):
 
     # Get the fast rotation times and heights from the histogram.
-    time, signal = self.transform.signal.centers, self.transform.signal.heights
+    time, signal = self.transform.full_signal.centers, self.transform.full_signal.heights
 
-    # Select one cyclotron period after the transform start time.
-    mask = (time >= self.transform.start) & (time <= self.transform.start + const.info["T"].magic * 1E-3)
+    # Select one cyclotron period after 4 microseconds.
+    mask = (time >= 4) & (time <= 4 + const.info["T"].magic * 1E-3)
 
     # Refine the selection by taking the nearest pair of minima.
     start = time[mask][np.argmin(signal[mask])]

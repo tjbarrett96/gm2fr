@@ -11,12 +11,14 @@ class Transform:
 
   # ================================================================================================
 
-  def __init__(self, signal, df = 2, width = 150):
+  def __init__(self, signal, start = 4, end = 250, df = 2, width = 150):
 
-    self.signal = signal
+    self.full_signal = signal
+    self.signal = signal.copy().mask((start, end))
+
     self.start = self.signal.centers[0]
     self.end = self.signal.centers[-1]
-    self.scale = 1 / (np.mean(signal.width) * const.kHz_us)
+    self.scale = 1 / (np.mean(self.signal.width) * const.kHz_us)
     self.fft_resolution = self.scale / len(self.signal.heights)
 
     f = np.arange(const.info["f"].magic - width / 2, const.info["f"].magic + width / 2 + df, df)

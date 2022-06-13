@@ -63,7 +63,6 @@ class Analyzer:
     self.raw_signal = None
     self.wiggle_fit = None
     self.fr_signal = None
-    self.fr_signal_masked = None
     self.load_fr_signal(fr_method)
 
     self.transform = None
@@ -149,8 +148,7 @@ class Analyzer:
     begin_time = time.time()
 
     # Compute the Fourier transform of the fast rotation signal, masked between the requested times.
-    self.fr_signal_masked = self.fr_signal.copy().mask((start, end))
-    self.transform = Transform(self.fr_signal_masked, df, freq_width)
+    self.transform = Transform(self.fr_signal, start, end, df, freq_width)
 
     # Determine whether or not to optimize t0. If t0 value supplied, then use it; otherwise, optimize.
     optimize_t0 = (t0 is None)
@@ -187,8 +185,6 @@ class Analyzer:
     if self.ref_filename is not None:
       self.corrector = Corrector(self.transform, corr_transform, self.ref_filename if self.ref_filename != "same" else self.filename)
       self.corrector.correct()
-
-    # output_variables = ["f", "x", "dp_p0", "T", "tau", "gamma", "c_e"]
 
     # Compile results.
     results = Results({"start": start, "end": end, "df": df, "t0": t0, "err_t0": err_t0})
@@ -356,7 +352,7 @@ class Analyzer:
 
       print(f"Finished plotting FFT magnitude in {time.time() - begin_time:.2f} seconds.")
 
-      calc.plot_fft(self.fr_signal_masked.centers, self.fr_signal_masked.heights, f"{self.output_path}/{self.output_prefix}FastRotationFFT.pdf")
+      calc.plot_fft(self.transform.signal.centers, self.transform.signal.heights, f"{self.output_path}/{self.output_prefix}FastRotationFFT.pdf")
 
       # Plot the final background fit.
       if self.bg_fit is not None:
