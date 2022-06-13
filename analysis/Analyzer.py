@@ -131,6 +131,7 @@ class Analyzer:
     start = 4, # Start time (us) for the cosine transform.
     end = 250, # End time (in us) for the cosine transform.
     t0 = None, # t0 time (in us) for the cosine transform.
+    t0_seed = None,
     err_t0 = 0,
     iterate = False,
     bg_model = "sinc", # Background fit model: "constant" / "parabola" / "sinc" / "error".
@@ -155,7 +156,7 @@ class Analyzer:
 
     if optimize_t0:
 
-      self.coarse_t0_optimizer = Optimizer(self.transform, bg_model, coarse_t0_width * 1E-3, coarse_t0_steps)
+      self.coarse_t0_optimizer = Optimizer(self.transform, bg_model, coarse_t0_width * 1E-3, coarse_t0_steps, seed = t0_seed)
       t0 = self.coarse_t0_optimizer.optimize()
 
       self.fine_t0_optimizer = Optimizer(self.transform, bg_model, fine_t0_width * 1E-3, fine_t0_steps, seed = t0)
@@ -371,10 +372,21 @@ class Analyzer:
       print("Scan parameter values are not iterable.")
       return
 
-    for parameter_set in itertools.product(*parameters.values()):
+    # Calculate how many steps there will be, as the product of all parameter list lengths.
+    num_iterations = 1
+    for parameter_list in parameters.values():
+      num_iterations *= len(parameter_list)
+
+    # Form an iterator that produces all combinations of input parameter values.
+    parameter_sets = itertools.product(*parameters.values())
+
+    for i, parameter_set in enumerate(parameter_sets):
+      print(f"\nWorking on step {i} of {num_iterations}.")
       self.analyze(
         **{parameter: parameter_set[i] for i, parameter in enumerate(parameters)},
-        save_output = False
+        save_output = False,
+        # if the analyzer already knows a t0 seed, re-use it (it won't change with input parameters)
+        t0_seed = self.coarse_t0_optimizer.seed if self.coarse_t0_optimizer is not None else None
       )
 
     if self.output_path is not None:
