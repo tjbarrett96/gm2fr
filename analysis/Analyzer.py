@@ -42,6 +42,7 @@ class Analyzer:
     output_label = None, # Output directory name, within gm2fr/analysis/results.
     output_prefix = "",
     ref_filename = None, # Truth .npz file from gm2fr simulation.
+    ref_t0 = None,
     fr_method = None,
     n = 0.108,
     time_units = 1E-6
@@ -53,6 +54,7 @@ class Analyzer:
     self.output_label = output_label
     self.output_prefix = output_prefix
     self.ref_filename = ref_filename
+    self.ref_t0 = ref_t0
     self.n = n
     self.time_units = time_units
 
@@ -184,7 +186,7 @@ class Analyzer:
 
     # If reference data is supplied, calculate and apply corrections.
     if self.ref_filename is not None:
-      self.corrector = Corrector(self.transform, corr_transform, self.ref_filename if self.ref_filename != "same" else self.filename)
+      self.corrector = Corrector(self.transform, corr_transform, self.ref_filename if self.ref_filename != "same" else self.filename, self.ref_t0)
       self.corrector.correct()
 
     # Compile results.
@@ -381,7 +383,7 @@ class Analyzer:
     parameter_sets = itertools.product(*parameters.values())
 
     for i, parameter_set in enumerate(parameter_sets):
-      print(f"\nWorking on step {i} of {num_iterations}.")
+      print(f"\nWorking on step {i + 1} of {num_iterations}.")
       self.analyze(
         **{parameter: parameter_set[i] for i, parameter in enumerate(parameters)},
         save_output = False,

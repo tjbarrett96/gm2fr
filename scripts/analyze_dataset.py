@@ -32,7 +32,18 @@ def analyze_dataset(dataset, subset = "nominal", label = None, **analyze_args):
 
     # Construct the standard path to the dataset ROOT file.
     input_path = f"{io.gm2fr_path}/data/FastRotation_{dataset}.root"
-    ref_filename = None
+
+    if "ref_filename" in analyze_args:
+      ref_filename = analyze_args["ref_filename"]
+      analyze_args.pop("ref_filename")
+    else:
+      ref_filename = None
+
+    if "ref_t0" in analyze_args:
+      ref_t0 = analyze_args["ref_t0"]
+      analyze_args.pop("ref_t0")
+    else:
+      ref_t0 = None
 
     if subset == "nominal":
 
@@ -67,6 +78,7 @@ def analyze_dataset(dataset, subset = "nominal", label = None, **analyze_args):
     output_group = None
     output_folders = [label if label is not None else "Simulation"]
     ref_filename = "same"
+    ref_t0 = None
 
   # Run the analysis on each part of the subset (e.g. each calo).
   for input_folder, subset_index, output_folder in zip(input_folders, subset_indices, output_folders):
@@ -75,7 +87,10 @@ def analyze_dataset(dataset, subset = "nominal", label = None, **analyze_args):
     if subset in ("energy", "threshold") and subset_index < 500:
       continue
 
-    if "fr_method" not in analyze_args:
+    if "fr_method" in analyze_args:
+      fr_method = analyze_args["fr_method"]
+      analyze_args.pop("fr_method")
+    else:
       fr_method = "nine" if subset == "nominal" else ("five" if subset != "sim" else None)
 
     analyzer = Analyzer(
@@ -86,7 +101,8 @@ def analyze_dataset(dataset, subset = "nominal", label = None, **analyze_args):
       fr_method = fr_method,
       n = 0.108 if dataset not in ("1B", "1C") else 0.120,
       time_units = 1E-9 if subset != "sim" else 1E-6,
-      ref_filename = ref_filename
+      ref_filename = ref_filename,
+      ref_t0 = ref_t0
     )
 
     # Assume default analysis parameters, and pass any extra keyword arguments.
@@ -124,12 +140,12 @@ if __name__ == "__main__":
 
   parameter_dict = dict()
   for parameter_spec in args.parameters:
-    if re.match(r"\w+:[\d\.]+", parameter_spec):
+    if re.match(r"\w+:[\-\d.]+$", parameter_spec):
       name, value = parameter_spec.split(":")
       parameter_dict[name] = float(value)
-    elif re.match(r"\w+:\w+", parameter_spec):
+    elif re.match(r"\w+:[\w./]+$", parameter_spec):
       name, value = parameter_spec.split(":")
-      parameter_dict[name] = value
+      parameter_dict[name] = value if value.lower() != "none" else None
     else:
       print(f"Parameter specification '{parameter_spec}' not understood.")
       exit()

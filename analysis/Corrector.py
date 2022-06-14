@@ -15,13 +15,15 @@ class Corrector:
 
   # ================================================================================================
 
-  def __init__(self, transform, bg_transform, ref_filename):
+  def __init__(self, transform, bg_transform, ref_filename, ref_t0):
 
     self.transform = transform
     self.bg_transform = bg_transform
 
     self.ref_joint = Histogram2D.load(ref_filename, "joint")
+    self.ref_tau = Histogram1D.load(ref_filename, "profile")
     self.ref_frequency = Histogram1D.load(ref_filename, "frequencies").normalize()
+    self.ref_t0 = ref_t0 if ref_t0 is not None else self.transform.t0
 
     # A(f) and B(f) coefficients, as defined in the derivation note.
     self.A = None
@@ -46,8 +48,13 @@ class Corrector:
   def correct(self, distortion = True, background = False, wiggle = False):
 
     # Take truth distribution, map time values to A and B coefficients, and average over time.
-    self.A = self.ref_joint.copy().map(x = lambda tau: calc.A(tau * 1E-3, self.transform.t0)).mean(axis = 0, empty = 0)
-    self.B = self.ref_joint.copy().map(x = lambda tau: calc.B(tau * 1E-3, self.transform.t0)).mean(axis = 0, empty = 0)
+    self.A = self.ref_joint.copy().map(x = lambda tau: calc.A(tau * 1E-3, self.ref_t0)).mean(axis = 0, empty = 0)
+    self.B = self.ref_joint.copy().map(x = lambda tau: calc.B(tau * 1E-3, self.ref_t0)).mean(axis = 0, empty = 0)
+
+    # Where the true frequency distribution is <0.5% of the maximum value, kill the coefficients to avoid bad behavior.
+    mask = self.ref_frequency.heights < 0.005 * np.max(self.ref_frequency.heights)
+    self.A.heights[mask] = 0
+    self.B.heights[mask] = 0
 
     self.A_rho = self.A.multiply(self.ref_frequency)
     self.B_rho = self.B.multiply(self.ref_frequency)
@@ -84,11 +91,6 @@ class Corrector:
     if wiggle:
       self.predicted_transform = self.predicted_transform.add(self.wiggle)
       self.corrected_transform = self.corrected_transform.subtract(self.wiggle.interpolate(self.corrected_transform.centers))
-
-    # Manual tweak: don't scale up small numbers (<5% of max value) by large factors (>6x). These are usually just mistakes.
-    # fix_mask = (abs(self.A_interpolated.heights) < 0.15) & (self.corrected_transform.heights < 0.05 * np.max(self.corrected_transform.heights))
-    # fix_mask = (self.corrected_transform.heights < 0.01 * np.max(self.corrected_transform.heights))
-    # self.A_interpolated.heights[fix_mask] = 0
 
     self.corrected_transform = self.corrected_transform.divide(self.A_interpolated, zero = 1)
 
