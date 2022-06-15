@@ -12,36 +12,22 @@
 
 # Ignore Python cache directories.
 __pycache__
-analysis/__pycache__
-simulation/__pycache__
-
-# Ignore specific files.
-datasets.py
 
 # Generally, ignore any subdirectories unless explicitly allowed below.
 */
 
-# Keep the simulation directory, but ignore further subdirectories by default.
-!simulation
-simulation/*/
+# Keep the src folder.
+!src
 
-# Keep the analysis directory, but ignore further subdirectories by default.
-!analysis
-analysis/*/
+# Keep an empty simulation folder.
+!simulation
+simulation/*
+!simulation/.gitkeep
 
 # Keep the scripts directory.
 !scripts
 
-# Keep an empty simulation/data folder, but not any contents.
-!simulation/data
-simulation/data/*
-!simulation/data/.gitkeep
-
-# Keep the simulation examples folder and files, but not subdirectories.
-!simulation/examples
-simulation/examples/*/
-
-# Keep an empty gm2fr/analysis/results folder, but not any contents.
-!analysis/results
-analysis/results/*
-!analysis/results/.gitkeep
+# Keep an empty results folder.
+!results
+results/*
+!results/.gitkeep
