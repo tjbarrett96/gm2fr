@@ -43,7 +43,6 @@ class Analyzer:
     output_prefix = "",
     ref_filename = None, # Truth .npz file from gm2fr simulation.
     ref_t0 = None,
-    fr_method = None,
     n = 0.108,
     time_units = 1E-6
   ):
@@ -65,7 +64,7 @@ class Analyzer:
     self.raw_signal = None
     self.wiggle_fit = None
     self.fr_signal = None
-    self.load_fr_signal(fr_method)
+    self.fr_method = None
 
     self.transform = None
     self.coarse_t0_optimizer = None
@@ -136,6 +135,7 @@ class Analyzer:
     t0_seed = None,
     err_t0 = 0,
     iterate = False,
+    fr_method = None,
     bg_model = "sinc", # Background fit model: "constant" / "parabola" / "sinc" / "error".
     df = 2, # Frequency interval (in kHz) for the cosine transform.
     freq_width = 150,
@@ -149,6 +149,10 @@ class Analyzer:
   ):
 
     begin_time = time.time()
+
+    if self.fr_signal is None or fr_method != self.fr_method:
+      self.fr_method = fr_method
+      self.load_fr_signal(fr_method)
 
     # Compute the Fourier transform of the fast rotation signal, masked between the requested times.
     self.transform = Transform(self.fr_signal, start, end, df, freq_width)
@@ -190,7 +194,17 @@ class Analyzer:
       self.corrector.correct()
 
     # Compile results.
-    results = Results({"start": start, "end": end, "df": df, "t0": t0, "err_t0": err_t0})
+    results = Results({
+      "start": start,
+      "end": end,
+      "df": df,
+      "freq_width": freq_width,
+      "t0": t0,
+      "err_t0": err_t0,
+      "bg_model": bg_model,
+      "fr_method": self.fr_method,
+      "dt": np.mean(self.fr_signal.width)
+    })
 
     # Convert final transform to other units.
     output_variables = ["f", "x", "dp_p0", "T", "tau", "gamma"]

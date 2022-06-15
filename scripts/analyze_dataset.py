@@ -4,7 +4,7 @@ import numpy as np
 import gm2fr.io as io
 from merge_results import merge_results
 from gm2fr.analysis.Analyzer import Analyzer
-import argparse, re
+import argparse, re, inspect
 
 # ==================================================================================================
 
@@ -21,29 +21,34 @@ subset_dir = {
 
 # ==================================================================================================
 
-def analyze_dataset(dataset, subset = "nominal", label = None, **analyze_args):
+def analyze_dataset(dataset, subset = "nominal", label = None, constructor_arg_dict = None, analyze_arg_dict = None):
 
   # Validate the requested subset to analyze.
   if subset not in ("nominal", "sim", *subset_dir.keys()):
     print(f"Data subset type '{subset}' not recognized.")
     return
 
+  if constructor_arg_dict is None:
+    constructor_arg_dict = dict()
+  if analyze_arg_dict is None:
+    analyze_arg_dict = dict()
+
   if subset != "sim":
 
     # Construct the standard path to the dataset ROOT file.
     input_path = f"{io.gm2fr_path}/data/FastRotation_{dataset}.root"
-
-    if "ref_filename" in analyze_args:
-      ref_filename = analyze_args["ref_filename"]
-      analyze_args.pop("ref_filename")
-    else:
-      ref_filename = None
-
-    if "ref_t0" in analyze_args:
-      ref_t0 = analyze_args["ref_t0"]
-      analyze_args.pop("ref_t0")
-    else:
-      ref_t0 = None
+    #
+    # if "ref_filename" in analyze_args:
+    #   ref_filename = analyze_args["ref_filename"]
+    #   analyze_args.pop("ref_filename")
+    # else:
+    #   ref_filename = None
+    #
+    # if "ref_t0" in analyze_args:
+    #   ref_t0 = analyze_args["ref_t0"]
+    #   analyze_args.pop("ref_t0")
+    # else:
+    #   ref_t0 = None
 
     if subset == "nominal":
 
@@ -77,8 +82,11 @@ def analyze_dataset(dataset, subset = "nominal", label = None, **analyze_args):
     subset_indices = [None]
     output_group = None
     output_folders = [label if label is not None else "Simulation"]
-    ref_filename = "same"
-    ref_t0 = None
+    constructor_arg_dict["ref_filename"] = "same"
+    # constructor_arg_dict["ref_t0"] = None
+
+  if "fr_method" not in analyze_arg_dict:
+    analyze_arg_dict["fr_method"] = "nine" if subset == "nominal" else ("five" if subset != "sim" else None)
 
   # Run the analysis on each part of the subset (e.g. each calo).
   for input_folder, subset_index, output_folder in zip(input_folders, subset_indices, output_folders):
@@ -87,26 +95,24 @@ def analyze_dataset(dataset, subset = "nominal", label = None, **analyze_args):
     if subset in ("energy", "threshold") and subset_index < 500:
       continue
 
-    if "fr_method" in analyze_args:
-      fr_method = analyze_args["fr_method"]
-      analyze_args.pop("fr_method")
-    else:
-      fr_method = "nine" if subset == "nominal" else ("five" if subset != "sim" else None)
+    # if "fr_method" in analyze_args:
+    #   fr_method = analyze_args["fr_method"]
+    #   analyze_args.pop("fr_method")
+    # else:
+    #   fr_method = "nine" if subset == "nominal" else ("five" if subset != "sim" else None)
 
     analyzer = Analyzer(
       filename = input_path,
       signal_label = f"{input_folder}/hHitTime" if subset != "sim" else "signal",
       pileup_label = f"{input_folder}/hPileupTime" if subset != "sim" else None,
       output_label = f"{dataset}/{(output_group + '/') if output_group is not None else ''}{output_folder}",
-      fr_method = fr_method,
       n = 0.108 if dataset not in ("1B", "1C") else 0.120,
       time_units = 1E-9 if subset != "sim" else 1E-6,
-      ref_filename = ref_filename,
-      ref_t0 = ref_t0
+      **constructor_arg_dict
     )
 
     # Assume default analysis parameters, and pass any extra keyword arguments.
-    analyzer.analyze(plot_level = 2 if subset in ("nominal", "sim") else 1, **analyze_args)
+    analyzer.analyze(plot_level = 2 if subset in ("nominal", "sim") else 1, **analyze_arg_dict)
 
   # Concatenate the results over the subset into a single group results file.
   if output_group is not None:
@@ -138,18 +144,26 @@ if __name__ == "__main__":
     print("Can only use 'label' with subset 'nominal' or 'sim'.")
     exit()
 
-  parameter_dict = dict()
-  for parameter_spec in args.parameters:
-    if re.match(r"\w+:[\-\d.]+$", parameter_spec):
-      name, value = parameter_spec.split(":")
-      parameter_dict[name] = float(value)
-    elif re.match(r"\w+:[\w./]+$", parameter_spec):
-      name, value = parameter_spec.split(":")
-      parameter_dict[name] = value if value.lower() != "none" else None
+  allowed_constructor_args = inspect.getfullargspec(Analyzer.__init__).args
+  allowed_analyze_args = inspect.getfullargspec(Analyzer.analyze).args
+
+  constructor_arg_dict = dict()
+  analyze_arg_dict = dict()
+
+  for arg in args.parameters:
+
+    name, value = io.parse_parameter(arg)
+
+    if io.is_iterable(value):
+      raise NotImplementedError("Multiple values for analyze_dataset parameter.")
+
+    if name in allowed_constructor_args:
+      constructor_arg_dict[name] = value
+    elif name in allowed_analyze_args:
+      analyze_arg_dict[name] = value
     else:
-      print(f"Parameter specification '{parameter_spec}' not understood.")
-      exit()
+      raise ValueError(f"Parameter '{name}' not recognized.")
 
   # Run the analysis on all requested subsets.
   for subset in args.subsets:
-    analyze_dataset(args.dataset, subset, label = args.label, **parameter_dict)
+    analyze_dataset(args.dataset, subset, args.label, constructor_arg_dict, analyze_arg_dict)

@@ -11,7 +11,10 @@ from gm2fr.scripts.plot_trend import plot_trend
 # ==================================================================================================
 
 systematics_folder = {
-  "start": "StartTimeScan"
+  "start": "StartTimeScan",
+  "end": "EndTimeScan",
+  "df": "FrequencySpacingScan",
+  "freq_width": "FrequencyWidthScan"
 }
 
 # ==================================================================================================

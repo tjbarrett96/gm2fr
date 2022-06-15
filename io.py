@@ -34,18 +34,18 @@ def make_if_absent(path):
 # ==================================================================================================
 
 def is_iterable(obj):
-  """Checks whether or not the given object is an iterable container."""
+  """Checks whether or not the given object is an iterable container, not including strings."""
   try:
     iterator = iter(obj)
-    return True
+    return (not isinstance(obj, str))
   except TypeError:
     return False
 
 # ==================================================================================================
 
 def force_list(obj):
-  """Returns a single-element list containing the object, unless already a list."""
-  return [obj] if type(obj) is not list else obj
+  """Returns a single-element list containing the object, unless already iterable."""
+  return [obj] if not is_iterable(obj) else obj
 
 # ==================================================================================================
 
@@ -93,3 +93,45 @@ def list_run_datasets(run):
 
 def list_subdirectories(directory):
   return [item for item in os.listdir(directory) if os.path.isdir(f"{directory}/{item}")]
+
+# ==================================================================================================
+
+def matches_number(string):
+  return re.match(r"[-.\d]+$", string)
+
+# ==================================================================================================
+
+def parse_parameter(arg):
+
+  # Check that parameter_spec has the form <name>:<value>.
+  if re.match(r"\w+:[^:]+", arg):
+
+    # Get the parameter name and specification, separated by the colon.
+    name, parameter_spec = arg.split(":")
+
+    # Check if it matches the range format (start,stop,end).
+    if re.match(r"\([-.\d]+,[-.\d]+,[-.\d]+\)$", parameter_spec):
+      start, end, step = parameter_spec[1:-1].split(",")
+      value = np.arange(float(start), float(end), float(step))
+
+    # Check if it matches the list format [item1,item2,...].
+    elif re.match(r"\[(?:[-.\w]+,?)+\]$", parameter_spec):
+      value = [float(item) if matches_number(item) else item for item in parameter_spec[1:-1].split(",")]
+
+    # Otherwise, treat it as a single value: either a number, None, or string.
+    else:
+      if matches_number(parameter_spec):
+        value = float(parameter_spec)
+      elif parameter_spec.lower() == "none":
+        value = None
+      else:
+        value = parameter_spec
+
+  else:
+    print(f"Parameter specification '{arg}' not understood. Valid formats:")
+    print("  name:(start,end,step)")
+    print("  name:[value1,value2,...]")
+    print("  name:value")
+    exit()
+
+  return name, value
