@@ -196,10 +196,16 @@ class Histogram1D:
   # a(self) / b
   def divide(a, b, cov = None, err = None, zero = 0):
     result = a.copy()
-    if isinstance(b, Histogram1D) and np.isclose(a.edges, b.edges).all():
+    if isinstance(b, Histogram1D) and np.isclose(a.edges, b.edges).all() and a.cov.ndim == b.cov.ndim:
       fixed_heights = np.where(np.isclose(b.heights, 0), zero, b.heights)
       result.heights /= fixed_heights
-      result.cov = 1 / np.outer(fixed_heights, fixed_heights) * a.cov + np.outer(a.heights, a.heights) / np.outer(fixed_heights, fixed_heights)**2 * b.cov
+      if a.cov.ndim == 2:
+        a_coeff = 1 / np.outer(fixed_heights, fixed_heights)
+        b_coeff = np.outer(a.heights, a.heights) / np.outer(fixed_heights, fixed_heights)**2
+      else:
+        a_coeff = 1 / fixed_heights**2
+        b_coeff = a.heights**2 / fixed_heights**4
+      result.cov = a_coeff * a.cov + b_coeff * b.cov
       if cov is not None:
         temp = np.outer(1 / fixed_heights, a.heights / fixed_heights**2) * cov
         result.cov -= temp + temp.T
