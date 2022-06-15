@@ -1,11 +1,11 @@
-from gm2fr.simulation.mixture import GaussianMixture
-from gm2fr.simulation.simulator import Simulator
+from gm2fr.src.mixture import GaussianMixture
+from gm2fr.src.simulator import Simulator
 
 import sys
-import gm2fr.io as io
-import gm2fr.constants as const
+import gm2fr.src.io as io
+import gm2fr.src.constants as const
 
-from gm2fr.Histogram1D import Histogram1D
+from gm2fr.src.Histogram1D import Histogram1D
 
 import numpy as np
 import ROOT as root
@@ -18,9 +18,9 @@ def emulate_dataset(dataset, muons):
 
   input_dir = f"{dataset}/Nominal"
 
-  fr_signal = Histogram1D.load(f"{io.gm2fr_path}/analysis/results/{input_dir}/signal.npz")
-  frequencies = Histogram1D.load(f"{io.gm2fr_path}/analysis/results/{input_dir}/transform.npz", "transform_f")
-  results = np.load(f"{io.gm2fr_path}/analysis/results/{input_dir}/results.npy")
+  fr_signal = Histogram1D.load(f"{io.gm2fr_path}/results/{input_dir}/signal.npz")
+  frequencies = Histogram1D.load(f"{io.gm2fr_path}/results/{input_dir}/transform.npz", "transform_f")
+  results = np.load(f"{io.gm2fr_path}/results/{input_dir}/results.npy")
 
   # No negative bin contents allowed for random sampling.
   frequencies.heights = np.where(frequencies.heights > 0, frequencies.heights, 0)

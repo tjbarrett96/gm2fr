@@ -1,7 +1,7 @@
-import gm2fr.style as style
+import gm2fr.src.style as style
 style.set_style()
-import gm2fr.io as io
-import gm2fr.constants as const
+import gm2fr.src.io as io
+import gm2fr.src.constants as const
 
 import argparse
 import numpy as np

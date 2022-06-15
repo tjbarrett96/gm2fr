@@ -1,8 +1,8 @@
 import argparse
 import re
-import gm2fr.constants as const
-import gm2fr.io as io
-from gm2fr.analysis.Analyzer import Analyzer
+import gm2fr.src.constants as const
+import gm2fr.src.io as io
+from gm2fr.src.Analyzer import Analyzer
 import os, inspect
 import numpy as np
 

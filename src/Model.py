@@ -1,14 +1,14 @@
 import numpy as np
 import scipy.optimize as opt
 import scipy.sparse.linalg as linalg
-import gm2fr.calculations as calc
-from gm2fr.analysis.Results import Results
-from gm2fr.Histogram1D import Histogram1D
+import gm2fr.src.calculations as calc
+from gm2fr.src.Results import Results
+from gm2fr.src.Histogram1D import Histogram1D
 
 from scipy.sparse.linalg import LinearOperator, spilu
 
 import matplotlib.pyplot as plt
-import gm2fr.style as style
+import gm2fr.src.style as style
 style.set_style()
 
 # ==============================================================================

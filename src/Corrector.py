@@ -1,12 +1,12 @@
-from gm2fr.Histogram1D import Histogram1D
-from gm2fr.Histogram2D import Histogram2D
-import gm2fr.calculations as calc
-import gm2fr.constants as const
+from gm2fr.src.Histogram1D import Histogram1D
+from gm2fr.src.Histogram2D import Histogram2D
+import gm2fr.src.calculations as calc
+import gm2fr.src.constants as const
 
 import numpy as np
 
 import matplotlib.pyplot as plt
-import gm2fr.style as style
+import gm2fr.src.style as style
 style.set_style()
 
 # ==================================================================================================

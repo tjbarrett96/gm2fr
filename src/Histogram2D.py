@@ -2,10 +2,10 @@ import numpy as np
 import array
 
 import matplotlib.pyplot as plt
-import gm2fr.style as style
+import gm2fr.src.style as style
 style.set_style()
-import gm2fr.io as io
-from gm2fr.Histogram1D import Histogram1D
+import gm2fr.src.io as io
+from gm2fr.src.Histogram1D import Histogram1D
 
 import ROOT as root
 import root_numpy as rnp

@@ -1,9 +1,9 @@
 import sys
 import ROOT as root
 import numpy as np
-import gm2fr.io as io
+import gm2fr.src.io as io
 from merge_results import merge_results
-from gm2fr.analysis.Analyzer import Analyzer
+from gm2fr.src.Analyzer import Analyzer
 import argparse, re, inspect
 
 # ==================================================================================================
@@ -37,18 +37,6 @@ def analyze_dataset(dataset, subset = "nominal", label = None, constructor_arg_d
 
     # Construct the standard path to the dataset ROOT file.
     input_path = f"{io.gm2fr_path}/data/FastRotation_{dataset}.root"
-    #
-    # if "ref_filename" in analyze_args:
-    #   ref_filename = analyze_args["ref_filename"]
-    #   analyze_args.pop("ref_filename")
-    # else:
-    #   ref_filename = None
-    #
-    # if "ref_t0" in analyze_args:
-    #   ref_t0 = analyze_args["ref_t0"]
-    #   analyze_args.pop("ref_t0")
-    # else:
-    #   ref_t0 = None
 
     if subset == "nominal":
 
@@ -94,12 +82,6 @@ def analyze_dataset(dataset, subset = "nominal", label = None, constructor_arg_d
     # Special exclusions of subsets which don't behave well.
     if subset in ("energy", "threshold") and subset_index < 500:
       continue
-
-    # if "fr_method" in analyze_args:
-    #   fr_method = analyze_args["fr_method"]
-    #   analyze_args.pop("fr_method")
-    # else:
-    #   fr_method = "nine" if subset == "nominal" else ("five" if subset != "sim" else None)
 
     analyzer = Analyzer(
       filename = input_path,

@@ -3,11 +3,11 @@ import copy
 
 import matplotlib.pyplot as plt
 
-from gm2fr.analysis.BackgroundModels import *
-import gm2fr.constants as const
-import gm2fr.style as style
+from gm2fr.src.BackgroundModels import *
+import gm2fr.src.constants as const
+import gm2fr.src.style as style
 style.set_style()
-from gm2fr.Histogram1D import Histogram1D
+from gm2fr.src.Histogram1D import Histogram1D
 
 # ==============================================================================
 

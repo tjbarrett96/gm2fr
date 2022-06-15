@@ -4,14 +4,14 @@ import os
 import ROOT as root
 import root_numpy as rnp
 
-from gm2fr.simulation.mixture import GaussianMixture
-from gm2fr.Histogram1D import Histogram1D
-from gm2fr.Histogram2D import Histogram2D
-import gm2fr.io as io
-import gm2fr.constants as const
+from gm2fr.src.mixture import GaussianMixture
+from gm2fr.src.Histogram1D import Histogram1D
+from gm2fr.src.Histogram2D import Histogram2D
+import gm2fr.src.io as io
+import gm2fr.src.constants as const
 
 import matplotlib.pyplot as plt
-import gm2fr.style as style
+import gm2fr.src.style as style
 
 import time
 
@@ -43,14 +43,14 @@ class Simulator:
     if joint_dist is None and (kinematics_dist is None or time_dist is None):
       raise ValueError("Invalid input distributions.")
 
-    path = f"{io.gm2fr_path}/simulation/data/{name}"
+    path = f"{io.sim_path}/{name}"
     if not os.path.isdir(path):
       os.mkdir(path)
-      print(f"Creating simulation directory 'gm2fr/simulation/data/{name}'.")
+      print(f"Creating simulation directory '{name}'.")
     elif overwrite:
-      print(f"Overwriting simulation directory 'gm2fr/simulation/data/{name}'.")
+      print(f"Overwriting simulation directory '{name}'.")
     else:
-      raise RuntimeError(f"Simulation directory 'gm2fr/simulation/data/{name}' already exists.")
+      raise RuntimeError(f"Simulation directory '{name}' already exists.")
 
     self.directory = path
 

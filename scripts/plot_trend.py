@@ -1,16 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import gm2fr.style as style
+import gm2fr.src.style as style
 style.set_style()
 import sys
-import gm2fr.io as io
-import gm2fr.constants as const
+import gm2fr.src.io as io
+import gm2fr.src.constants as const
 
 # ==================================================================================================
 
 def plot_trend(x, y, filename, label = None, ls = "-", color = None):
 
-  # results = np.load(f"{io.gm2fr_path}/analysis/results/{filename}/results.npy")
+  # results = np.load(f"{io.gm2fr_path}/results/{filename}/results.npy")
   results = np.load(filename, allow_pickle = True)
 
   if f"err_{y}" in results.dtype.names:

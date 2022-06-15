@@ -1,10 +1,10 @@
-from gm2fr.analysis.BackgroundFit import BackgroundFit
-import gm2fr.constants as const
+from gm2fr.src.BackgroundFit import BackgroundFit
+import gm2fr.src.constants as const
 
 # import math
 import numpy as np
 import matplotlib.pyplot as plt
-import gm2fr.style as style
+import gm2fr.src.style as style
 style.set_style()
 import time
 

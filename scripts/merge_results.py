@@ -1,8 +1,8 @@
 import sys
 import os
 import re
-import gm2fr.io as io
-from gm2fr.analysis.Results import Results
+import gm2fr.src.io as io
+from gm2fr.src.Results import Results
 
 # ==================================================================================================
 

@@ -1,9 +1,9 @@
 import numpy as np
 import scipy.linalg as lg
 
-import gm2fr.constants as const
-import gm2fr.calculations as calc
-from gm2fr.Histogram1D import Histogram1D
+import gm2fr.src.constants as const
+import gm2fr.src.calculations as calc
+from gm2fr.src.Histogram1D import Histogram1D
 
 # ==================================================================================================
 

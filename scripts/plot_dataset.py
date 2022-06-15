@@ -2,13 +2,13 @@ import sys
 import re
 import os
 
-import gm2fr.io as io
-import gm2fr.constants as const
+import gm2fr.src.io as io
+import gm2fr.src.constants as const
 from plot_trend import plot_trend
 import analyze_dataset
 
 import matplotlib.pyplot as plt
-import gm2fr.style as style
+import gm2fr.src.style as style
 style.set_style()
 
 # ==================================================================================================

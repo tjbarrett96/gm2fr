@@ -1,6 +1,6 @@
-from gm2fr.analysis.Model import Model
+from gm2fr.src.Model import Model
 import numpy as np
-import gm2fr.constants as const
+import gm2fr.src.constants as const
 
 # ==============================================================================
 

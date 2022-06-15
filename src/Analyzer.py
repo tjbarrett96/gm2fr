@@ -1,18 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import gm2fr.io as io
-import gm2fr.constants as const
-import gm2fr.calculations as calc
-import gm2fr.style as style
-from gm2fr.analysis.Transform import Transform
-from gm2fr.Histogram1D import Histogram1D
-from gm2fr.analysis.Optimizer import Optimizer
-from gm2fr.analysis.Results import Results
-from gm2fr.analysis.WiggleFit import WiggleFit
-from gm2fr.analysis.BackgroundFit import BackgroundFit
-from gm2fr.analysis.Iterator import Iterator
-from gm2fr.analysis.Corrector import Corrector
+import gm2fr.src.io as io
+import gm2fr.src.constants as const
+import gm2fr.src.calculations as calc
+import gm2fr.src.style as style
+from gm2fr.src.Transform import Transform
+from gm2fr.src.Histogram1D import Histogram1D
+from gm2fr.src.Optimizer import Optimizer
+from gm2fr.src.Results import Results
+from gm2fr.src.WiggleFit import WiggleFit
+from gm2fr.src.BackgroundFit import BackgroundFit
+from gm2fr.src.Iterator import Iterator
+from gm2fr.src.Corrector import Corrector
 
 import ROOT as root
 
@@ -21,7 +21,7 @@ import ROOT as root
 
 # Filesystem management.
 import os
-import gm2fr.analysis
+import gm2fr.src
 import time
 import inspect
 import itertools
@@ -39,7 +39,7 @@ class Analyzer:
     filename, # Filename containing data to analyze.
     signal_label = None, # Label for signal data inside each file.
     pileup_label = None, # Label for pileup data inside file.
-    output_label = None, # Output directory name, within gm2fr/analysis/results.
+    output_label = None, # Output directory name, within gm2fr/results.
     output_prefix = "",
     ref_filename = None, # Truth .npz file from gm2fr simulation.
     ref_t0 = None,

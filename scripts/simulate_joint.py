@@ -1,14 +1,14 @@
-from gm2fr.simulation.mixture import GaussianMixture
-from gm2fr.simulation.simulator import Simulator
-import gm2fr.io as io
-import gm2fr.constants as const
+from gm2fr.src.mixture import GaussianMixture
+from gm2fr.src.simulator import Simulator
+import gm2fr.src.io as io
+import gm2fr.src.constants as const
 import root_numpy as rnp
 from scipy.ndimage import gaussian_filter
 import numpy as np
 from scipy.interpolate import SmoothBivariateSpline
 
 import matplotlib.pyplot as plt
-import gm2fr.style as style
+import gm2fr.src.style as style
 style.set_style()
 
 import ROOT as root

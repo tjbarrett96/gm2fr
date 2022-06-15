@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
-import gm2fr.constants as const
+import gm2fr.src.constants as const
 
 # ==================================================================================================
 

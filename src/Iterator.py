@@ -1,13 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import gm2fr.style as style
+import gm2fr.src.style as style
 style.set_style()
-import gm2fr.constants as const
-import gm2fr.calculations as calc
+import gm2fr.src.constants as const
+import gm2fr.src.calculations as calc
 import scipy.interpolate as interp
-from gm2fr.analysis.BackgroundFit import BackgroundFit
-from gm2fr.analysis.BackgroundModels import Template
-from gm2fr.analysis.Optimizer import Optimizer
+from gm2fr.src.BackgroundFit import BackgroundFit
+from gm2fr.src.BackgroundModels import Template
+from gm2fr.src.Optimizer import Optimizer
 
 # ==================================================================================================
 

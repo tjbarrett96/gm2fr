@@ -7,9 +7,9 @@ import numpy as np
 
 # Paths to common locations in the gm2fr project directory.
 gm2fr_path = os.path.dirname(gm2fr.__file__)
-results_path = f"{gm2fr_path}/analysis/results"
+results_path = f"{gm2fr_path}/results"
 data_path = f"{gm2fr_path}/data"
-sim_path = f"{gm2fr_path}/simulation/data"
+sim_path = f"{gm2fr_path}/simulation"
 
 # ==================================================================================================
 
