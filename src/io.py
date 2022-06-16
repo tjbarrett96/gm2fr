@@ -10,6 +10,7 @@ gm2fr_path = os.path.dirname(gm2fr.__file__)
 results_path = f"{gm2fr_path}/results"
 data_path = f"{gm2fr_path}/data"
 sim_path = f"{gm2fr_path}/simulation"
+plot_path = f"{gm2fr_path}/plots"
 
 # ==================================================================================================
 

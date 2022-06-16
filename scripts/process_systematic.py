@@ -21,19 +21,25 @@ systematics_folder = {
 
 def process_systematic(dataset, systematic, variable, output = None):
 
-  data_x, data_y, data_error = plot_trend(
+  data_results = np.load(f"{io.results_path}/{dataset}/{systematics_folder[systematic]}/results.npy")
+  data_errorbar = plot_trend(
     systematic,
     variable,
-    f"{io.results_path}/{dataset}/{systematics_folder[systematic]}/results.npy",
+    data_results,
     label = "Data"
   )
 
-  sim_x, sim_y, sim_error = plot_trend(
+  data_x, data_y = data_results[systematic], data_results[variable]
+
+  sim_results = np.load(f"{io.results_path}/{dataset}/{systematics_folder[systematic]}/sim_results.npy")
+  sim_errorbar = plot_trend(
     systematic,
     variable,
-    f"{io.results_path}/{dataset}/{systematics_folder[systematic]}/sim_results.npy",
+    sim_results,
     label = "Toy MC"
   )
+
+  sim_x, sim_y = sim_results[systematic], sim_results[variable]
 
   if output is None:
     output = f"{io.results_path}/{dataset}/{systematics_folder[systematic]}/{systematic}_plot.pdf"

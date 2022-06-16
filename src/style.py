@@ -127,10 +127,10 @@ def set_physical_limits(unit = "f"):
 # ==================================================================================================
 
 # Shortcut for labeling axes, adding legend, saving the figure, and clearing the plot.
-def label_and_save(xLabel, yLabel, output):
+def label_and_save(xLabel, yLabel, output, **legend_kwargs):
   xlabel(xLabel)
   ylabel(yLabel)
-  make_unique_legend()
+  make_unique_legend(**legend_kwargs)
   if isinstance(output, PdfPages):
     output.savefig()
   else:

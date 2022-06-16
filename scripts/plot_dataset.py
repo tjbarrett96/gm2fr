@@ -1,6 +1,7 @@
 import sys
 import re
 import os
+import numpy as np
 
 import gm2fr.src.io as io
 import gm2fr.src.constants as const
@@ -10,6 +11,8 @@ import analyze_dataset
 import matplotlib.pyplot as plt
 import gm2fr.src.style as style
 style.set_style()
+
+import argparse
 
 # ==================================================================================================
 
@@ -40,59 +43,77 @@ def plot_dataset(dataset, subset, variable):
   # TODO: add optional dashed line of same color for nominal result (no extra label)
   if subset == "nominal":
 
+    results = np.load(f"{io.results_path}/{dataset}/Nominal/results.npy", allow_pickle = True)
+
     plot_trend(
       x = [dataset],
       y = variable,
-      filename = f"{io.results_path}/{dataset}/Nominal/results.npy",
+      results = results,
       label = f"Run {dataset[0]}",
       color = f"C{int(dataset[0]) - 1}"
     )
-    
+
   else:
 
-    plot_trend(
+    results = np.load(f"{io.results_path}/{dataset}/By{subset.capitalize()}/{dataset}_{subset}_results.npy", allow_pickle = True)
+    nominal_results = np.load(f"{io.results_path}/{dataset}/Nominal/results.npy", allow_pickle = True)
+
+    errorbar = plot_trend(
       x = "index",
       y = variable,
-      filename = f"{io.results_path}/{dataset}/By{subset.capitalize()}/{dataset}_{subset}_results.npy",
+      results = results,
       label = dataset,
       ls = "-" if subset != "run" else ""
     )
 
+    nominal_value = nominal_results[variable][0]
+    weights = results["wg_N"] if "wg_N" in results.dtype.names else None
+    avg = np.average(results[variable], weights = weights)
+    std = np.sqrt(np.average((results[variable] - avg)**2, weights = weights))
+    if variable == "t0":
+      nominal_value *= 1E3
+      avg *= 1E3
+      std *= 1E3
+
+    style.draw_horizontal(nominal_value, c = errorbar[0].get_color())
+    style.draw_horizontal(avg, ls = "--", c = errorbar[0].get_color())
+    style.horizontal_spread(std, avg, color = errorbar[0].get_color())
+
 # ==================================================================================================
 
-def parse_dataset_arg(arg):
-  tokens = arg.split(",")
+def parse_dataset_arg(tokens):
   datasets = []
   for token in tokens:
-    if re.match("[1-9][A-Z*]{0,1}", token):
-      number = token[0]
-      letter = token[1] if len(token) > 1 else None
-      if letter == "*":
-        datasets += io.list_run_datasets(number)
-      else:
-        datasets.append(token)
+    if re.match("[1-9]\*", token):
+      datasets += io.list_run_datasets(token[0])
+    else:
+      datasets.append(token)
   return sorted(list(set(datasets)))
 
 # ==================================================================================================
 
 if __name__ == "__main__":
 
-  if len(sys.argv) not in (2, 3, 4):
-    print("Arguments not recognized. Usage:")
-    print("python3 plotting.py <dataset(s)> [subset(s): calo,bunch,run,energy,threshold,row,column] [variable(s):x,sig_x,c_e,...]")
-    exit()
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--datasets", "-d", nargs = "+", required = True)
+  parser.add_argument("--subsets", "-s", nargs = "+", default = list(subset_labels.keys()))
+  parser.add_argument("--label", "-l", default = None)
+  parser.add_argument("--variables", "-v", nargs = "*", default = ["x", "sig_x", "c_e", "t0"])
+  args = parser.parse_args()
 
-  datasets = parse_dataset_arg(sys.argv[1])
-  subsets = sys.argv[2].split(",") if len(sys.argv) > 2 else list(subset_labels.keys())
-  variables = sys.argv[3].split(",") if len(sys.argv) > 3 else ["x", "sig_x", "c_e"]
+  datasets = parse_dataset_arg(args.datasets)
+  label = ",".join(args.datasets) if args.label is None else args.label
 
-  for subset in subsets:
-    for variable in variables:
+  for subset in args.subsets:
+    pdf = style.make_pdf(f"{io.plot_path}/{label}_{subset}_plots.pdf")
+    for variable in args.variables:
       for dataset in datasets:
         plot_dataset(dataset, subset, variable)
-      style.xlabel(subset_labels[subset])
-      style.ylabel(const.info[variable].format_label())
-
-      style.make_unique_legend(extend_x = 0.15, loc = "center right")
-
-      plt.show()
+      style.label_and_save(
+        subset_labels[subset],
+        const.info[variable].format_label(),
+        pdf,
+        extend_x = 0.15,
+        loc = "center right"
+      )
+    pdf.close()
