@@ -70,6 +70,10 @@ class WiggleFit:
       if self.model is not None:
         model.seeds[:len(self.model.p_opt)] = self.model.p_opt
 
+      # update the initial asymmetry seed based on the apparent amplitude remaining after removing 2-parameter fit
+      if isinstance(model, FiveParameter):
+        model.seeds[2] = np.max(self.coarse_signal.heights / self.model.eval(self.coarse_signal) - 1)
+
       model.fit(self.coarse_signal)
 
       # Calculate the best fit and residuals.
