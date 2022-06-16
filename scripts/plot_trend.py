@@ -19,7 +19,7 @@ def plot_trend(x, y, results, label = None, ls = "-", color = None):
   x_data = results[x] if x in results.dtype.names else x
   y_data = results[y]
 
-  if "wg_N" in results.dtype.names:
+  if "wg_N" in results.dtype.names and len(results) > 1:
     mask = (results["wg_N"] > 5000)
     x_data, y_data, errors = x_data[mask], y_data[mask], errors[mask]
 

@@ -67,17 +67,21 @@ def plot_dataset(dataset, subset, variable):
     )
 
     nominal_value = nominal_results[variable][0]
-    weights = np.where(results["wg_N"] > 5000, results["wg_N"], 0) if "wg_N" in results.dtype.names else None
-    avg = np.average(results[variable], weights = weights)
-    std = np.sqrt(np.average((results[variable] - avg)**2, weights = weights))
     if variable == "t0":
       nominal_value *= 1E3
-      avg *= 1E3
-      std *= 1E3
-
     style.draw_horizontal(nominal_value, c = errorbar[0].get_color())
-    style.draw_horizontal(avg, ls = "--", c = errorbar[0].get_color())
-    style.horizontal_spread(std, avg, color = errorbar[0].get_color())
+
+    if subset != "threshold":
+      weights = np.where(results["wg_N"] > 5000, results["wg_N"], 0)
+      if subset == "energy":
+        weights = np.where(results["index"] > 1700, results["wg_N"] * results["wg_A"], 0)
+      avg = np.average(results[variable], weights = weights)
+      std = np.sqrt(np.average((results[variable] - avg)**2, weights = weights))
+      if variable == "t0":
+        avg *= 1E3
+        std *= 1E3
+      style.draw_horizontal(avg, ls = "--", c = errorbar[0].get_color())
+      style.horizontal_spread(std, avg, color = errorbar[0].get_color())
 
 # ==================================================================================================
 
