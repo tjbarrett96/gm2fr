@@ -1,5 +1,6 @@
 import numpy as np
 import gm2fr.src.constants as const
+import scipy.optimize as opt
 
 from gm2fr.src.WiggleModels import *
 import matplotlib.pyplot as plt
@@ -70,10 +71,19 @@ class WiggleFit:
       if self.model is not None:
         model.seeds[:len(self.model.p_opt)] = self.model.p_opt
 
-      # update the initial asymmetry seed based on the apparent amplitude remaining after removing 2-parameter fit
-      if isinstance(model, FiveParameter):
-        model.seeds[2] = np.max(self.coarse_signal.heights / self.model.eval(self.coarse_signal) - 1)
+      # Divide out the optimal 2-parameter fit, then fit just the omega_a wiggle to obtain initial seeds.
+      if type(model) is FiveParameter:
+        wiggle_part = self.coarse_signal.heights / self.model.eval(self.coarse_signal)
+        p_opt, p_cov = opt.curve_fit(model.five, self.coarse_signal.centers, wiggle_part, p0 = model.seeds[2:])
+        model.seeds[2:] = p_opt
 
+      # Divide out the optimal 5-parameter fit, then fit just the CBO wiggle to obtain initial seeds.
+      if type(model) is NineParameter:
+        cbo_part = self.coarse_signal.heights / self.model.eval(self.coarse_signal)
+        p_opt, p_cov = opt.curve_fit(model.nine, self.coarse_signal.centers, cbo_part, p0 = model.seeds[5:])
+        model.seeds[5:] = p_opt
+
+      # Fit the entire model, with all parameters floating from initial seeds.
       model.fit(self.coarse_signal)
 
       # Calculate the best fit and residuals.

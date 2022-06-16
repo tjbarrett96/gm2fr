@@ -47,7 +47,7 @@ class FiveParameter(TwoParameter):
     self.name = "five-parameter wiggle"
     self.names += ["A", "f_a", "phi_a"]
     self.units += ["",  "MHz", "rad"  ]
-    self.seeds += [0.3, 0.229, np.pi  ]
+    self.seeds += [0.3, 0.2291, 2.27  ]
 
   # ============================================================================
 
@@ -101,7 +101,7 @@ class NineParameter(FiveParameter):
     fcbo = (1 - np.sqrt(1 - n)) * const.info["f"].magic * 1E-3
     self.names += ["tau_cbo", "A_cbo", "f_cbo", "phi_cbo"]
     self.units += ["us",      "",      "MHz",   "rad"    ]
-    self.seeds += [150,       0.005,   fcbo,    np.pi    ]
+    self.seeds += [150,       0.005,   fcbo,    0        ]
 
   # ============================================================================
 
