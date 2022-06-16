@@ -39,6 +39,7 @@ class WiggleFit:
     self.models = []
     if model == "two":
       self.models.append(TwoParameter())
+      self.models[0].seeds[0] = self.coarse_signal.heights[0] # set better seed for parameter N
     if model == "five":
       self.models.append(TwoParameter())
       self.models.append(FiveParameter())
