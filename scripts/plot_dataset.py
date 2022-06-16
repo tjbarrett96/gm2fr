@@ -67,7 +67,7 @@ def plot_dataset(dataset, subset, variable):
     )
 
     nominal_value = nominal_results[variable][0]
-    weights = results["wg_N"] if "wg_N" in results.dtype.names else None
+    weights = np.where(results["wg_N"] > 5000, results["wg_N"], 0) if "wg_N" in results.dtype.names else None
     avg = np.average(results[variable], weights = weights)
     std = np.sqrt(np.average((results[variable] - avg)**2, weights = weights))
     if variable == "t0":
