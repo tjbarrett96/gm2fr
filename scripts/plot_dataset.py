@@ -98,14 +98,15 @@ if __name__ == "__main__":
   parser.add_argument("--datasets", "-d", nargs = "+", required = True)
   parser.add_argument("--subsets", "-s", nargs = "+", default = list(subset_labels.keys()))
   parser.add_argument("--label", "-l", default = None)
-  parser.add_argument("--variables", "-v", nargs = "*", default = ["x", "sig_x", "c_e", "t0"])
+  parser.add_argument("--variables", "-v", nargs = "*", default = ["x", "sig_x", "c_e", "t0", "bg_chi2_ndf"])
   args = parser.parse_args()
 
   datasets = parse_dataset_arg(args.datasets)
-  label = ",".join(args.datasets) if args.label is None else args.label
+  label = ",".join(args.datasets).replace("*", "-") if args.label is None else args.label
+  io.make_if_absent(f"{io.plot_path}/{label}")
 
   for subset in args.subsets:
-    pdf = style.make_pdf(f"{io.plot_path}/{label}_{subset}_plots.pdf")
+    pdf = style.make_pdf(f"{io.plot_path}/{label}/{label}_{subset}_plots.pdf")
     for variable in args.variables:
       for dataset in datasets:
         plot_dataset(dataset, subset, variable)
