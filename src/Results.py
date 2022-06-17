@@ -11,14 +11,14 @@ class Results:
   # ============================================================================
 
   def merge(self, *results):
-    
+
     merged = pd.concat(
       (self.table, *[result.table for result in results]),
       axis = "columns"
     )
 
     # Take a slice which removes any duplicated columns.
-    self.result = merged.loc[:, ~merged.columns.duplicated()].copy()
+    self.table = merged.loc[:, ~merged.columns.duplicated()].copy()
 
   # ============================================================================
 
