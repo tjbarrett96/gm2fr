@@ -7,6 +7,7 @@ import gm2fr.src.io as io
 import gm2fr.src.constants as const
 from plot_trend import plot_trend
 import analyze_dataset
+from gm2fr.src.Results import Results
 
 import matplotlib.pyplot as plt
 import gm2fr.src.style as style
@@ -83,6 +84,14 @@ def plot_dataset(dataset, subset, variable):
       style.draw_horizontal(avg, ls = "--", c = errorbar[0].get_color())
       style.horizontal_spread(std, avg, color = errorbar[0].get_color())
 
+      return Results({
+        "dataset": dataset,
+        "subset": subset,
+        f"avg_{variable}": avg,
+        f"std_{variable}": std,
+        f"diff_{variable}": avg - nominal_value
+      })
+
 # ==================================================================================================
 
 def parse_dataset_arg(tokens):
@@ -111,9 +120,12 @@ if __name__ == "__main__":
 
   for subset in args.subsets:
     pdf = style.make_pdf(f"{io.plot_path}/{label}/{label}_{subset}_plots.pdf")
+    subset_results = Results()
     for variable in args.variables:
       for dataset in datasets:
-        plot_dataset(dataset, subset, variable)
+        results = plot_dataset(dataset, subset, variable)
+        if results is not None:
+          subset_results.merge(results)
       style.label_and_save(
         subset_labels[subset],
         const.info[variable].format_label(),
@@ -122,3 +134,4 @@ if __name__ == "__main__":
         loc = "center right"
       )
     pdf.close()
+    subset_results.save(f"{io.plot_path}/{label}", f"{label}_{subset}_results")
