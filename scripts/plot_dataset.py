@@ -70,7 +70,7 @@ def plot_dataset(dataset, subset, variable):
     nominal_value = nominal_results[variable][0]
     if variable == "t0":
       nominal_value *= 1E3
-    style.draw_horizontal(nominal_value, c = errorbar[0].get_color())
+    # style.draw_horizontal(nominal_value, c = errorbar[0].get_color())
 
     if subset != "threshold":
       weights = np.where(results["wg_N"] > 5000, results["wg_N"], 0)
@@ -81,8 +81,8 @@ def plot_dataset(dataset, subset, variable):
       if variable == "t0":
         avg *= 1E3
         std *= 1E3
-      style.draw_horizontal(avg, ls = "--", c = errorbar[0].get_color())
-      style.horizontal_spread(std, avg, color = errorbar[0].get_color())
+      # style.draw_horizontal(avg, ls = "--", c = errorbar[0].get_color())
+      # style.horizontal_spread(std, avg, color = errorbar[0].get_color())
 
       return Results({
         "dataset": dataset,
@@ -118,11 +118,15 @@ if __name__ == "__main__":
   label = ",".join(args.datasets).replace("*", "-") if args.label is None else args.label
   io.make_if_absent(f"{io.plot_path}/{label}")
 
+  plt.rcParams["legend.fontsize"] = 10
+  plt.rcParams["axes.labelsize"] = 12
+
   for subset in args.subsets:
     pdf = style.make_pdf(f"{io.plot_path}/{label}/{label}_{subset}_plots.pdf")
     subset_results = Results()
     for variable in args.variables:
       for dataset in datasets:
+        # TODO: need to append rows for datasets, not just merge & drop duplicates
         results = plot_dataset(dataset, subset, variable)
         if results is not None:
           subset_results.merge(results)
