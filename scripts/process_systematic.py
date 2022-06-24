@@ -22,6 +22,8 @@ limit_range = {
   "end": (200, 400)
 }
 
+difference_mode = ["start"]
+
 # ==================================================================================================
 
 def process_systematic(dataset, systematic, variable, output = None):
@@ -60,15 +62,20 @@ def process_systematic(dataset, systematic, variable, output = None):
 
   style.label_and_save(x_label, y_label, output)
 
-  diff_y = data_y - sim_y
-  diff_mean = np.mean(diff_y)
-  diff_std = np.std(diff_y)
+  if systematic in difference_mode:
+    diff_y = data_y - sim_y
+    diff_mean = np.mean(diff_y)
+    diff_std = np.std(diff_y)
+  else:
+    diff_y = data_y
+    diff_mean = np.mean(diff_y)
+    diff_std = np.std(diff_y)
 
   style.errorbar(data_x, diff_y, None)
   style.horizontal_spread(diff_std, diff_mean, label = f"spread = {diff_std:.2f} {y_unit}")
   style.draw_horizontal(diff_mean, label = f"mean = {diff_mean:.2f} {y_unit}")
 
-  style.label_and_save(x_label, f"Error in {y_label}", output)
+  style.label_and_save(x_label, f"Diff. in {y_label}" if systematic in difference_mode else y_label, output)
 
 # ==================================================================================================
 
