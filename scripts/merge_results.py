@@ -8,16 +8,19 @@ from gm2fr.src.Results import Results
 
 def merge_results(folders, output_dir = None, output_name = None, indices = None):
 
-  # Loop through the folders, load each results file, and merge them into a cumulative array.
-  merged_results = Results()
-  for folder in folders:
-    results_path = f"{folder}/results.npy"
-    if os.path.isfile(results_path):
-      merged_results.append(Results.load(results_path))
-
   # Look for numerical indices in each folder name, e.g. "Calo12" -> 12. Default to -1 if none found.
   if indices is None:
     indices = [(index if index is not None else -1) for index in io.find_indices([os.path.basename(os.path.normpath(folder)) for folder in folders])]
+
+  # Loop through the folders, load each results file, and merge them into a cumulative array.
+  merged_results = Results()
+  for i, folder in enumerate(folders):
+    results_path = f"{folder}/results.npy"
+    if os.path.isfile(results_path):
+      merged_results.append(Results.load(results_path))
+    else:
+      del indices[i]
+
   merged_results.table["index"] = indices
 
   # Put the new 'index' column first, and sort the rows by index value.
