@@ -74,7 +74,7 @@ def analyze_dataset(dataset, subset = "nominal", label = None, constructor_arg_d
     # constructor_arg_dict["ref_t0"] = None
 
   if "fr_method" not in analyze_arg_dict:
-    analyze_arg_dict["fr_method"] = "nine" if subset == "nominal" else ("five" if subset != "sim" else None)
+    analyze_arg_dict["fr_method"] = "nine" if subset != "sim" else None
 
   # Run the analysis on each part of the subset (e.g. each calo).
   for input_folder, subset_index, output_folder in zip(input_folders, subset_indices, output_folders):
