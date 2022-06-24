@@ -17,6 +17,11 @@ systematics_folder = {
   "freq_width": "FrequencyWidthScan"
 }
 
+limit_range = {
+  "start": (4, 30),
+  "end": (200, 400)
+}
+
 # ==================================================================================================
 
 def process_systematic(dataset, systematic, variable, output = None):
@@ -40,6 +45,11 @@ def process_systematic(dataset, systematic, variable, output = None):
   )
 
   sim_x, sim_y = sim_results[systematic], sim_results[variable]
+
+  if systematic in limit_range:
+    mask = (data_x >= limit_range[systematic][0]) & (data_x <= limit_range[systematic][1])
+    data_x, data_y = data_x[mask], data_y[mask]
+    sim_x, sim_y = sim_x[mask], sim_y[mask]
 
   if output is None:
     output = f"{io.results_path}/{dataset}/{systematics_folder[systematic]}/{systematic}_plot.pdf"
