@@ -129,15 +129,18 @@ if __name__ == "__main__":
       for dataset in datasets:
         results = plot_dataset(dataset, subset, variable)
         if results is not None:
-          if dataset not in subset_results["dataset"]:
+          if "dataset" not in subset_results.table.columns or dataset not in subset_results.table["dataset"].values:
             # need to add a new row for this dataset
             subset_results.append(results)
           elif f"avg_{variable}" in subset_results.table.columns:
-            # column already added for this variable from previous dataset; update null values for this dataset
-            subset_results.table.combine_first(results.table)
+            # columns already added for this variable from previous dataset; update values for this dataset
+            subset_results.table.loc[
+              subset_results.table["dataset"] == dataset,
+              subset_results.table.columns & result.table.columns
+            ] = result.table.values
           else:
-            # add new columns for this variable in the "dataset" row, excluding the "subset" column
-            subset_results.table.join(results.table.loc[:, results.table.columns != "subset"], on = "dataset")
+            # add new columns for this variable where "dataset" and "subset" match
+            subset_results.table = subset_results.table.merge(results.table, how = "left", on = ["dataset", "subset"])
       style.label_and_save(
         subset_labels[subset],
         const.info[variable].format_label(),
