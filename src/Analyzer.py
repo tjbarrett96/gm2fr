@@ -65,6 +65,7 @@ class Analyzer:
     self.wiggle_fit = None
     self.fr_signal = None
     self.fr_method = None
+    self.fr_rebin = None
 
     self.transform = None
     self.coarse_t0_optimizer = None
@@ -150,9 +151,12 @@ class Analyzer:
 
     begin_time = time.time()
 
-    if self.fr_signal is None or fr_method != self.fr_method:
+    if self.fr_signal is None or fr_method != self.fr_method or rebin != self.fr_rebin:
+      rebin = int(rebin)
       self.fr_method = fr_method
+      self.fr_rebin = rebin
       self.load_fr_signal(fr_method)
+      self.fr_signal.rebin(rebin, discard = True)
 
     # Compute the Fourier transform of the fast rotation signal, masked between the requested times.
     self.transform = Transform(self.fr_signal, start, end, df, freq_width)

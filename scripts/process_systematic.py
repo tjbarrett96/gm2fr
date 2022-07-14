@@ -28,7 +28,7 @@ difference_mode = ["start"]
 
 def process_systematic(dataset, systematic, variable, output = None):
 
-  data_results = np.load(f"{io.results_path}/{dataset}/{systematics_folder[systematic]}/results.npy")
+  data_results = np.load(f"{io.results_path}/{dataset}/{systematics_folder[systematic]}/results.npy", allow_pickle = True)
   data_errorbar = plot_trend(
     systematic,
     variable,
@@ -38,7 +38,7 @@ def process_systematic(dataset, systematic, variable, output = None):
 
   data_x, data_y = data_results[systematic], data_results[variable]
 
-  sim_results = np.load(f"{io.results_path}/{dataset}/{systematics_folder[systematic]}/sim_results.npy")
+  sim_results = np.load(f"{io.results_path}/{dataset}/{systematics_folder[systematic]}/sim_results.npy", allow_pickle = True)
   sim_errorbar = plot_trend(
     systematic,
     variable,

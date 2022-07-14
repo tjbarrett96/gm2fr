@@ -74,13 +74,13 @@ class WiggleFit:
       # Divide out the optimal 2-parameter fit, then fit just the omega_a wiggle to obtain initial seeds.
       if type(model) is FiveParameter:
         wiggle_part = self.coarse_signal.heights / self.model.eval(self.coarse_signal)
-        p_opt, p_cov = opt.curve_fit(model.five, self.coarse_signal.centers, wiggle_part, p0 = model.seeds[2:])
+        p_opt, p_cov = opt.curve_fit(model.five, self.coarse_signal.centers, wiggle_part, p0 = model.seeds[2:], maxfev = 100000)
         model.seeds[2:] = p_opt
 
       # Divide out the optimal 5-parameter fit, then fit just the CBO wiggle to obtain initial seeds.
       if type(model) is NineParameter:
         cbo_part = self.coarse_signal.heights / self.model.eval(self.coarse_signal)
-        p_opt, p_cov = opt.curve_fit(model.nine, self.coarse_signal.centers, cbo_part, p0 = model.seeds[5:])
+        p_opt, p_cov = opt.curve_fit(model.nine, self.coarse_signal.centers, cbo_part, p0 = model.seeds[5:], maxfev = 100000)
         model.seeds[5:] = p_opt
 
       # Fit the entire model, with all parameters floating from initial seeds.

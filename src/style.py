@@ -101,8 +101,8 @@ def colorbar(label = None, pad = 0.01, fraction = 0.10, aspect = 18, **kwargs):
 # ==================================================================================================
 
 # Override plt.errorbar with automatic formatting.
-def errorbar(x, y, yErr, xErr = None, ls = "-", ms = 4, **kwargs):
-  return plt.errorbar(x, y, yErr, xErr, fmt = f"o{ls}", ms = ms, capsize = 2, lw = 0.75, elinewidth = 0.5, mew = 0.5, **kwargs)
+def errorbar(x, y, yErr, xErr = None, ls = "-", marker = "o", ms = 4, **kwargs):
+  return plt.errorbar(x, y, yErr, xErr, fmt = f"{marker}{ls}", ms = ms, capsize = 2, lw = 0.75, elinewidth = 0.5, mew = 0.5, **kwargs)
 
 # ==================================================================================================
 

@@ -118,24 +118,32 @@ if __name__ == "__main__":
   label = ",".join(args.datasets).replace("*", "-") if args.label is None else args.label
   io.make_if_absent(f"{io.plot_path}/{label}")
 
-  plt.rcParams["legend.fontsize"] = 10
-  plt.rcParams["axes.labelsize"] = 12
+  if len(args.subsets) == 1 and args.subsets[0] == "nominal":
+    plt.rcParams["legend.fontsize"] = 9
+    plt.rcParams["xtick.labelsize"] = 12
 
   for subset in args.subsets:
     pdf = style.make_pdf(f"{io.plot_path}/{label}/{label}_{subset}_plots.pdf")
     subset_results = Results()
     for variable in args.variables:
       for dataset in datasets:
-        # TODO: need to append rows for datasets, not just merge & drop duplicates
         results = plot_dataset(dataset, subset, variable)
         if results is not None:
-          subset_results.merge(results)
+          if dataset not in subset_results["dataset"]:
+            # need to add a new row for this dataset
+            subset_results.append(results)
+          elif f"avg_{variable}" in subset_results.table.columns:
+            # column already added for this variable from previous dataset; update null values for this dataset
+            subset_results.table.combine_first(results.table)
+          else:
+            # add new columns for this variable in the "dataset" row, excluding the "subset" column
+            subset_results.table.join(results.table.loc[:, results.table.columns != "subset"], on = "dataset")
       style.label_and_save(
         subset_labels[subset],
         const.info[variable].format_label(),
         pdf,
-        extend_x = 0.15,
-        loc = "center right"
+        extend_x = 0.1 if subset != "nominal" else 0,
+        loc = "center right" if subset != "nominal" else None
       )
     pdf.close()
     subset_results.save(f"{io.plot_path}/{label}", f"{label}_{subset}_results")

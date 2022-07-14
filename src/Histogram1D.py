@@ -308,6 +308,7 @@ class Histogram1D:
 
     # clip any negative heights to zero
     masked_heights = np.where(self.heights > 0, self.heights, 0)
+    # masked_heights = self.heights
 
     # normalize the heights and covariance to unit area using Simpson's rule
     area = calc.area(self.centers, masked_heights)
@@ -398,8 +399,8 @@ class Histogram1D:
     if not even and not discard:
       raise ValueError(f"Cannot rebin {length} bins into {length / step:.2f} blocks.")
 
-    # Note: indices are SPLIT points; including a boundary index puts an empty array!
-    blocks = np.split(array, np.arange(step, length - 1, step), axis)
+    # Note: indices are SPLIT points; including 0 puts an empty array!
+    blocks = np.split(array, np.arange(step, length, step), axis)
     if not even and discard:
       blocks = blocks[:-1]
     return np.concatenate([block.sum(axis, keepdims = True) for block in blocks], axis)
@@ -419,15 +420,16 @@ class Histogram1D:
   # Merge integer groups of bins along the x- or y-axes.
   def rebin(self, step, discard = False):
 
-    if io.is_integer(step) and step > 0:
-      self.heights = Histogram1D.split_sum(self.heights, step, 0, discard)
-      self.cov = Histogram1D.split_sum(self.cov, step, 0, discard)
-      if self.cov.ndim == 2:
-        self.cov = Histogram1D.split_sum(self.cov, step, 1, discard)
-      self.update_errors()
+    if io.is_integer(step):
+      if step > 1:
+        self.heights = Histogram1D.split_sum(self.heights, step, 0, discard)
+        self.cov = Histogram1D.split_sum(self.cov, step, 0, discard)
+        if self.cov.ndim == 2:
+          self.cov = Histogram1D.split_sum(self.cov, step, 1, discard)
+        self.update_errors()
 
-      self.edges = self.edges[::step]
-      self.update_bins()
+        self.edges = self.edges[::step]
+        self.update_bins()
 
     else:
       raise ValueError(f"Cannot rebin histogram in groups of '{step}'.")

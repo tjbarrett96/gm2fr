@@ -92,6 +92,8 @@ class Corrector:
       self.predicted_transform = self.predicted_transform.add(self.wiggle)
       self.corrected_transform = self.corrected_transform.subtract(self.wiggle.interpolate(self.corrected_transform.centers))
 
+    self.A_interpolated.cov = np.diag(self.A_interpolated.cov)
+
     self.corrected_transform = self.corrected_transform.divide(self.A_interpolated, zero = 1)
 
   # ================================================================================================
