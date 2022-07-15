@@ -57,7 +57,7 @@ def process_systematic(dataset, systematic, variable, output = None):
     output = f"{io.results_path}/{dataset}/{systematics_folder[systematic]}/{systematic}_plot.pdf"
 
   x_label = const.info[systematic].format_label() if systematic in const.info.keys() else systematic
-  y_label = const.info[variable].format_label() if variable in const.info.keys() else variable
+  y_label = const.info[variable].format_symbol() if variable in const.info.keys() else variable
   y_unit = const.info[variable].units if variable in const.info.keys() else ""
 
   style.label_and_save(x_label, y_label, output)
@@ -70,7 +70,7 @@ def process_systematic(dataset, systematic, variable, output = None):
     style.horizontal_spread(syst_std, syst_mean, label = f"spread = {syst_std:.2f} {y_unit}")
     style.draw_horizontal(syst_mean, label = f"mean = {syst_mean:.2f} {y_unit}")
 
-    style.label_and_save(x_label, f"Diff. in {y_label}" if mode == "diff" else y_label, output)
+    style.label_and_save(x_label, f"Difference in {y_label}" if mode == "diff" else y_label, output)
 
   return Results({
     f"mean_{variable}": np.mean(data_y),

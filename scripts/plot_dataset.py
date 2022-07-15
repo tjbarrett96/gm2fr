@@ -145,7 +145,7 @@ if __name__ == "__main__":
             subset_results.table = subset_results.table.merge(results.table, how = "left", on = ["dataset", "subset"])
       style.label_and_save(
         subset_labels[subset],
-        const.info[variable].format_label(),
+        const.info[variable].format_symbol(),
         pdf,
         extend_x = 0.1 if subset != "nominal" and len(datasets) > 1 else 0,
         loc = "center right" if subset != "nominal" and len(datasets) > 1 else None

@@ -52,6 +52,9 @@ class Quantity:
   def format_label(self):
     return self.label + (f" ({self.units})" if self.units is not None else "")
 
+  def format_symbol(self):
+    return f"${self.symbol}$" + (f" ({self.units})" if self.units is not None else "")
+
 # ==================================================================================================
 
 # Dictionary containing information (e.g. labels, magic values, etc.) for various types of quantities.
@@ -60,7 +63,7 @@ class Quantity:
 info = {
   "f": Quantity("Frequency", "f", "kHz"),
   "r": Quantity("Equilibrium Radius", "r", "mm"),
-  "x": Quantity("Equilibrium Radial Offset", "x", "mm"),
+  "x": Quantity("Equilibrium Radial Offset", "x_e", "mm"),
   "p": Quantity("Momentum", "p", "GeV"),
   "gamma": Quantity("Boost Factor", r"\gamma", None),
   "beta": Quantity("Speed", r"\beta", "$c$"),
@@ -128,9 +131,9 @@ info["start"] = Quantity("Start Time", "t_s", r"$\mu$s")
 info["end"] = Quantity("End Time", "t_m", r"$\mu$s")
 info["df"] = Quantity("Frequency Spacing", r"\Delta f", "kHz")
 info["t0"] = Quantity("Reference Time", "t_0", "ns")
-info["bg_chi2_ndf"] = Quantity(r"Background Fit $\chi^2$/ndf", r"$\chi^2$/ndf", None)
+info["bg_chi2_ndf"] = Quantity(r"Background Fit $\chi^2$/ndf", r"\mathrm{Background} \; \chi^2/\mathrm{ndf}", None)
 info["bg_pval"] = Quantity("Background Fit $p$-value", "p", None)
-info["wg_chi2_ndf"] = Quantity(r"Wiggle Fit $\chi^2$/ndf", r"$\chi^2$/ndf", None)
+info["wg_chi2_ndf"] = Quantity(r"Wiggle Fit $\chi^2$/ndf", r"\mathrm{Wiggle} \; \chi^2/\mathrm{ndf}", None)
 info["wg_pval"] = Quantity("Wiggle Fit $p$-value", "p", None)
 info["wg_N"] = Quantity("Wiggle Normalization", "N", None)
 info["wg_tau"] = Quantity("Wiggle Lifetime", r"\tau_\mu", r"$\mu$s")
