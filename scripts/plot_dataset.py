@@ -31,7 +31,7 @@ subset_labels = {
 
 # ==================================================================================================
 
-def plot_dataset(dataset, subset, variable):
+def plot_dataset(dataset, subset, variable, plot_lines = False):
 
   # Validate the requested subset and variable.
   if subset not in subset_labels.keys():
@@ -70,7 +70,8 @@ def plot_dataset(dataset, subset, variable):
     nominal_value = nominal_results[variable][0]
     if variable == "t0":
       nominal_value *= 1E3
-    # style.draw_horizontal(nominal_value, c = errorbar[0].get_color())
+    if plot_lines:
+      style.draw_horizontal(nominal_value, c = "k")
 
     if subset != "threshold":
       weights = np.where(results["wg_N"] > 5000, results["wg_N"], 0)
@@ -81,8 +82,9 @@ def plot_dataset(dataset, subset, variable):
       if variable == "t0":
         avg *= 1E3
         std *= 1E3
-      # style.draw_horizontal(avg, ls = "--", c = errorbar[0].get_color())
-      # style.horizontal_spread(std, avg, color = errorbar[0].get_color())
+      if plot_lines:
+        style.draw_horizontal(avg, ls = "--", c = "k")
+        style.horizontal_spread(std, avg, color = "k")
 
       return Results({
         "dataset": dataset,
@@ -127,7 +129,7 @@ if __name__ == "__main__":
     subset_results = Results()
     for variable in args.variables:
       for dataset in datasets:
-        results = plot_dataset(dataset, subset, variable)
+        results = plot_dataset(dataset, subset, variable, plot_lines = (len(datasets) == 1))
         if results is not None:
           if "dataset" not in subset_results.table.columns or dataset not in subset_results.table["dataset"].values:
             # need to add a new row for this dataset
@@ -145,8 +147,8 @@ if __name__ == "__main__":
         subset_labels[subset],
         const.info[variable].format_label(),
         pdf,
-        extend_x = 0.1 if subset != "nominal" else 0,
-        loc = "center right" if subset != "nominal" else None
+        extend_x = 0.1 if subset != "nominal" and len(datasets) > 1 else 0,
+        loc = "center right" if subset != "nominal" and len(datasets) > 1 else None
       )
     pdf.close()
     subset_results.save(f"{io.plot_path}/{label}", f"{label}_{subset}_results")

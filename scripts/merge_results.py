@@ -3,21 +3,24 @@ import os
 import re
 import gm2fr.src.io as io
 from gm2fr.src.Results import Results
+import argparse
 
 # ==================================================================================================
 
-def merge_results(folders, output_dir = None, output_name = None, indices = None):
+def merge_results(results, output_dir = None, output_name = None, indices = None):
 
   # Look for numerical indices in each folder name, e.g. "Calo12" -> 12. Default to -1 if none found.
   if indices is None:
-    indices = [(index if index is not None else -1) for index in io.find_indices([os.path.basename(os.path.normpath(folder)) for folder in folders])]
+    indices = [
+      (index if index is not None else -1)
+      for index in io.find_indices([os.path.basename(os.path.dirname(result)) for result in results])
+    ]
 
   # Loop through the folders, load each results file, and merge them into a cumulative array.
   merged_results = Results()
-  for i, folder in enumerate(folders):
-    results_path = f"{folder}/results.npy"
-    if os.path.isfile(results_path):
-      merged_results.append(Results.load(results_path))
+  for i, result in enumerate(results):
+    if os.path.isfile(result):
+      merged_results.append(Results.load(result))
     else:
       del indices[i]
 
@@ -36,26 +39,13 @@ def merge_results(folders, output_dir = None, output_name = None, indices = None
 
 if __name__ == "__main__":
 
-  if len(sys.argv) != 2:
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--output", "-o", required = True)
+  parser.add_argument("--name", "-n", default = "merged_results")
+  parser.add_argument("--results", "-r", nargs = "+")
+  parser.add_argument("--indices", "-i", default = "auto", choices = ["parent", "auto"])
+  args = parser.parse_args()
 
-    print("Usage: python3 merge_results.py <parent_directory / run_number>")
-    exit()
+  indices = None if args.indices == "auto" else [os.path.basename(os.path.dirname(os.path.dirname(result))) for result in args.results]
 
-  else:
-
-    folders, output_dir, output_name, indices = None, None, None, None
-
-    # If the argument is an integer, merge the Nominal results from all datasets in that run number.
-    if re.match(r"\d+\Z", sys.argv[1]):
-      run_number = int(sys.argv[1])
-      indices = io.list_run_datasets(run_number)
-      folders = [f"{io.results_path}/{dataset}/Nominal" for dataset in indices]
-      output_dir = io.results_path
-      output_name = f"Run{run_number}_nominal_results"
-    # Otherwise, interpret the argument as a parent directory, and merge results from all subdirectories.
-    else:
-      parent_dir = sys.argv[1]
-      folders = [f"{parent_dir}/{folder}" for folder in os.listdir(parent_dir) if os.path.isdir(f"{parent_dir}/{folder}")]
-      output_dir = parent_dir
-
-    merge_results(folders, output_dir, output_name, indices)
+  merge_results(args.results, args.output, args.name, indices)

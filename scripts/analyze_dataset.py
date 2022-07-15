@@ -99,7 +99,7 @@ def analyze_dataset(dataset, subset = "nominal", label = None, constructor_arg_d
   # Concatenate the results over the subset into a single group results file.
   if output_group is not None:
     merge_results(
-      folders = [f"{io.results_path}/{dataset}/{output_group}/{output_folder}" for output_folder in output_folders],
+      results = [f"{io.results_path}/{dataset}/{output_group}/{output_folder}/results.npy" for output_folder in output_folders],
       output_dir = f"{io.results_path}/{dataset}/{output_group}",
       output_name = f"{dataset}_{subset}_results",
       indices = subset_indices
