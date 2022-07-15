@@ -2,6 +2,7 @@ import gm2fr.src.style as style
 style.set_style()
 import gm2fr.src.io as io
 import gm2fr.src.constants as const
+from gm2fr.src.Results import Results
 
 import argparse
 import numpy as np
@@ -63,19 +64,24 @@ def process_systematic(dataset, systematic, variable, output = None):
   style.label_and_save(x_label, y_label, output)
 
   if systematic in difference_mode:
-    diff_y = data_y - sim_y
-    diff_mean = np.mean(diff_y)
-    diff_std = np.std(diff_y)
+    syst_y = data_y - sim_y
   else:
-    diff_y = data_y
-    diff_mean = np.mean(diff_y)
-    diff_std = np.std(diff_y)
+    syst_y = data_y
+  syst_mean = np.mean(syst_y)
+  syst_std = np.std(syst_y)
 
-  style.errorbar(data_x, diff_y, None)
-  style.horizontal_spread(diff_std, diff_mean, label = f"spread = {diff_std:.2f} {y_unit}")
-  style.draw_horizontal(diff_mean, label = f"mean = {diff_mean:.2f} {y_unit}")
+  style.errorbar(data_x, syst_y, None)
+  style.horizontal_spread(syst_std, syst_mean, label = f"spread = {syst_std:.2f} {y_unit}")
+  style.draw_horizontal(syst_mean, label = f"mean = {syst_mean:.2f} {y_unit}")
 
   style.label_and_save(x_label, f"Diff. in {y_label}" if systematic in difference_mode else y_label, output)
+
+  return Results({
+    f"mean_{variable}": np.mean(data_y),
+    f"std_{variable}": np.std(data_y),
+    f"diff_mean_{variable}": np.mean(data_y - sim_y),
+    f"diff_std_{variable}": np.std(data_y - sim_y)
+  })
 
 # ==================================================================================================
 
@@ -86,7 +92,10 @@ if __name__ == "__main__":
   parser.add_argument("--systematic", "-s", required = True)
   args = parser.parse_args()
 
-  pdf = style.make_pdf(f"{io.results_path}/{args.dataset}/{systematics_folder[args.systematic]}/{args.systematic}_plots.pdf")
+  pdf = style.make_pdf(f"{io.results_path}/{args.dataset}/{systematics_folder[args.systematic]}/{args.dataset}_{args.systematic}_plots.pdf")
+  results = Results({"dataset": args.dataset, "systematic": args.systematic})
   for variable in ("x", "sig_x", "c_e", "t0"):
-    process_systematic(args.dataset, args.systematic, variable, output = pdf)
+    var_results = process_systematic(args.dataset, args.systematic, variable, output = pdf)
+    results.merge(var_results)
   pdf.close()
+  results.save(f"{io.results_path}/{args.dataset}/{systematics_folder[args.systematic]}", f"{args.dataset}_{args.systematic}_results")
