@@ -71,7 +71,7 @@ def plot_dataset(dataset, subset, variable, plot_lines = False):
     if variable == "t0":
       nominal_value *= 1E3
     if plot_lines:
-      style.draw_horizontal(nominal_value, c = "k")
+      style.draw_horizontal(nominal_value, c = "k", label = "Nominal")
 
     if subset != "threshold":
       weights = np.where(results["wg_N"] > 5000, results["wg_N"], 0)
@@ -83,8 +83,8 @@ def plot_dataset(dataset, subset, variable, plot_lines = False):
         avg *= 1E3
         std *= 1E3
       if plot_lines:
-        style.draw_horizontal(avg, ls = "--", c = "k")
-        style.horizontal_spread(std, avg, color = "k")
+        style.draw_horizontal(avg, ls = "--", c = "k", label = "Average")
+        style.horizontal_spread(std, avg, color = "k", label = "Spread")
 
       return Results({
         "dataset": dataset,

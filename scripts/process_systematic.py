@@ -20,10 +20,9 @@ systematics_folder = {
 
 limit_range = {
   "start": (4, 30),
-  "end": (200, 400)
+  "end": (200, 400),
+  "freq_width": (150, np.inf)
 }
-
-difference_mode = ["start"]
 
 # ==================================================================================================
 
@@ -63,18 +62,15 @@ def process_systematic(dataset, systematic, variable, output = None):
 
   style.label_and_save(x_label, y_label, output)
 
-  if systematic in difference_mode:
-    syst_y = data_y - sim_y
-  else:
-    syst_y = data_y
-  syst_mean = np.mean(syst_y)
-  syst_std = np.std(syst_y)
+  for syst_y, mode in ((data_y - sim_y, "diff"), (data_y, "normal")):
+    syst_mean = np.mean(syst_y)
+    syst_std = np.std(syst_y)
 
-  style.errorbar(data_x, syst_y, None)
-  style.horizontal_spread(syst_std, syst_mean, label = f"spread = {syst_std:.2f} {y_unit}")
-  style.draw_horizontal(syst_mean, label = f"mean = {syst_mean:.2f} {y_unit}")
+    style.errorbar(data_x, syst_y, None)
+    style.horizontal_spread(syst_std, syst_mean, label = f"spread = {syst_std:.2f} {y_unit}")
+    style.draw_horizontal(syst_mean, label = f"mean = {syst_mean:.2f} {y_unit}")
 
-  style.label_and_save(x_label, f"Diff. in {y_label}" if systematic in difference_mode else y_label, output)
+    style.label_and_save(x_label, f"Diff. in {y_label}" if mode == "diff" else y_label, output)
 
   return Results({
     f"mean_{variable}": np.mean(data_y),
@@ -94,7 +90,7 @@ if __name__ == "__main__":
 
   pdf = style.make_pdf(f"{io.results_path}/{args.dataset}/{systematics_folder[args.systematic]}/{args.dataset}_{args.systematic}_plots.pdf")
   results = Results({"dataset": args.dataset, "systematic": args.systematic})
-  for variable in ("x", "sig_x", "c_e", "t0"):
+  for variable in ("x", "sig_x", "c_e", "t0", "bg_chi2_ndf"):
     var_results = process_systematic(args.dataset, args.systematic, variable, output = pdf)
     results.merge(var_results)
   pdf.close()
