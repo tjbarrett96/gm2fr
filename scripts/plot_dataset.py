@@ -24,9 +24,9 @@ subset_labels = {
   "bunch": "Bunch Number",
   "run": "Run Number",
   "energy": "Energy (MeV)",
-  "threshold": "Energy Threshold (MeV)",
-  "row": "Crystal Row",
-  "column": "Crystal Column"
+  "threshold": "Energy Threshold (MeV)"
+  # "row": "Crystal Row",
+  # "column": "Crystal Column"
 }
 
 # ==================================================================================================
@@ -41,7 +41,9 @@ def plot_dataset(dataset, subset, variable, plot_lines = False):
     print(f"Variable '{variable}' not recognized.")
     return
 
-  # TODO: add optional dashed line of same color for nominal result (no extra label)
+  # parse the dataset label to find the run number, e.g. "Run3a" -> 3, "2D" -> 2
+  run_number = io.find_index(re.match(r"(?:Run)?(\d[a-zA-Z]?)", dataset).group(1))
+
   if subset == "nominal":
 
     results = np.load(f"{io.results_path}/{dataset}/Nominal/results.npy", allow_pickle = True)
@@ -50,8 +52,8 @@ def plot_dataset(dataset, subset, variable, plot_lines = False):
       x = [dataset],
       y = variable,
       results = results,
-      label = f"Run {dataset[0]}",
-      color = f"C{int(dataset[0]) - 1}"
+      label = f"Run {run_number}",
+      color = f"C{run_number - 1}"
     )
 
   else:
@@ -117,7 +119,7 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   datasets = parse_dataset_arg(args.datasets)
-  label = ",".join(args.datasets).replace("*", "-") if args.label is None else args.label
+  label = ",".join(args.datasets).replace("*", "All") if args.label is None else args.label
   io.make_if_absent(f"{io.plot_path}/{label}")
 
   if len(args.subsets) == 1 and args.subsets[0] == "nominal":
@@ -151,4 +153,5 @@ if __name__ == "__main__":
         loc = "center right" if subset != "nominal" and len(datasets) > 1 else None
       )
     pdf.close()
-    subset_results.save(f"{io.plot_path}/{label}", f"{label}_{subset}_results")
+    if not subset_results.table.empty:
+      subset_results.save(f"{io.plot_path}/{label}", f"{label}_{subset}_results")

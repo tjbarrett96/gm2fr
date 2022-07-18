@@ -54,7 +54,7 @@ def process_systematic(dataset, systematic, variable, output = None):
     sim_x, sim_y = sim_x[mask], sim_y[mask]
 
   if output is None:
-    output = f"{io.results_path}/{dataset}/{systematics_folder[systematic]}/{systematic}_plot.pdf"
+    output = f"{io.plot_path}/{dataset}_{systematic}_plots.pdf"
 
   x_label = const.info[systematic].format_label() if systematic in const.info.keys() else systematic
   y_label = const.info[variable].format_symbol() if variable in const.info.keys() else variable
@@ -88,10 +88,10 @@ if __name__ == "__main__":
   parser.add_argument("--systematic", "-s", required = True)
   args = parser.parse_args()
 
-  pdf = style.make_pdf(f"{io.results_path}/{args.dataset}/{systematics_folder[args.systematic]}/{args.dataset}_{args.systematic}_plots.pdf")
+  pdf = style.make_pdf(f"{io.plot_path}/{args.dataset}_{args.systematic}_plots.pdf")
   results = Results({"dataset": args.dataset, "systematic": args.systematic})
   for variable in ("x", "sig_x", "c_e", "t0", "bg_chi2_ndf"):
     var_results = process_systematic(args.dataset, args.systematic, variable, output = pdf)
     results.merge(var_results)
   pdf.close()
-  results.save(f"{io.results_path}/{args.dataset}/{systematics_folder[args.systematic]}", f"{args.dataset}_{args.systematic}_results")
+  results.save(f"{io.plot_path}/{args.dataset}", f"{args.dataset}_{args.systematic}_results")
