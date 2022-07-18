@@ -7,7 +7,7 @@ import argparse
 
 # ==================================================================================================
 
-def merge_results(results, output_dir = None, output_name = None, indices = None):
+def merge_results(results, output_dir = None, output_name = None, indices = None, sort_column = "index"):
 
   # Look for numerical indices in each folder name, e.g. "Calo12" -> 12. Default to -1 if none found.
   if indices is None:
@@ -26,9 +26,9 @@ def merge_results(results, output_dir = None, output_name = None, indices = None
 
   merged_results.table["index"] = indices
 
-  # Put the new 'index' column first, and sort the rows by index value.
+  # Put the new 'index' column first, and sort the rows by the values in the specified column.
   column_order = ["index"] + [col for col in merged_results.table.columns if col != "index"]
-  merged_results.table = merged_results.table[column_order].sort_values(by = "index")
+  merged_results.table = merged_results.table[column_order].sort_values(by = sort_column)
 
   # Save (if output specified) and return merged Results object.
   if output_dir is not None:
@@ -43,9 +43,13 @@ if __name__ == "__main__":
   parser.add_argument("--output", "-o", required = True)
   parser.add_argument("--name", "-n", default = "merged_results")
   parser.add_argument("--results", "-r", nargs = "+")
-  parser.add_argument("--indices", "-i", default = "auto", choices = ["parent", "auto"])
+  parser.add_argument("--indices", "-i", default = None, choices = [None, "parent"])
+  parser.add_argument("--sort", "-s", default = "index")
   args = parser.parse_args()
 
-  indices = None if args.indices == "auto" else [os.path.basename(os.path.dirname(os.path.dirname(result))) for result in args.results]
+  if args.indices == "parent":
+    indices = [os.path.basename(os.path.dirname(os.path.dirname(result))) for result in args.results]
+  else:
+    indices = args.indices
 
-  merge_results(args.results, args.output, args.name, indices)
+  merge_results(args.results, args.output, args.name, indices, args.sort)
