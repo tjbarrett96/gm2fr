@@ -130,6 +130,7 @@ for quantity in list(info.keys()):
 info["start"] = Quantity("Start Time", "t_s", r"$\mu$s")
 info["end"] = Quantity("End Time", "t_m", r"$\mu$s")
 info["df"] = Quantity("Frequency Spacing", r"\Delta f", "kHz")
+info["freq_width"] = Quantity("Frequency Width", r"f_{\mathrm{max}} - f_{\mathrm{min}}", "kHz")
 info["t0"] = Quantity("Reference Time", "t_0", "ns")
 info["bg_chi2_ndf"] = Quantity(r"Background Fit $\chi^2$/ndf", r"\mathrm{Background} \; \chi^2/\mathrm{ndf}", None)
 info["bg_pval"] = Quantity("Background Fit $p$-value", "p", None)

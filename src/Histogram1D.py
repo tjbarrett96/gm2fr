@@ -307,8 +307,8 @@ class Histogram1D:
       raise ValueError(f"Cannot calculate moment of degree '{degree}'.")
 
     # clip any negative heights to zero
-    masked_heights = np.where(self.heights > 0, self.heights, 0)
-    # masked_heights = self.heights
+    # masked_heights = np.where(self.heights > 0, self.heights, 0)
+    masked_heights = self.heights
 
     # normalize the heights and covariance to unit area using Simpson's rule
     area = calc.area(self.centers, masked_heights)
