@@ -50,8 +50,8 @@ def process_systematic(dataset, systematic, variable, output = None):
 
   if systematic in limit_range:
     mask = (data_x >= limit_range[systematic][0]) & (data_x <= limit_range[systematic][1])
-    data_x, data_y = data_x[mask], data_y[mask]
-    sim_x, sim_y = sim_x[mask], sim_y[mask]
+    data_x, data_y, data_err_y = data_x[mask], data_y[mask], data_err_y[mask]
+    sim_x, sim_y, sim_err_y = sim_x[mask], sim_y[mask], sim_err_y[mask]
 
   if output is None:
     output = f"{io.plot_path}/{dataset}_{systematic}_plots.pdf"
