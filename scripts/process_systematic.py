@@ -15,7 +15,8 @@ systematics_folder = {
   "start": "StartTimeScan",
   "end": "EndTimeScan",
   "df": "FrequencySpacingScan",
-  "freq_width": "FrequencyWidthScan"
+  "freq_width": "FrequencyWidthScan",
+  "inner_width": "InnerWidthScan"
 }
 
 limit_range = {
@@ -26,9 +27,11 @@ limit_range = {
 
 # ==================================================================================================
 
-def process_systematic(dataset, systematic, variable, output = None):
+def process_systematic(dataset, systematic, variable, output = None, folder = None):
 
-  data_results = np.load(f"{io.results_path}/{dataset}/{systematics_folder[systematic]}/results.npy", allow_pickle = True)
+  folder = systematics_folder[systematic] if folder is None else folder
+
+  data_results = np.load(f"{io.results_path}/{dataset}/{folder}/results.npy", allow_pickle = True)
   data_errorbar = plot_trend(
     systematic,
     variable,
@@ -38,7 +41,7 @@ def process_systematic(dataset, systematic, variable, output = None):
 
   data_x, data_y, data_err_y = data_results[systematic], data_results[variable], data_results[f"err_{variable}"]
 
-  sim_results = np.load(f"{io.results_path}/{dataset}/{systematics_folder[systematic]}/sim_results.npy", allow_pickle = True)
+  sim_results = np.load(f"{io.results_path}/{dataset}/{folder}/sim_results.npy", allow_pickle = True)
   sim_errorbar = plot_trend(
     systematic,
     variable,
@@ -88,6 +91,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("--dataset", "-d", required = True)
   parser.add_argument("--systematic", "-s", required = True)
+  parser.add_argument("--label", "-l", default = None)
   args = parser.parse_args()
 
   pdf = style.make_pdf(f"{io.plot_path}/{args.dataset}/{args.dataset}_{args.systematic}_plots.pdf")
