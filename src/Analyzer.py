@@ -139,6 +139,7 @@ class Analyzer:
     fr_method = None,
     bg_model = "sinc", # Background fit model: "constant" / "parabola" / "sinc" / "error".
     df = 2, # Frequency interval (in kHz) for the cosine transform.
+    inner_width = None,
     freq_width = 150,
     coarse_t0_width = 20, # full range (in ns) for the initial coarse t0 scan range.
     coarse_t0_steps = 5, # Number of steps for the initial coarse t0 scan range.
@@ -166,10 +167,10 @@ class Analyzer:
 
     if optimize_t0:
 
-      self.coarse_t0_optimizer = Optimizer(self.transform, bg_model, coarse_t0_width * 1E-3, coarse_t0_steps, seed = t0_seed)
+      self.coarse_t0_optimizer = Optimizer(self.transform, bg_model, coarse_t0_width * 1E-3, coarse_t0_steps, seed = t0_seed, inner_width = inner_width)
       t0 = self.coarse_t0_optimizer.optimize()
 
-      self.fine_t0_optimizer = Optimizer(self.transform, bg_model, fine_t0_width * 1E-3, fine_t0_steps, seed = t0)
+      self.fine_t0_optimizer = Optimizer(self.transform, bg_model, fine_t0_width * 1E-3, fine_t0_steps, seed = t0, inner_width = inner_width)
       t0 = self.fine_t0_optimizer.optimize()
       err_t0 = self.fine_t0_optimizer.err_t0
 
@@ -184,7 +185,7 @@ class Analyzer:
 
     # Perform the background fit, and subtract it from the optimal cosine transform.
     if bg_model is not None:
-      self.bg_fit = BackgroundFit(self.transform.opt_cosine, t0, start, bg_model, err_t0 = err_t0).fit()
+      self.bg_fit = BackgroundFit(self.transform.opt_cosine, t0, start, bg_model, err_t0 = err_t0, inner_width = inner_width).fit()
       corr_transform = self.transform.opt_cosine.subtract(self.bg_fit.result)
       # If enabled, perform empirical iteration of the background fit.
       if iterate:
@@ -203,6 +204,7 @@ class Analyzer:
       "end": end,
       "df": df,
       "freq_width": freq_width,
+      "inner_width": inner_width,
       "t0": t0,
       "err_t0": err_t0,
       "bg_model": bg_model,

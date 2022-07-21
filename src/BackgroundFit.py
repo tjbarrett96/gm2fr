@@ -23,7 +23,8 @@ class BackgroundFit:
     t0,
     start,
     model,
-    err_t0 = 0
+    err_t0 = 0,
+    inner_width = None
   ):
 
     # Keep a reference to the Transform object whose background we are fitting.
@@ -35,7 +36,12 @@ class BackgroundFit:
     self.start = start
 
     # Fit data, with boundary mask applied.
-    self.mask = const.unphysical(self.transform.centers)
+    if inner_width is None:
+      self.mask = const.unphysical(self.transform.centers)
+    else:
+      self.mask = (self.transform.centers <= (const.info["f"].magic - inner_width/2)) | (self.transform.centers >= (const.info["f"].magic + inner_width/2))
+    self.inner_width = inner_width
+
     self.x = self.transform.centers[self.mask]
     self.y = self.transform.heights[self.mask]
 

@@ -18,7 +18,8 @@ class Optimizer:
     model,
     width = 0.001,
     steps = 10,
-    seed = None
+    seed = None,
+    inner_width = None
   ):
 
     self.transform = transform
@@ -28,6 +29,7 @@ class Optimizer:
     self.steps = steps
     self.width = width
     self.times = None
+    self.inner_width = inner_width
 
     self.fits = None
     self.chi2_ndf = None
@@ -76,7 +78,7 @@ class Optimizer:
 
     for i in range(len(self.times)):
       tempTransform = self.transform.get_cosine_at_t0(self.times[i])
-      self.fits[i] = BackgroundFit(tempTransform, t0 = self.times[i], start = self.transform.start, model = self.model)
+      self.fits[i] = BackgroundFit(tempTransform, t0 = self.times[i], start = self.transform.start, model = self.model, inner_width = self.inner_width)
       self.fits[i].fit()
 
     # Extract an array of the reduced chi-squareds from the fits.
