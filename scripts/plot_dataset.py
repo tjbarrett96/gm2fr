@@ -61,10 +61,6 @@ def plot_dataset(dataset, subset, variable, plot_lines = False):
     results = np.load(f"{io.results_path}/{dataset}/By{subset.capitalize()}/{dataset}_{subset}_results.npy", allow_pickle = True)
     nominal_results = np.load(f"{io.results_path}/{dataset}/Nominal/results.npy", allow_pickle = True)
 
-    if "wg_N" in results.dtype.names and len(results) > 1:
-      mask = (results["wg_N"] > 10_000) & (results["c_e"] < 1000)
-      x_data, y_data, errors = x_data[mask], y_data[mask], errors[mask]
-
     mask = (results["wg_N"] > 10_000) & (results["c_e"] < 1000)
     results = results[mask, :]
 
