@@ -211,7 +211,8 @@ class Analyzer:
       "err_t0": err_t0,
       "bg_model": bg_model,
       "fr_method": self.fr_method,
-      "dt": np.mean(self.fr_signal.width)
+      "dt": np.mean(self.fr_signal.width),
+      "n": self.n
     })
 
     # Convert final transform to other units.

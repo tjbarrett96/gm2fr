@@ -76,7 +76,7 @@ def plot_dataset(dataset, subset, variable, plot_lines = False):
       style.draw_horizontal(nominal_value, c = "k", label = "Nominal")
 
     if subset != "threshold":
-      weights = np.where(results["wg_N"] > 5000, results["wg_N"], 0)
+      weights = np.where((results["wg_N"] > 10_000) & (results["c_e"] < 1000), results["wg_N"], 0)
       if subset == "energy":
         weights = np.where(results["index"] > 1700, results["wg_N"] * results["wg_A"], 0)
       avg = np.average(results[variable], weights = weights)
