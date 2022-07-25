@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.linalg as lg
+import matplotlib.pyplot as plt
 
 import gm2fr.src.constants as const
 import gm2fr.src.calculations as calc
@@ -11,7 +12,7 @@ class Transform:
 
   # ================================================================================================
 
-  def __init__(self, signal, start = 4, end = 250, df = 2, width = 150):
+  def __init__(self, signal, start = 4, end = 250, df = 2, width = 150, harmonic = 1):
 
     self.full_signal = signal
     self.signal = signal.copy().mask((start, end))
@@ -27,6 +28,8 @@ class Transform:
     self.cross_cov = None
     self.magnitude = None
     self.omega = 2 * np.pi * self.raw_cosine.centers
+    self.harmonic = harmonic
+    self.scaled_omega = self.harmonic * self.omega
 
     self.t0 = None
     self.err_t0 = None
@@ -43,17 +46,18 @@ class Transform:
     time, signal, errors = self.signal.centers, self.signal.heights, self.signal.errors
 
     # Compute the cosine transform, and subtract the s(f) wiggle function.
-    cosTransform = calc.np_transform(np.cos, self.raw_cosine.centers, signal, time)
-    cosTransform -= self.scale * calc.s(self.raw_cosine.centers, self.start, self.end)
+    cosTransform = calc.np_transform(np.cos, self.harmonic * self.raw_cosine.centers, signal, time)
+    cos_wiggle = self.scale * calc.s(self.harmonic * self.raw_cosine.centers, self.start, self.end)
+    cosTransform -= cos_wiggle
     self.raw_cosine.set_heights(cosTransform)
 
     # Compute the sine transform, and subtract the c(f) wiggle function.
-    sinTransform = calc.np_transform(np.sin, self.raw_sine.centers, signal, time)
-    sinTransform += self.scale * calc.c(self.raw_sine.centers, self.start, self.end)
+    sinTransform = calc.np_transform(np.sin, self.harmonic * self.raw_sine.centers, signal, time)
+    sinTransform += self.scale * calc.c(self.harmonic * self.raw_sine.centers, self.start, self.end)
     self.raw_sine.set_heights(sinTransform)
 
     # Compute the covariance matrix for both transforms.
-    fDiff = self.raw_cosine.centers - self.raw_cosine.centers[0]
+    fDiff = self.harmonic * (self.raw_cosine.centers - self.raw_cosine.centers[0])
     cov = 0.5 * lg.toeplitz(calc.np_transform(np.cos, fDiff, errors**2, time))
     self.raw_cosine.set_cov(cov)
     self.raw_sine.set_cov(cov)
@@ -76,8 +80,8 @@ class Transform:
   def get_t0_weights(self, t0, err = 0):
 
     # Compute cos(self.omega * t0) and sin(self.omega * t0).
-    cos_t0 = np.cos(self.omega * t0 * const.kHz_us)
-    sin_t0 = np.sin(self.omega * t0 * const.kHz_us)
+    cos_t0 = np.cos(self.scaled_omega * t0 * const.kHz_us)
+    sin_t0 = np.sin(self.scaled_omega * t0 * const.kHz_us)
 
     # Create histograms for the cosine and sine weight factors.
     cos_weight = self.raw_cosine.copy().clear().set_heights(cos_t0)
@@ -85,8 +89,8 @@ class Transform:
 
     # If a t0 uncertainty is provided, set the weight factors' covariance matrices.
     if err > 0:
-      cos_weight.set_cov(np.outer(self.omega * sin_t0, self.omega * sin_t0) * (err * const.kHz_us)**2)
-      sin_weight.set_cov(np.outer(self.omega * cos_t0, self.omega * cos_t0) * (err * const.kHz_us)**2)
+      cos_weight.set_cov(np.outer(self.scaled_omega * sin_t0, self.scaled_omega * sin_t0) * (err * const.kHz_us)**2)
+      sin_weight.set_cov(np.outer(self.scaled_omega * cos_t0, self.scaled_omega * cos_t0) * (err * const.kHz_us)**2)
 
     return cos_t0, sin_t0, cos_weight, sin_weight
 
@@ -103,7 +107,7 @@ class Transform:
     # Compute the covariance matrix between the weighted cosine and sine terms.
     weighted_cross_cov = np.outer(cos_weight.heights, sin_weight.heights) * self.cross_cov
     if err > 0:
-      w_cross_cov = -np.outer(self.omega * sin_t0, self.omega * cos_t0) * (err * const.kHz_us)**2
+      w_cross_cov = -np.outer(self.scaled_omega * sin_t0, self.scaled_omega * cos_t0) * (err * const.kHz_us)**2
       weighted_cross_cov += np.outer(self.raw_cosine.heights, self.raw_sine.heights) * w_cross_cov
 
     return weighted_cos.add(weighted_sin, cov = weighted_cross_cov)
@@ -121,7 +125,7 @@ class Transform:
     # Compute the covariance matrix between the weighted cosine and sine terms.
     weighted_cross_cov = np.outer(sin_weight.heights, cos_weight.heights) * self.cross_cov
     if err > 0:
-      w_cross_cov = -np.outer(self.omega * cos_t0, self.omega * sin_t0) * (err * const.kHz_us)**2
+      w_cross_cov = -np.outer(self.scaled_omega * cos_t0, self.scaled_omega * sin_t0) * (err * const.kHz_us)**2
       weighted_cross_cov += np.outer(self.raw_cosine.heights, self.raw_sine.heights) * w_cross_cov
 
     return weighted_sin.subtract(weighted_cos, cov = weighted_cross_cov)

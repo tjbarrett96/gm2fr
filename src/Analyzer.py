@@ -139,6 +139,7 @@ class Analyzer:
     fr_method = None,
     bg_model = "sinc", # Background fit model: "constant" / "parabola" / "sinc" / "error".
     df = 2, # Frequency interval (in kHz) for the cosine transform.
+    harmonic = 1,
     inner_width = None,
     freq_width = 150,
     coarse_t0_width = 20, # full range (in ns) for the initial coarse t0 scan range.
@@ -160,7 +161,7 @@ class Analyzer:
       self.fr_signal.rebin(rebin, discard = True)
 
     # Compute the Fourier transform of the fast rotation signal, masked between the requested times.
-    self.transform = Transform(self.fr_signal, start, end, df, freq_width)
+    self.transform = Transform(self.fr_signal, start, end, df, freq_width, harmonic)
 
     # Determine whether or not to optimize t0. If t0 value supplied, then use it; otherwise, optimize.
     optimize_t0 = (t0 is None)
@@ -205,6 +206,7 @@ class Analyzer:
       "df": df,
       "freq_width": freq_width,
       "inner_width": inner_width,
+      "harmonic": harmonic,
       "t0": t0,
       "err_t0": err_t0,
       "bg_model": bg_model,
@@ -380,6 +382,9 @@ class Analyzer:
       # Plot the final background fit.
       if self.bg_fit is not None:
         self.bg_fit.plot(f"{self.output_path}/{self.output_prefix}BackgroundFit.pdf")
+
+      if level > 1 and self.coarse_t0_optimizer is not None:
+        self.coarse_t0_optimizer.plot_fits(f"{self.output_path}/{self.output_prefix}CoarseOptimizerFits.pdf")
 
   # ================================================================================================
 

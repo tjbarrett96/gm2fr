@@ -26,7 +26,7 @@ class Optimizer:
     self.model = model
 
     self.seed = seed if seed is not None else self.get_seed()
-    self.steps = steps
+    self.steps = int(steps)
     self.width = width
     self.times = None
     self.inner_width = inner_width
