@@ -93,19 +93,14 @@ def plot_fft(t, y, output = None):
   # Plot the FFT magnitude.
   plt.plot(f, mag)
 
-  # Axis labels.
-  style.xlabel("Frequency (kHz)")
-  style.ylabel("Arbitrary Units")
-
   # Use a logarithmic vertical scale, and set the limits appropriately.
   plt.yscale("log")
   plt.xlim(0, 8000)
   plt.ylim(np.min(mag[(f < 8000)]), None)
 
-  # Save and clear.
-  if output is not None:
-    plt.savefig(output)
-    plt.clf()
+  plt.axvspan(const.info["f"].min, const.info["f"].max, color = "k", alpha = 0.1, label = "Cyclotron Acceptance")
+
+  style.label_and_save("Frequency (kHz)", "Arbitrary Units", output)
 
 # ==================================================================================================
 
