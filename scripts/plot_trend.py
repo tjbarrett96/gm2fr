@@ -21,10 +21,6 @@ def plot_trend(x, y, results, label = None, ls = "-", color = None):
   x_data = results[x] if x in results.dtype.names else x
   y_data = results[y]
 
-  if "wg_N" in results.dtype.names and len(results) > 1:
-    mask = (results["wg_N"] > 10_000) & (results["c_e"] < 1000)
-    x_data, y_data, errors = x_data[mask], y_data[mask], errors[mask]
-
   if y == "t0": # patch the output for t0 being in microseconds
     y_data = y_data * 1E3
     errors = errors * 1E3

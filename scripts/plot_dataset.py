@@ -61,6 +61,13 @@ def plot_dataset(dataset, subset, variable, plot_lines = False):
     results = np.load(f"{io.results_path}/{dataset}/By{subset.capitalize()}/{dataset}_{subset}_results.npy", allow_pickle = True)
     nominal_results = np.load(f"{io.results_path}/{dataset}/Nominal/results.npy", allow_pickle = True)
 
+    if "wg_N" in results.dtype.names and len(results) > 1:
+      mask = (results["wg_N"] > 10_000) & (results["c_e"] < 1000)
+      x_data, y_data, errors = x_data[mask], y_data[mask], errors[mask]
+
+    mask = (results["wg_N"] > 10_000) & (results["c_e"] < 1000)
+    results = results[mask, :]
+
     errorbar = plot_trend(
       x = "index",
       y = variable,
@@ -76,9 +83,12 @@ def plot_dataset(dataset, subset, variable, plot_lines = False):
       style.draw_horizontal(nominal_value, c = "k", label = "Nominal")
 
     if subset != "threshold":
-      weights = np.where((results["wg_N"] > 10_000) & (results["c_e"] < 1000), results["wg_N"], 0)
+
       if subset == "energy":
         weights = np.where(results["index"] > 1700, results["wg_N"] * results["wg_A"], 0)
+      else:
+        weights = results["wg_N"]
+
       avg = np.average(results[variable], weights = weights)
       std = np.sqrt(np.average((results[variable] - avg)**2, weights = weights))
       if variable == "t0":
