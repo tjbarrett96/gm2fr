@@ -25,6 +25,8 @@ def plot_trend(x, y, results, label = None, ls = "-", color = None, skip = 1):
     y_data = y_data * 1E3
     errors = errors * 1E3
 
+  skip = int(skip)
+
   errorbar = style.errorbar(
     x_data[::skip],
     y_data[::skip],
