@@ -8,7 +8,7 @@ import gm2fr.src.constants as const
 
 # ==================================================================================================
 
-def plot_trend(x, y, results, label = None, ls = "-", color = None):
+def plot_trend(x, y, results, label = None, ls = "-", color = None, skip = 1):
 
   if f"err_{y}" in results.dtype.names:
     errors = results[f"err_{y}"]
@@ -26,9 +26,9 @@ def plot_trend(x, y, results, label = None, ls = "-", color = None):
     errors = errors * 1E3
 
   errorbar = style.errorbar(
-    x_data,
-    y_data,
-    errors,
+    x_data[::skip],
+    y_data[::skip],
+    errors[::skip],
     ls = ls,
     label = label,
     color = color

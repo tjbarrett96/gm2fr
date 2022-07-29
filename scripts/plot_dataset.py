@@ -62,7 +62,7 @@ def plot_dataset(dataset, subset, variable, plot_lines = False):
     nominal_results = np.load(f"{io.results_path}/{dataset}/Nominal/results.npy", allow_pickle = True)
 
     mask = (results["wg_N"] > 10_000) & (results["c_e"] < 1000)
-    results = results[mask, :]
+    results = results[:][mask]
 
     errorbar = plot_trend(
       x = "index",

@@ -22,12 +22,13 @@ systematics_folder = {
 limit_range = {
   "start": (4, 30),
   "end": (200, 400),
-  "freq_width": (150, np.inf)
+  "df": (0, 4.5),
+  "freq_width": (150, 450)
 }
 
 # ==================================================================================================
 
-def process_systematic(dataset, systematic, variable, output = None, folder = None):
+def process_systematic(dataset, systematic, variable, output = None, folder = None, skip = 1):
 
   folder = systematics_folder[systematic] if folder is None else folder
 
@@ -36,7 +37,8 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
     systematic,
     variable,
     data_results,
-    label = "Data"
+    label = "Data",
+    skip = skip
   )
 
   data_x, data_y, data_err_y = data_results[systematic], data_results[variable], data_results[f"err_{variable}"]
@@ -46,7 +48,8 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
     systematic,
     variable,
     sim_results,
-    label = "Toy MC"
+    label = "Toy MC",
+    skip = skip
   )
 
   sim_x, sim_y, sim_err_y = sim_results[systematic], sim_results[variable], sim_results[f"err_{variable}"]
@@ -92,12 +95,13 @@ if __name__ == "__main__":
   parser.add_argument("--dataset", "-d", required = True)
   parser.add_argument("--systematic", "-s", required = True)
   parser.add_argument("--label", "-l", default = None)
+  parser.add_argument("--skip", default = 1)
   args = parser.parse_args()
 
   pdf = style.make_pdf(f"{io.plot_path}/{args.dataset}/{args.dataset}_{args.systematic}_plots.pdf")
   results = Results({"dataset": args.dataset, "systematic": args.systematic})
   for variable in ("x", "sig_x", "c_e", "t0", "bg_chi2_ndf"):
-    var_results = process_systematic(args.dataset, args.systematic, variable, output = pdf)
+    var_results = process_systematic(args.dataset, args.systematic, variable, output = pdf, skip = args.skip)
     results.merge(var_results)
   pdf.close()
   results.save(f"{io.plot_path}/{args.dataset}", f"{args.dataset}_{args.systematic}_results")
