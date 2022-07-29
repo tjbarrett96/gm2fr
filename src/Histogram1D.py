@@ -325,11 +325,16 @@ class Histogram1D:
     if not error:
       return moment
 
+    if central:
+      central_term = degree * (self.moment(degree - 1, central) if degree > 1 else 0) * self.centers
+    else:
+      central_term = 0
+
     # get covariance of the integrand: scale covariance of heights with moment factor
     if self.cov.ndim == 1:
-      scaled_cov = norm_cov * (moment_factor - moment)**2
+      scaled_cov = norm_cov * (moment_factor - central_term - moment)**2
     else:
-      scaled_cov = norm_cov * np.outer(moment_factor - moment, moment_factor - moment)
+      scaled_cov = norm_cov * np.outer(moment_factor - central_term - moment, moment_factor - central_term - moment)
 
     # integrate (x - <x>)^n * rho(x)
     return calc.area(self.centers, moment_factor * norm_heights, cov = scaled_cov)
