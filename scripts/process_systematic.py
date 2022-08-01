@@ -93,7 +93,7 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
     if io.is_numeric_pair(limit_range[systematic]):
       range_mask = (data_x >= limit_range[systematic][0]) & (data_x <= limit_range[systematic][1])
     else:
-      range_mask = (data_x in limit_range[systematic])
+      range_mask = np.isin(data_x, limit_range[systematic])
     data_x, data_y, data_err_y = data_x[range_mask], data_y[range_mask], data_err_y[range_mask]
     if sim_present:
       sim_x, sim_y, sim_err_y = sim_x[range_mask], sim_y[range_mask], sim_err_y[range_mask]
