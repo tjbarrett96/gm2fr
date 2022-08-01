@@ -114,10 +114,10 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
   return Results({
     f"mean_{variable}": np.mean(data_y),
     f"std_{variable}": np.std(data_y),
-    f"range_{variable}": np.max(data_y) - np.min(data_y),
+    f"range_{variable}": (np.max(data_y) - np.min(data_y)) / 2,
     f"diff_mean_{variable}": np.mean(data_y - sim_y),
     f"diff_std_{variable}": np.std(data_y - sim_y),
-    f"diff_range_{variable}": np.max(data_y - sim_y) - np.min(data_y - sim_y)
+    f"diff_range_{variable}": (np.max(data_y - sim_y) - np.min(data_y - sim_y)) / 2
   })
 
 # ==================================================================================================
