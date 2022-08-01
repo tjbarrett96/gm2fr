@@ -84,6 +84,11 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
       skip = skip
     )
 
+    # plot the MC truth line
+    sim_nominal_results = np.load(f"{io.results_path}/{dataset}/Simulation/results.npy", allow_pickle = True)
+    if f"ref_{variable}" in sim_nominal_results.dtype.names:
+      style.draw_horizontal(sim_nominal_results[f"ref_{variable}"][0], label = "Toy MC Truth")
+
     sim_present = True
 
   except:
