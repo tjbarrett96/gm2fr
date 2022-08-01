@@ -29,7 +29,7 @@ limit_range = {
   "start": (4, 30),
   "end": (200, 400),
   "df": (0, 4.5),
-  "freq_width": (150, 450)
+  "freq_width": (150, 400)
 }
 
 # ==================================================================================================
@@ -41,11 +41,12 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
 
   # read the systematic scan results for data from the results folder
   data_results = np.load(f"{io.results_path}/{dataset}/{folder}/results.npy", allow_pickle = True)
-  data_x, data_y, data_err_y = data_results[systematic], data_results[variable], data_results[f"err_{variable}"]
 
   # remove misbehaved data points based on wildly unlikely C_E
   data_mask = (data_results["c_e"] > 0) & (data_results["c_e"] < 1000)
-  data_x, data_y, data_err_y = data_x[data_mask], data_y[data_mask], data_err_y[data_mask]
+  data_results = data_results.loc[data_mask, :]
+
+  data_x, data_y, data_err_y = data_results[systematic], data_results[variable], data_results[f"err_{variable}"]
 
   # plot the data trend
   data_errorbar = plot_trend(
@@ -58,11 +59,12 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
 
   # read the systematic scan results for toy MC from the results folder
   sim_results = np.load(f"{io.results_path}/{dataset}/{folder}/sim_results.npy", allow_pickle = True)
-  sim_x, sim_y, sim_err_y = sim_results[systematic], sim_results[variable], sim_results[f"err_{variable}"]
 
   # remove misbehaved data points based on wildly unlikely C_E
   sim_mask = (sim_results["c_e"] > 0) & (sim_results["c_e"] < 1000)
-  sim_x, sim_y, sim_err_y = sim_x[sim_mask], sim_y[sim_mask], sim_err_y[sim_mask]
+  sim_results = sim_results.loc[sim_mask, :]
+
+  sim_x, sim_y, sim_err_y = sim_results[systematic], sim_results[variable], sim_results[f"err_{variable}"]
 
   # plot the MC trend
   sim_errorbar = plot_trend(
