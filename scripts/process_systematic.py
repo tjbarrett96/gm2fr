@@ -48,9 +48,6 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
   data_results = data_results[data_mask]
 
   data_x, data_y, data_err_y = data_results[systematic], data_results[variable], data_results[f"err_{variable}"]
-  if variable == "t0":
-    data_y *= 1E3
-    data_err_y *= 1E3
 
   # plot the data trend
   data_errorbar = plot_trend(
@@ -71,9 +68,6 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
     sim_results = sim_results[sim_mask]
 
     sim_x, sim_y, sim_err_y = sim_results[systematic], sim_results[variable], sim_results[f"err_{variable}"]
-    if variable == "t0":
-      sim_y *= 1E3
-      sim_err_y *= 1E3
 
     # plot the MC trend
     sim_errorbar = plot_trend(
@@ -125,6 +119,13 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
     )
   else:
     plot_modes = ((data_y, data_err_y, "normal"),)
+
+  if variable == "t0":
+    data_y *= 1E3
+    data_err_y *= 1E3
+    if sim_present:
+      sim_y *= 1E3
+      sim_err_y *= 1E3
 
   results_dict = {}
 
