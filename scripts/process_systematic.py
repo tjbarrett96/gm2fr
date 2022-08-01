@@ -29,7 +29,8 @@ limit_range = {
   "start": (4, 30),
   "end": (200, 400),
   "df": (0, 4.5),
-  "freq_width": (150, 400)
+  "freq_width": (150, 400),
+  "fr_method": ("nine", "ratio")
 }
 
 # ==================================================================================================
@@ -47,6 +48,9 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
   data_results = data_results[data_mask]
 
   data_x, data_y, data_err_y = data_results[systematic], data_results[variable], data_results[f"err_{variable}"]
+  if variable == "t0":
+    data_y *= 1E3
+    data_err_y *= 1E3
 
   # plot the data trend
   data_errorbar = plot_trend(
@@ -67,6 +71,9 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
     sim_results = sim_results[sim_mask]
 
     sim_x, sim_y, sim_err_y = sim_results[systematic], sim_results[variable], sim_results[f"err_{variable}"]
+    if variable == "t0":
+      sim_y *= 1E3
+      sim_err_y *= 1E3
 
     # plot the MC trend
     sim_errorbar = plot_trend(
@@ -84,7 +91,10 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
 
   # mask the trends within the appropriate range for this parameter, before computing std. dev.
   if systematic in limit_range:
-    range_mask = (data_x >= limit_range[systematic][0]) & (data_x <= limit_range[systematic][1])
+    if io.is_numeric_pair(limit_range[systematic]):
+      range_mask = (data_x >= limit_range[systematic][0]) & (data_x <= limit_range[systematic][1])
+    else:
+      range_mask = (data_x in limit_range[systematic])
     data_x, data_y, data_err_y = data_x[range_mask], data_y[range_mask], data_err_y[range_mask]
     if sim_present:
       sim_x, sim_y, sim_err_y = sim_x[range_mask], sim_y[range_mask], sim_err_y[range_mask]
@@ -133,8 +143,6 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
 
     # apply labels, legend, and save to output
     style.label_and_save(x_label, f"{y_label} Difference from Toy MC" if mode == "diff" else y_label, output)
-
-  results_dict =
 
   # assemble results object
   return Results(results_dict)

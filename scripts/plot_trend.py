@@ -12,11 +12,10 @@ def plot_trend(x, y, results, label = None, ls = "-", color = None, skip = 1):
 
   if f"err_{y}" in results.dtype.names:
     errors = results[f"err_{y}"]
+    median_err = np.median(errors)
+    errors[errors > 10*median_err] = 0
   else:
     errors = None
-
-  median_err = np.median(errors)
-  errors[errors > 10*median_err] = 0
 
   x_data = results[x] if x in results.dtype.names else x
   y_data = results[y]

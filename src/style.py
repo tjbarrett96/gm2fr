@@ -84,10 +84,11 @@ def ylabel(label):
 
 # ==================================================================================================
 
-def twinx(right = 0.875):
+def twinx(right = None):
   plt.twinx()
   plt.grid(False)
-  plt.subplots_adjust(right = right)
+  if right is not None:
+    plt.subplots_adjust(right = right)
 
 # ==================================================================================================
 
