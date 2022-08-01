@@ -44,7 +44,7 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
 
   # remove misbehaved data points based on wildly unlikely C_E
   data_mask = (data_results["c_e"] > 0) & (data_results["c_e"] < 1000)
-  data_results = data_results.loc[data_mask, :]
+  data_results = data_results[data_mask]
 
   data_x, data_y, data_err_y = data_results[systematic], data_results[variable], data_results[f"err_{variable}"]
 
@@ -62,7 +62,7 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
 
   # remove misbehaved data points based on wildly unlikely C_E
   sim_mask = (sim_results["c_e"] > 0) & (sim_results["c_e"] < 1000)
-  sim_results = sim_results.loc[sim_mask, :]
+  sim_results = sim_results[sim_mask]
 
   sim_x, sim_y, sim_err_y = sim_results[systematic], sim_results[variable], sim_results[f"err_{variable}"]
 
