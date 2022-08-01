@@ -57,29 +57,37 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
     skip = skip
   )
 
-  # read the systematic scan results for toy MC from the results folder
-  sim_results = np.load(f"{io.results_path}/{dataset}/{folder}/sim_results.npy", allow_pickle = True)
+  try:
 
-  # remove misbehaved data points based on wildly unlikely C_E
-  sim_mask = (sim_results["c_e"] > 0) & (sim_results["c_e"] < 1000)
-  sim_results = sim_results[sim_mask]
+    # read the systematic scan results for toy MC from the results folder
+    sim_results = np.load(f"{io.results_path}/{dataset}/{folder}/sim_results.npy", allow_pickle = True)
 
-  sim_x, sim_y, sim_err_y = sim_results[systematic], sim_results[variable], sim_results[f"err_{variable}"]
+    # remove misbehaved data points based on wildly unlikely C_E
+    sim_mask = (sim_results["c_e"] > 0) & (sim_results["c_e"] < 1000)
+    sim_results = sim_results[sim_mask]
 
-  # plot the MC trend
-  sim_errorbar = plot_trend(
-    systematic,
-    variable,
-    sim_results,
-    label = "Toy MC",
-    skip = skip
-  )
+    sim_x, sim_y, sim_err_y = sim_results[systematic], sim_results[variable], sim_results[f"err_{variable}"]
+
+    # plot the MC trend
+    sim_errorbar = plot_trend(
+      systematic,
+      variable,
+      sim_results,
+      label = "Toy MC",
+      skip = skip
+    )
+
+    sim_present = True
+
+  except:
+    sim_present = False
 
   # mask the trends within the appropriate range for this parameter, before computing std. dev.
   if systematic in limit_range:
     range_mask = (data_x >= limit_range[systematic][0]) & (data_x <= limit_range[systematic][1])
     data_x, data_y, data_err_y = data_x[range_mask], data_y[range_mask], data_err_y[range_mask]
-    sim_x, sim_y, sim_err_y = sim_x[range_mask], sim_y[range_mask], sim_err_y[range_mask]
+    if sim_present:
+      sim_x, sim_y, sim_err_y = sim_x[range_mask], sim_y[range_mask], sim_err_y[range_mask]
 
   # get the default output name, if path or PDF not specified
   if output is None:
@@ -95,12 +103,28 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
   # apply labels, legend, and save to output
   style.label_and_save(x_label, y_label, output)
 
+  if sim_present:
+    plot_modes = (
+      (data_y, data_err_y, "normal"),
+      (data_y - sim_y, np.sqrt(data_err_y**2 + sim_err_y**2), "diff")
+    )
+  else:
+    plot_modes = ((data_y, data_err_y, "normal"),)
+
+  results_dict = {}
+
   # iterate over two modes to plot: difference between data and simulation ("diff"), and raw data trend alone ("normal")
-  for syst_y, syst_err_y, mode in ((data_y - sim_y, np.sqrt(data_err_y**2 + sim_err_y**2), "diff"), (data_y, data_err_y, "normal")):
+  for syst_y, syst_err_y, mode in plot_modes:
 
     # get the mean and standard deviation of the trend
     syst_mean = np.mean(syst_y)
     syst_std = np.std(syst_y)
+    syst_range = (np.max(syst_y) - np.min(syst_y)) / 2
+
+    prefix = "diff_" if mode == "diff" else ""
+    results_dict[f"{prefix}mean_{variable}"] = syst_mean
+    results_dict[f"{prefix}std_{variable}"] = syst_std
+    results_dict[f"{prefix}range_{variable}"] = syst_range
 
     # plot the trend, std. dev. band, and mean line
     style.errorbar(data_x, syst_y, syst_err_y)
@@ -110,15 +134,10 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
     # apply labels, legend, and save to output
     style.label_and_save(x_label, f"{y_label} Difference from Toy MC" if mode == "diff" else y_label, output)
 
+  results_dict =
+
   # assemble results object
-  return Results({
-    f"mean_{variable}": np.mean(data_y),
-    f"std_{variable}": np.std(data_y),
-    f"range_{variable}": (np.max(data_y) - np.min(data_y)) / 2,
-    f"diff_mean_{variable}": np.mean(data_y - sim_y),
-    f"diff_std_{variable}": np.std(data_y - sim_y),
-    f"diff_range_{variable}": (np.max(data_y - sim_y) - np.min(data_y - sim_y)) / 2
-  })
+  return Results(results_dict)
 
 # ==================================================================================================
 
