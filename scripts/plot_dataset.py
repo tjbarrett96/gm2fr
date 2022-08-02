@@ -125,21 +125,25 @@ def plot_transforms(dataset, subset):
   results = np.load(f"{io.results_path}/{dataset}/By{subset.capitalize()}/{dataset}_{subset}_results.npy", allow_pickle = True)
   transforms = np.load(f"{io.results_path}/{dataset}/By{subset.capitalize()}/{dataset}_{subset}_transforms.npz", allow_pickle = True)
 
+  style.draw_horizontal(0)
+  style.draw_vertical(0)
+
   if subset != "dataset":
     cmap = mpl.cm.get_cmap("coolwarm")
     norm = mpl.colors.Normalize(vmin = np.min(results["index"]), vmax = np.max(results["index"]))
   else:
     cmap = mpl.cm.get_cmap("coolwarm", len(results["index"]))
-    norm = mpl.colors.BoundaryNorm(np.linspace(-0.5, len(results["index"]) + 0.5, len(results["index"]) + 1), len(results["index"]))
+    norm = mpl.colors.BoundaryNorm(np.arange(-0.5, len(results["index"])), len(results["index"]))
   sm = mpl.cm.ScalarMappable(cmap = cmap, norm = norm)
 
-  for index in results["index"]:
+  for i, index in enumerate(results["index"]):
     histogram = Histogram1D(transforms[f"{index}/edges"], heights = transforms[f"{index}/heights"], cov = transforms[f"{index}/cov"])
-    histogram.plot(color = cmap(index))
+    histogram.normalize().plot(errors = False, color = cmap(norm(index)) if subset != "dataset" else cmap(i))
 
   colorbar = style.colorbar(label = subset_labels[subset], mappable = sm)
   if subset == "dataset":
-    colorbar.ax.set_yticks(np.arange(len(results["index"]) + 1), results["index"])
+    colorbar.set_ticks(np.arange(len(results["index"]) + 1))
+    colorbar.set_ticklabels(results["index"])
 
 # ==================================================================================================
 
@@ -168,8 +172,13 @@ if __name__ == "__main__":
   io.make_if_absent(f"{io.plot_path}/{label}")
 
   for subset in args.subsets:
+
+    # create output PDF file
     pdf = style.make_pdf(f"{io.plot_path}/{label}/{label}_{subset}_plots.pdf")
+
+    # initialize Results object for avg & std. dev. across subset (only used for single datasets)
     subset_results = Results({"dataset": datasets[0], "subset": subset})
+
     for variable in args.variables:
       for dataset in datasets:
         results = plot_dataset(dataset, subset, variable, plot_lines = (len(datasets) == 1))
@@ -182,9 +191,13 @@ if __name__ == "__main__":
         extend_x = 0.1 if subset != "nominal" and len(datasets) > 1 else 0,
         loc = "center right" if subset != "nominal" and len(datasets) > 1 else None
       )
-      if len(datasets) == 1:
-        plot_transforms(datasets[0], subset)
-        style.label_and_save(const.info["x"].format_label(), "Arbitrary Units", pdf)
+
+    # plot overlaid transforms across subset (only used for single datasets)
+    if len(datasets) == 1:
+      plot_transforms(datasets[0], subset)
+      style.label_and_save(const.info["x"].format_label(), "Arbitrary Units", pdf)
+
     pdf.close()
+    
     if not subset_results.table.empty:
       subset_results.save(f"{io.plot_path}/{label}", f"{label}_{subset}_results")
