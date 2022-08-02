@@ -97,10 +97,7 @@ def plot_dataset(dataset, subset, variable, plot_lines = False):
         avg_modes["T"] = np.where(results["index"] >= 1700, results["wg_N"] * results["wg_A"], 0)
         avg_modes["A"] = np.where(results["index"] >= 1000, results["wg_N"] * results["wg_A"]**2, 0)
 
-    results_dict = {
-      "dataset": dataset,
-      "subset": subset
-    }
+    results_dict = {}
 
     for mode, weights in avg_modes.items():
 
@@ -172,12 +169,12 @@ if __name__ == "__main__":
 
   for subset in args.subsets:
     pdf = style.make_pdf(f"{io.plot_path}/{label}/{label}_{subset}_plots.pdf")
-    subset_results = Results()
+    subset_results = Results({"dataset": datasets[0], "subset": subset})
     for variable in args.variables:
       for dataset in datasets:
         results = plot_dataset(dataset, subset, variable, plot_lines = (len(datasets) == 1))
         if len(datasets) == 1:
-          subset_results.table = subset_results.table.merge(results.table, how = "left", on = ["dataset", "subset"])
+          subset_results.merge(results)
       style.label_and_save(
         subset_labels[subset],
         const.info[variable].format_symbol(),
