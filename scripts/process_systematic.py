@@ -20,7 +20,7 @@ systematics_folder = {
   "inner_width": "InnerWidthScan",
   "fr_method": "FRMethodScan",
   "bg_model": "BGModelScan",
-  "fr_rebin": "FRRebinScan"
+  "dt": "FRRebinScan"
 }
 
 # allowed ranges for parameters when computing std. dev. of systematic scan results
