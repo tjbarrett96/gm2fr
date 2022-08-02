@@ -73,7 +73,7 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   if args.indices == "parent":
-    indices = [os.path.basename(os.path.dirname(os.path.dirname(result))) for result in args.results]
+    indices = [os.path.basename(os.path.dirname(result)) for result in args.results]
   else:
     indices = args.indices
 
