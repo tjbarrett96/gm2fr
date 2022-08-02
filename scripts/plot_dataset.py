@@ -112,7 +112,7 @@ def plot_dataset(dataset, subset, variable, plot_lines = False):
       results_dict[f"{prefix}std_{variable}"] = std
       results_dict[f"{prefix}diff_{variable}"] = avg - nominal_value
 
-      if plot_lines and ((mode == "normal" and variable != "c_e") or mode == "A"):
+      if plot_lines and (subset != "energy" or variable != "c_e" or mode == "A"):
         style.draw_horizontal(avg, ls = "--", c = "k", label = "Average")
         style.horizontal_spread(std, avg, color = "k", label = "Spread")
 
@@ -137,7 +137,7 @@ if __name__ == "__main__":
   parser.add_argument("--datasets", "-d", nargs = "+", required = True)
   parser.add_argument("--subsets", "-s", nargs = "+", default = list(subset_labels.keys()))
   parser.add_argument("--label", "-l", default = None)
-  parser.add_argument("--variables", "-v", nargs = "*", default = ["x", "sig_x", "c_e", "t0"])#, "bg_chi2_ndf"])
+  parser.add_argument("--variables", "-v", nargs = "*", default = ["x", "sig_x", "c_e", "t0", "bg_chi2_ndf"])
   args = parser.parse_args()
 
   datasets = parse_dataset_arg(args.datasets)
