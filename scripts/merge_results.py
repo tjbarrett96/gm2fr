@@ -31,13 +31,13 @@ def merge_results(results, output_dir = None, output_name = None, indices = None
     if os.path.isfile(result):
       merged_results.append(Results.load(result))
 
-    if transforms:
-      parent_dir = os.path.dirname(result)
-      transform_file = f"{parent_dir}/transform.npz"
-      if os.path.isfile(transform_file):
-        transform_data = np.load(transform_file, allow_pickle = True)
-        for element in ("edges", "heights", "cov"):
-          merged_transforms[f"{unique_indices[i]}/{element}"] = transform_data[f"transform_x/{element}"]
+      if transforms:
+        parent_dir = os.path.dirname(result)
+        transform_file = f"{parent_dir}/transform.npz"
+        if os.path.isfile(transform_file):
+          transform_data = np.load(transform_file, allow_pickle = True)
+          for element in ("edges", "heights", "cov"):
+            merged_transforms[f"{unique_indices[i]}/{element}"] = transform_data[f"transform_x/{element}"]
 
     else:
       del indices[i]

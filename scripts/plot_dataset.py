@@ -125,6 +125,9 @@ def plot_transforms(dataset, subset):
   results = np.load(f"{io.results_path}/{dataset}/By{subset.capitalize()}/{dataset}_{subset}_results.npy", allow_pickle = True)
   transforms = np.load(f"{io.results_path}/{dataset}/By{subset.capitalize()}/{dataset}_{subset}_transforms.npz", allow_pickle = True)
 
+  mask = (results["wg_N"] > 10_000) & (results["c_e"] < 1000)
+  results = results[mask]
+
   style.draw_horizontal(0)
   style.draw_vertical(0)
 
@@ -138,7 +141,10 @@ def plot_transforms(dataset, subset):
 
   for i, index in enumerate(results["index"]):
     histogram = Histogram1D(transforms[f"{index}/edges"], heights = transforms[f"{index}/heights"], cov = transforms[f"{index}/cov"])
-    histogram.normalize().plot(errors = False, color = cmap(norm(index)) if subset != "dataset" else cmap(i))
+    histogram.normalize().plot(
+      errors = False,
+      color = cmap(norm(index)) if subset != "dataset" else cmap(i)
+    )
 
   colorbar = style.colorbar(label = subset_labels[subset], mappable = sm)
   if subset == "dataset":
@@ -198,6 +204,6 @@ if __name__ == "__main__":
       style.label_and_save(const.info["x"].format_label(), "Arbitrary Units", pdf)
 
     pdf.close()
-    
+
     if not subset_results.table.empty:
       subset_results.save(f"{io.plot_path}/{label}", f"{label}_{subset}_results")
