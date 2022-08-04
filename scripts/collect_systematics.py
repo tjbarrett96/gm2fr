@@ -16,7 +16,7 @@ diff_mode = [
 
 variables = [
   "x",
-  "std_x",
+  "sig_x",
   "c_e",
   "t0"
 ]
@@ -44,4 +44,4 @@ def collect_systematics():
 # ==================================================================================================
 
 if __name__ == "__main__":
-  collect_systematics(dataset)
+  collect_systematics()
