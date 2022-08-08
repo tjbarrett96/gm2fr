@@ -212,7 +212,8 @@ class Analyzer:
       "bg_model": bg_model,
       "fr_method": self.fr_method,
       "dt": np.mean(self.fr_signal.width),
-      "n": self.n
+      "n_used": self.n,
+      "n_data": None if self.wiggle_fit is None else 1 - (1 - 1E3 * self.wiggle_fit.model.p_opt[7] / const.info["f"].magic)**2
     })
 
     # Convert final transform to other units.

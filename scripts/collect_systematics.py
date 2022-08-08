@@ -6,7 +6,10 @@ systematics = [
   "start",
   "end",
   "df",
-  "freq_width"
+  "freq_width",
+  "inner_width",
+  "bg_model",
+  "fr_method"
 ]
 
 diff_mode = [
