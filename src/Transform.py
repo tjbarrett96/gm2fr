@@ -12,7 +12,7 @@ class Transform:
 
   # ================================================================================================
 
-  def __init__(self, signal, start = 4, end = 250, df = 2, width = 150, harmonic = 1):
+  def __init__(self, signal, start = 4, end = 250, df = 2, width = 75, harmonic = 1):
 
     self.full_signal = signal
     self.signal = signal.copy().mask((start, end))
@@ -22,7 +22,7 @@ class Transform:
     self.scale = 1 / (np.mean(self.signal.width) * const.kHz_us)
     self.fft_resolution = self.scale / len(self.signal.heights)
 
-    f = np.arange(const.info["f"].magic - width / 2, const.info["f"].magic + width / 2 + df, df)
+    f = np.arange(const.info["f"].magic - width, const.info["f"].magic + width + df, df)
     self.raw_cosine = Histogram1D(f)
     self.raw_sine = Histogram1D(f)
     self.cross_cov = None
@@ -67,9 +67,9 @@ class Transform:
     self.cross_cov = -0.5 * lg.toeplitz(column, -column)
 
     # Scale down the transform by the discrete scale factor.
-    self.raw_cosine = self.raw_cosine.divide(self.scale)
-    self.raw_sine = self.raw_sine.divide(self.scale)
-    self.cross_cov /= self.scale**2
+    self.raw_cosine = self.raw_cosine.multiply(self.harmonic / self.scale)
+    self.raw_sine = self.raw_sine.multiply(self.harmonic / self.scale)
+    self.cross_cov *= (self.harmonic / self.scale)**2
 
     # Compute the Fourier transform magnitude (i.e. square root of the sum in quadrature).
     square_cross_cov = 4 * np.outer(self.raw_cosine.heights, self.raw_sine.heights) * self.cross_cov

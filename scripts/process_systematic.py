@@ -16,8 +16,8 @@ systematics_folder = {
   "start": "StartTimeScan",
   "end": "EndTimeScan",
   "df": "FrequencySpacingScan",
-  "freq_width": "FrequencyWidthScan",
-  "inner_width": "InnerWidthScan",
+  "bg_width": "BackgroundWidthScan",
+  "bg_space": "BackgroundSpaceScan",
   "fr_method": "FRMethodScan",
   "bg_model": "BGModelScan",
   "dt": "FRRebinScan"
@@ -29,7 +29,7 @@ limit_range = {
   "start": (4, 30),
   "end": (200, 400),
   "df": (0, 4.5),
-  "freq_width": (150, 400),
+  "bg_width": (33, 167),
   "fr_method": ("nine", "ratio")
 }
 
