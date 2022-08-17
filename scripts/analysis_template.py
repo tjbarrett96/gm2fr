@@ -29,6 +29,7 @@ def run_fr_analysis(
   analyzer.analyze(
     start = 0, # in microseconds
     end = 250 # in microseconds
+    # see gm2fr.src.Analyzer for more fine-tuning options
   )
 
 # ==================================================================================================
@@ -37,5 +38,7 @@ def run_fr_analysis(
 if __name__ == "__main__":
 
   # Running a test.
-  fr_signal = Histogram1D.load(f"{io.sim_path}/3N_sim/data.npz", "signal")
-  run_fr_analysis(fr_signal.centers, fr_signal.heights)
+  fr_signal = Histogram1D.load(f"{io.sim_path}/sample/data.npz", "signal")
+  time, signal = fr_signal.centers, fr_signal.heights
+
+  run_fr_analysis(time, signal)
