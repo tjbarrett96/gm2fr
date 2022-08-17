@@ -1,5 +1,9 @@
 import numpy as np
 import pandas as pd
+import gm2fr.src.style as style
+style.set_style()
+import matplotlib.pyplot as plt
+import gm2fr.src.constants as const
 
 # ==============================================================================
 
@@ -84,3 +88,54 @@ class Results:
   @staticmethod
   def load(path):
     return Results(np.load(path, allow_pickle = True))
+
+  # ================================================================================================
+
+  def plot(self, x, y, z = None, label = None, ls = "-", color = None, skip = 1):
+
+    results = self.array()
+    # mask = (results["c_e"] > 0) & (results["c_e"] < 1000) & (results["err_c_e"] < results["c_e"])
+    mask = (~np.isnan(results["sig_x"])) & (results["bg_space"] < 100) & (results["bg_width"] < 100)
+    results = results[mask]
+
+    x_data = results[x]
+    y_data = results[y]
+
+    style.xlabel(const.info[x].format_symbol() if x in const.info else x)
+    style.ylabel(const.info[y].format_symbol() if y in const.info else y)
+
+    if z is None:
+
+      if f"err_{y}" in results.dtype.names:
+        errors = results[f"err_{y}"]
+        errors[errors > 10 * (max(results[y]) - min(results[y]))] = 0
+      else:
+        errors = None
+
+      if y == "t0": # patch the output for t0 being in microseconds
+        y_data = y_data * 1E3
+        errors = errors * 1E3
+
+      skip = int(skip)
+
+      errorbar = style.errorbar(
+        x_data[::skip],
+        y_data[::skip],
+        errors[::skip],
+        ls = ls,
+        label = label,
+        color = color
+      )
+
+      if f"ref_{y}" in results.dtype.names:
+        plt.axhline(results[f"ref_{y}"][0], ls = "--", color = errorbar[0].get_color(), label = "Toy MC Truth")
+
+      return errorbar
+
+    else:
+
+      z_data = results[z]
+      heatmap = plt.tricontourf(x_data, y_data, z_data)
+      style.colorbar(const.info[z].format_symbol() if z in const.info else z)
+
+      return heatmap

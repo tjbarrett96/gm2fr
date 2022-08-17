@@ -5,6 +5,8 @@ style.set_style()
 import sys
 import gm2fr.src.io as io
 import gm2fr.src.constants as const
+import argparse
+from gm2fr.src.Results import Results
 
 # ==================================================================================================
 
@@ -44,19 +46,18 @@ def plot_trend(x, y, results, label = None, ls = "-", color = None, skip = 1):
 
 if __name__ == "__main__":
 
-  if len(sys.argv) < 4:
-    print("Usage: python3 plot_trend.py <var_x> <var_y> [dir_name(s)]")
-    quit()
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--results", "-r", required = True, nargs = "+")
+  parser.add_argument("-x", required = True)
+  parser.add_argument("-y", required = True)
+  parser.add_argument("-z", default = None)
+  args = parser.parse_args()
 
-  x, y = sys.argv[1], sys.argv[2]
-  filenames = sys.argv[3:]
+  if len(args.results) > 1 and args.z is not None:
+    raise ValueError("Cannot make contour plot from multiple results files.")
 
-  for filename in filenames:
-    results = np.load(filename)
-    plot_trend(x, y, results, label = filename)
-
-  style.xlabel(const.info[x].format_label() if x in const.info.keys() else x)
-  style.ylabel(const.info[y].format_label() if y in const.info.keys() else y)
-  plt.legend()
+  for filename in args.results:
+    results = Results.load(filename)
+    results.plot(args.x, args.y, args.z)
 
   plt.show()
