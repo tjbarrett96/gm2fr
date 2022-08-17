@@ -3,6 +3,7 @@ from gm2fr.src.Histogram1D import Histogram1D
 from gm2fr.src.Analyzer import Analyzer
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 # ==================================================================================================
 
@@ -20,17 +21,24 @@ def run_fr_analysis(
   fr_signal = Histogram1D(time_edges, heights = signal, cov = 0.001 * signal)
   # non-zero uncertainties are required, so assign small 'cov' (covariance diagonal sqrts) as toy placeholder
 
+  # convert time units to microseconds
+  fr_signal.map(lambda t: t * time_units / 1E-6)
+
   # Construct an Analyzer object and assign the fast rotation signal we created above.
   # Usually Analyzer's constructor takes filenames to load from disk, so this is a workaround.
-  analyzer = Analyzer(output_label = output_label, time_units = time_units)
+  analyzer = Analyzer(output_label = output_label)
   analyzer.fr_signal = fr_signal
 
   # Run the analysis, supplying optional arguments for various parameter choices.
   analyzer.analyze(
-    start = 0, # in microseconds
+    start = 4, # in microseconds
     end = 250 # in microseconds
     # see gm2fr.src.Analyzer for more fine-tuning options
   )
+
+  # Plot the optimized cosine transform.
+  # analyzer.transform.opt_cosine.plot()
+  # plt.show()
 
 # ==================================================================================================
 
