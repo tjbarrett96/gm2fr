@@ -36,15 +36,15 @@ class Analyzer:
   # Constructor.
   def __init__(
     self,
-    filename, # Filename containing data to analyze.
-    signal_label = None, # Label for signal data inside each file.
-    pileup_label = None, # Label for pileup data inside file.
-    output_label = None, # Output directory name, within gm2fr/results.
-    output_prefix = "",
+    filename = None, # Filename containing the fast rotation histogram to analyze.
+    signal_label = None, # Label for signal histogram inside file.
+    pileup_label = None, # Label for pileup histogram inside file.
+    output_label = None, # Output directory name, to be created within gm2fr/results.
+    output_prefix = "", # Prefix prepended to default output filenames.
     ref_filename = None, # Truth .npz file from gm2fr simulation.
-    ref_t0 = None,
-    n = 0.108,
-    time_units = 1E-6
+    ref_t0 = None, # t0 time for reference signal.
+    n = 0.108, # Expected n-value for CBO frequency fit seed.
+    time_units = 1E-6 # Units of FR signal times relative to seconds.
   ):
 
     self.filename = filename
@@ -65,7 +65,7 @@ class Analyzer:
     self.wiggle_fit = None
     self.fr_signal = None
     self.fr_method = None
-    self.fr_rebin = None
+    self.fr_rebin = 1
 
     self.transform = None
     self.coarse_t0_optimizer = None
@@ -327,8 +327,8 @@ class Analyzer:
 
       pdf.close()
 
-      print(f"Finished plotting distributions in {time.time() - begin_time:.2f} seconds.")
-      begin_time = time.time()
+      # print(f"Finished plotting distributions in {time.time() - begin_time:.2f} seconds.")
+      # begin_time = time.time()
 
       # ~1.3 seconds
       pdf = style.make_pdf(f"{self.output_path}/{self.output_prefix}FastRotation.pdf")
@@ -340,8 +340,8 @@ class Analyzer:
         style.label_and_save(r"Time ($\mu$s)", "Arbitrary Units", pdf)
       pdf.close()
 
-      print(f"Finished plotting FR signal in {time.time() - begin_time:.2f} seconds.")
-      begin_time = time.time()
+      # print(f"Finished plotting FR signal in {time.time() - begin_time:.2f} seconds.")
+      # begin_time = time.time()
 
       if self.wiggle_fit is not None:
         #slowest: ~2 seconds
@@ -351,8 +351,8 @@ class Analyzer:
         #fast: ~0.5 seconds
         calc.plot_fft(self.raw_signal.centers, self.raw_signal.heights, f"{self.output_path}/{self.output_prefix}RawSignalFFT.pdf")
 
-      print(f"Finished plotting wiggle fit in {time.time() - begin_time:.2f} seconds.")
-      begin_time = time.time()
+      # print(f"Finished plotting wiggle fit in {time.time() - begin_time:.2f} seconds.")
+      # begin_time = time.time()
 
       # <1 second
       if self.fine_t0_optimizer is not None:
@@ -361,8 +361,8 @@ class Analyzer:
         self.fine_t0_optimizer.plot_chi2(pdf)
         pdf.close()
 
-      print(f"Finished plotting optimizers in {time.time() - begin_time:.2f} seconds.")
-      begin_time = time.time()
+      # print(f"Finished plotting optimizers in {time.time() - begin_time:.2f} seconds.")
+      # begin_time = time.time()
 
       if self.bg_iterator is not None:
         self.bg_iterator.plot(f"{self.output_path}/{self.output_prefix}Iterations.pdf")
@@ -380,7 +380,7 @@ class Analyzer:
       plt.axvline(const.info["f"].magic, ls = ":", c = "k", label = "Magic")
       style.label_and_save("Frequency (kHz)", "Arbitrary Units", f"{self.output_path}/{self.output_prefix}FourierMagnitude.pdf")
 
-      print(f"Finished plotting FFT magnitude in {time.time() - begin_time:.2f} seconds.")
+      # print(f"Finished plotting FFT magnitude in {time.time() - begin_time:.2f} seconds.")
 
       calc.plot_fft(self.transform.signal.centers, self.transform.signal.heights, f"{self.output_path}/{self.output_prefix}FastRotationFFT.pdf")
 
