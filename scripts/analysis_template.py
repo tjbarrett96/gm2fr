@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 def run_fr_analysis(
   time, # NumPy array of signal times
   signal, # NumPy array of signal heights
+  errors = None, # NumPy array of signal error bars
   output_label = "fr_analysis", # label for output folder containing results
   time_units = 1E-6 # units for signal times relative to seconds
 ):
@@ -18,8 +19,10 @@ def run_fr_analysis(
   # Construct a Histogram1D object from the signal times and heights.
   dt = time[1] - time[0]
   time_edges = np.append(time - dt/2, time[-1] + dt/2)
-  fr_signal = Histogram1D(time_edges, heights = signal, cov = 0.001 * signal)
-  # non-zero uncertainties are required, so assign small 'cov' (covariance diagonal sqrts) as toy placeholder
+  fr_signal = Histogram1D(time_edges, heights = signal, cov = errors**2 if errors is not None else (0.001 * np.abs(signal))**2)
+  fr_signal.plot()
+  plt.show()
+  # non-zero uncertainties are required, so assign small 'cov' (covariance diagonal sqrts) as toy placeholder if no errors provided
 
   # convert time units to microseconds
   fr_signal.map(lambda t: t * time_units / 1E-6)
@@ -46,7 +49,6 @@ def run_fr_analysis(
 if __name__ == "__main__":
 
   # Running a test.
-  fr_signal = Histogram1D.load(f"{io.sim_path}/sample/data.npz", "signal")
-  time, signal = fr_signal.centers, fr_signal.heights
-
-  run_fr_analysis(time, signal)
+  fr_signal = Histogram1D.load(f"{io.sim_path}/sample/simulation.root", "signal")
+  time, signal, errors = fr_signal.centers, fr_signal.heights, fr_signal.errors
+  run_fr_analysis(time, signal, errors)

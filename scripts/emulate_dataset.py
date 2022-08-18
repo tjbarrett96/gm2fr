@@ -20,7 +20,7 @@ def emulate_dataset(dataset, muons):
 
   fr_signal = Histogram1D.load(f"{io.gm2fr_path}/results/{input_dir}/signal.npz")
   frequencies = Histogram1D.load(f"{io.gm2fr_path}/results/{input_dir}/transform.npz", "transform_f")
-  results = np.load(f"{io.gm2fr_path}/results/{input_dir}/results.npy")
+  results = np.load(f"{io.gm2fr_path}/results/{input_dir}/results.npy", allow_pickle = True)
 
   # No negative bin contents allowed for random sampling.
   frequencies.heights = np.where(frequencies.heights > 0, frequencies.heights, 0)
