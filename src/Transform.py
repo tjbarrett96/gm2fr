@@ -19,7 +19,7 @@ class Transform:
 
     self.start = self.signal.centers[0]
     self.end = self.signal.centers[-1]
-    self.scale = 1 / (np.mean(self.signal.width) * const.kHz_us)
+    self.scale = np.mean(self.signal.heights) / (np.mean(self.signal.width) * const.kHz_us)
     self.fft_resolution = self.scale / len(self.signal.heights)
 
     f = np.arange(const.info["f"].magic - width, const.info["f"].magic + width + df, df)
