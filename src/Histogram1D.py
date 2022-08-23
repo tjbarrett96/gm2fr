@@ -306,6 +306,9 @@ class Histogram1D:
     if not io.is_integer(degree) or degree < 1:
       raise ValueError(f"Cannot calculate moment of degree '{degree}'.")
 
+    if central and degree == 1:
+      return (0, 0) if error else 0
+
     # clip any negative heights to zero
     # masked_heights = np.where(self.heights > 0, self.heights, 0)
     masked_heights = self.heights
@@ -325,8 +328,8 @@ class Histogram1D:
     if not error:
       return moment
 
-    if central:
-      central_term = degree * (self.moment(degree - 1, central) if degree > 1 else 0) * self.centers
+    if central and degree > 1:
+      central_term = degree * self.moment(degree - 1, central) * (self.centers - self.mean())
     else:
       central_term = 0
 
@@ -343,7 +346,7 @@ class Histogram1D:
 
   # Calculate the mean.
   def mean(self, error = False):
-    return self.moment(degree = 1, error = error)
+    return self.moment(degree = 1, central = False, error = error)
 
   # ================================================================================================
 
