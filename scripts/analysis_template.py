@@ -1,9 +1,12 @@
 import gm2fr.src.io as io
+import gm2fr.src.constants as const
 from gm2fr.src.Histogram1D import Histogram1D
 from gm2fr.src.Analyzer import Analyzer
 
 import numpy as np
 import matplotlib.pyplot as plt
+import gm2fr.src.style as style
+style.set_style()
 
 # ==================================================================================================
 
@@ -20,8 +23,6 @@ def run_fr_analysis(
   dt = time[1] - time[0]
   time_edges = np.append(time - dt/2, time[-1] + dt/2)
   fr_signal = Histogram1D(time_edges, heights = signal, cov = errors**2 if errors is not None else (0.001 * np.abs(signal))**2)
-  fr_signal.plot()
-  plt.show()
   # non-zero uncertainties are required, so assign small 'cov' (covariance diagonal sqrts) as toy placeholder if no errors provided
 
   # convert time units to microseconds
@@ -39,9 +40,7 @@ def run_fr_analysis(
     # see gm2fr.src.Analyzer for more fine-tuning options
   )
 
-  # Plot the optimized cosine transform.
-  # analyzer.transform.opt_cosine.plot()
-  # plt.show()
+  return analyzer
 
 # ==================================================================================================
 
@@ -51,4 +50,12 @@ if __name__ == "__main__":
   # Running a test.
   fr_signal = Histogram1D.load(f"{io.sim_path}/sample/simulation.root", "signal")
   time, signal, errors = fr_signal.centers, fr_signal.heights, fr_signal.errors
-  run_fr_analysis(time, signal, errors)
+  analyzer = run_fr_analysis(time, signal, errors)
+
+  # Plot the optimized cosine transform.
+  analyzer.converted_transforms["f"].normalize().plot()
+  style.draw_horizontal(0)
+  style.draw_vertical(const.info["f"].magic)
+  style.xlabel("Frequency (kHz)")
+  style.ylabel("Arbitrary Units")
+  plt.show()
