@@ -38,7 +38,7 @@ def run_fr_analysis(
     analyzer.fr_signal = fr_signal
 
   elif filename is not None and histogram is not None:
-    
+
     analyzer = Analyzer(
       filename = filename,
       signal_label = histogram,
@@ -71,10 +71,19 @@ if __name__ == "__main__":
   # Test using ROOT histogram.
   analyzer = run_fr_analysis(filename = f"{io.sim_path}/sample/simulation.root", histogram = "signal")
 
+  # Get Results object from Analyzer, pull mean <f> and width sigma_f with errors.
+  results = analyzer.results
+  mean, mean_err = results.get("f"), results.get("err_f")
+  std, std_err = results.get("sig_f"), results.get("err_sig_f")
+
   # Plot the optimized cosine transform.
   analyzer.converted_transforms["f"].normalize().plot()
   style.draw_horizontal(0)
   style.draw_vertical(const.info["f"].magic)
   style.xlabel("Frequency (kHz)")
   style.ylabel("Arbitrary Units")
+  style.databox(
+    style.Entry(mean, r"\langle f \rangle", mean_err, "kHz"),
+    style.Entry(std, r"\sigma_f", std_err, "kHz")
+  )
   plt.show()
