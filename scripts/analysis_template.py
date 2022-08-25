@@ -18,7 +18,8 @@ def run_fr_analysis(
   filename = None, # (optional) string path to ROOT file, if not using NumPy arrays
   histogram = None, # (optional) string histogram label within ROOT file, if not using NumPy arrays
   output_label = "fr_analysis", # label for output folder containing results
-  time_units = 1E-6 # units for signal times relative to seconds
+  time_units = 1E-6, # units for signal times relative to seconds
+  **kwargs # any other keyword arguments will be passed along to Analyzer.analyze (e.g. start, end)
 ):
 
   if time is not None and signal is not None:
@@ -51,8 +52,7 @@ def run_fr_analysis(
 
   # Run the analysis, supplying optional arguments for various parameter choices.
   analyzer.analyze(
-    start = 4, # in microseconds
-    end = 250 # in microseconds
+    **kwargs # any other keyword arguments passed to function
     # see gm2fr.src.Analyzer for more fine-tuning options
   )
 
