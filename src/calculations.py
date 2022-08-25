@@ -79,8 +79,9 @@ def p_value(chi2, ndf):
 
 # One-sided FFT and frequencies (kHz), assuming time in microseconds.
 def fft(time, data):
+  dt = time[1] - time[0]
   transform = np.fft.rfft(data)
-  frequencies = np.fft.rfftfreq(len(time), d = 1E-9) * 1E-3
+  frequencies = np.fft.rfftfreq(len(time), d = dt * 1E-6) * 1E-3
   return frequencies, transform
 
 # Plot an FFT of the supplied signal.
