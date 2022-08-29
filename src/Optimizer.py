@@ -19,7 +19,7 @@ class Optimizer:
     width = 0.001,
     steps = 10,
     seed = None,
-    bg_space = int(const.info["f"].max - const.info["f"].magic)
+    bg_space = None
   ):
 
     self.transform = transform
@@ -78,9 +78,7 @@ class Optimizer:
     self.fits = [None] * len(self.times)
 
     for i in range(len(self.times)):
-      tempTransform = self.transform.get_cosine_at_t0(self.times[i])
-      self.fits[i] = BackgroundFit(tempTransform, t0 = self.times[i], start = self.transform.start, model = self.model, bg_space = self.bg_space)
-      self.fits[i].fit()
+      self.fits[i] = BackgroundFit(self.transform, self.model, t0 = self.times[i], bg_space = self.bg_space).fit()
 
     # Extract an array of the reduced chi-squareds from the fits.
     self.chi2_ndf = np.array([fit.model.chi2_ndf for fit in self.fits])

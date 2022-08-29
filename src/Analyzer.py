@@ -189,7 +189,7 @@ class Analyzer:
 
     # Perform the background fit, and subtract it from the optimal cosine transform.
     if bg_model is not None:
-      self.bg_fit = BackgroundFit(self.transform.opt_cosine, t0, start, bg_model, err_t0 = err_t0, bg_space = bg_space).fit()
+      self.bg_fit = BackgroundFit(self.transform, bg_model, bg_space = bg_space).fit()
       corr_transform = self.transform.opt_cosine.subtract(self.bg_fit.result)
       # If enabled, perform empirical iteration of the background fit.
       if iterate:

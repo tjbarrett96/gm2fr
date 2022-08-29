@@ -56,12 +56,12 @@ class Iterator:
       opt_t0 = self.t0[-1]
       newScan = None
       if optimize:
-        newScan = Optimizer(self.transform, newModel, fineWidth, fineSteps, seed = self.t0[-1], inner_width = self.fits[0].inner_width)
+        newScan = Optimizer(self.transform, newModel, fineWidth, fineSteps, seed = self.t0[-1], bg_space = self.fits[0].bg_space)
         newScan.optimize()
         opt_t0 = newScan.t0
         tempTransform = self.transform.get_cosine_at_t0(opt_t0, newScan.err_t0)
 
-      self.newBGFit = BackgroundFit(tempTransform, opt_t0, self.transform.start, newModel, inner_width = self.fits[0].inner_width).fit()
+      self.newBGFit = BackgroundFit(self.transform, newModel, t0 = opt_t0, bg_space = self.fits[0].bg_space).fit()
       self.newBGFit.model.print()
 
       if i == 1:

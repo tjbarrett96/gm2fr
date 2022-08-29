@@ -145,7 +145,7 @@ class Model:
   # ============================================================================
 
   # Plot the data with error bars and fit result with one-sigma error band.
-  def plot(self, x = None, dataLabel = "Data", fitLabel = "Fit"):
+  def plot(self, x = None, dataLabel = "Data", fitLabel = "Fit", fill_errors = True):
 
     # Plot the data with errorbars.
     style.errorbar(self.x, self.y, self.err, zorder = 0, ls = "", label = dataLabel)
@@ -157,7 +157,7 @@ class Model:
     # Plot the fit result and one-sigma error band.
     plt.plot(fn_x, fn, label = fitLabel)
 
-    if self.cov is not None:
+    if fill_errors and self.cov is not None:
       fn_err = self.uncertainty(fn_x)
       plt.fill_between(fn_x, fn - fn_err, fn + fn_err, alpha = 0.25)
 

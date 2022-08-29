@@ -20,31 +20,43 @@ class BackgroundFit:
   def __init__(
     self,
     transform,
-    t0,
-    start,
     model,
-    err_t0 = 0,
-    bg_space = int(const.info["f"].max - const.info["f"].magic)
+    t0 = None, # use Transform object's current t0 value if None, else override with given value
+    bg_space = None
   ):
 
-    # Keep a reference to the Transform object whose background we are fitting.
-    self.transform = transform.copy()
+    # The Transform object whose background we are fitting.
+    self.transform = transform
 
-    # Key times used in the cosine transform: start, end, and t0.
-    self.t0 = t0
-    self.err_t0 = err_t0
-    self.start = start
+    # If t0 is provided, then use it, or else copy the optimal t0 from the Transform object.
+    if t0 is not None:
+      self.t0, self.err_t0 = t0, None
+      self.cosine_histogram = self.transform.get_cosine_at_t0(t0)
+    else:
+      self.t0, self.err_t0 = self.transform.t0, self.transform.err_t0
+      self.cosine_histogram = self.transform.opt_cosine
 
-    # Fit data, with boundary mask applied.
-    self.mask = (self.transform.centers <= (const.info["f"].magic - bg_space)) | (self.transform.centers >= (const.info["f"].magic + bg_space))
-    self.bg_space = bg_space
+    # The gap between the t0 time and the transform start time.
+    self.start_gap = self.transform.harmonic * (self.transform.start - self.t0)\
 
-    self.x = self.transform.centers[self.mask]
-    self.y = self.transform.heights[self.mask]
+    # If bg_space is provided, then use it, or else use the physical frequency limit.
+    if bg_space is not None:
+      self.bg_space = bg_space
+    else:
+      self.bg_space = int(round(const.info["f"].max - const.info["f"].magic))
 
-    # The covariance matrix, its inverse, the variance, and correlation matrix.
-    self.cov = self.transform.cov if self.transform.cov.ndim == 2 else np.diag(self.transform.cov)
-    self.cov = self.cov[self.mask][:, self.mask]
+    # Get the x, y, and covariance values from the transform histogram.
+    self.x = self.cosine_histogram.centers
+    self.y = self.cosine_histogram.heights
+    self.cov = self.cosine_histogram.cov
+
+    # Apply boundary mask to the fit data.
+    left_boundary = const.info["f"].magic - bg_space
+    right_boundary = const.info["f"].magic + bg_space
+    self.mask = (self.x <= left_boundary) | (self.x >= right_boundary)
+    self.masked_x = self.x[self.mask]
+    self.masked_y = self.y[self.mask]
+    self.masked_cov = self.cov[self.mask][:, self.mask]
 
     # Extract the variance and normalized correlation matrix.
     # self.var = np.diag(self.cov)
@@ -57,10 +69,12 @@ class BackgroundFit:
       self.model = Polynomial(2)
     elif model == "sinc":
       # self.model = Sinc(np.min(self.transform.heights), self.start - self.t0)
-      self.model = Sinc(0.001, self.start - self.t0)
+      self.model = Sinc(0.001, self.start_gap)
+      # self.model.seeds[0] /= self.harmonic**2
     elif model == "error":
       # self.model = Error(np.min(self.transform.heights), self.start - self.t0)
-      self.model = Error(self.start - self.t0)
+      self.model = Error(self.start_gap)
+      # self.model.seeds[0] /= self.harmonic**2
     elif isinstance(model, Template):
       self.model = copy.deepcopy(model)
     else:
@@ -77,37 +91,38 @@ class BackgroundFit:
   def fit(self):
 
     # First, fit using only the diagonal of the covariance matrix, which is more stable.
-    self.model.fit(self.x, self.y, np.sqrt(np.diag(self.cov)))
+    self.model.fit(self.masked_x, self.masked_y, np.sqrt(np.diag(self.masked_cov)))
 
     # Update the fit parameter seeds using the above result, then use the full covariance matrix.
     self.model.seeds = self.model.p_opt
-    self.model.fit(self.x, self.y, self.cov)
+    self.model.fit(self.masked_x, self.masked_y, self.masked_cov)
 
     self.result = Histogram1D(
-      self.transform.edges,
-      heights = self.model.eval(self.transform.centers),
-      cov = self.model.covariance(self.transform.centers)
+      self.cosine_histogram.edges,
+      heights = self.model.eval(self.x),
+      cov = self.model.covariance(self.x)
     )
     return self
 
   # ============================================================================
 
   # Plot this background fit.
-  def plot(self, output = None):
+  def plot(self, output = None, fill_errors = True):
 
     # Plot the background and fit.
     self.model.plot(
-      x = self.transform.centers,
+      x = self.x,
       dataLabel = "Background",
-      fitLabel = "Background Fit"
+      fitLabel = "Background Fit",
+      fill_errors = fill_errors
     )
 
     style.draw_horizontal()
 
     # Plot the central (non-background) region of the transform.
     style.errorbar(
-      self.transform.centers[~self.mask],
-      self.transform.heights[~self.mask],
+      self.x[~self.mask],
+      self.y[~self.mask],
       None,
       ls = "-",
       label = "Cosine Transform"
@@ -115,7 +130,7 @@ class BackgroundFit:
 
     # Annotate the t_0 value and fit quality.
     style.databox(
-      style.Entry(self.t0 * 1E3, "t_0", self.err_t0 * 1E3 if self.err_t0 > 0 else None, "ns"),
+      style.Entry(self.t0 * 1E3, "t_0", self.err_t0 * 1E3 if self.err_t0 else None, "ns"),
       style.Entry(self.model.chi2_ndf, r"\chi^2/\mathrm{ndf}", self.model.err_chi2_ndf, None),
       style.Entry(self.model.p_value, "p", None, None)
     )
