@@ -122,7 +122,7 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
 
   if variable == "t0":
     data_y *= 1E3
-    data_err_y *= 1E3
+    data_err_y = data_err_y * 1E3
     if sim_present:
       sim_y *= 1E3
       sim_err_y *= 1E3
@@ -167,7 +167,7 @@ if __name__ == "__main__":
   pdf = style.make_pdf(f"{io.plot_path}/{args.dataset}/{args.dataset}_{args.systematic}_plots.pdf")
   results = Results({"dataset": args.dataset, "systematic": args.systematic})
   for variable in ("x", "sig_x", "c_e", "t0", "bg_chi2_ndf"):
-    var_results = process_systematic(args.dataset, args.systematic, variable, output = pdf, skip = args.skip)
+    var_results = process_systematic(args.dataset, args.systematic, variable, folder = args.label, output = pdf, skip = args.skip)
     results.merge(var_results)
   pdf.close()
   results.save(f"{io.plot_path}/{args.dataset}", f"{args.dataset}_{args.systematic}_results")

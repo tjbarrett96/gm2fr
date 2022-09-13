@@ -71,7 +71,7 @@ class Optimizer:
 
   # ================================================================================================
 
-  def optimize(self):
+  def optimize(self, check_minimum = True, max_iterations = 10):
 
     begin = time.time()
     self.times = np.linspace(self.seed - self.width / 2, self.seed + self.width / 2, self.steps)
@@ -89,24 +89,32 @@ class Optimizer:
     self.t0 = -b / (2 * a)
     self.opt_chi2_ndf = np.polyval(self.p_opt, self.t0)
 
-    # If the parabola is concave-down, try shifting the search window and re-optimizing.
-    if a < 0 and self.iteration < 10:
-      self.seed += self.width
-      self.iteration += 1
-      return self.optimize()
+    # Check that we have found the optimal t0 at a well-behaved chi-squared minimum.
+    if check_minimum:
 
-    # If the minimum is not contained within the scan window, update the t_0 seed and try again.
-    if self.t0 < self.times[0] or self.t0 > self.times[-1]:
+      # Check that the minimum is bowl-shaped: 2nd derivative is positive everywhere in the window.
+      valid_minimum = np.all(np.diff(self.chi2_ndf, 2) > 0)
+      if not valid_minimum:
+        # Shift the t0 seed to the left or right, depending on which side had the smallest chi2.
+        self.seed += self.width * (1 if self.chi2_ndf[-1] < self.chi2_ndf[0] else -1)
+        print("\nBackground fit chi-squareds do not form a smooth bowl.")
+        print(f"Trying again with shifted t0 seed: {self.seed * 1000:.4f} ns.")
 
-      # Print an update.
-      print("\nOptimal t0 not found within time window.")
-      print(f"Trying again with re-estimated t0 seed: {self.t0 * 1000:.4f} ns.")
-
-      # Make a recursive call to optimize again using the new t_0 estimate, up to 5 times.
-      if self.iteration < 10:
+      # Check that the fitted chi2 minimum is contained within the window, not extrapolated.
+      valid_t0 = self.times[0] < self.t0 < self.times[-1]
+      if not valid_t0:
+        # Update the t0 seed from the fitted parabolic minimum.
         self.seed = self.t0
-        self.iteration += 1
-        return self.optimize()
+        print("\nOptimal t0 extrapolated outside the time window.")
+        print(f"Trying again with extrapolated t0 seed: {self.seed * 1000:.4f} ns.")
+
+      # Only proceed to re-optimizing if we haven't exceeded the maximum number of iterations.
+      if not valid_minimum or not valid_t0:
+        if self.iteration + 1 < max_iterations:
+          self.iteration += 1
+          return self.optimize(check_minimum, max_iterations)
+        else:
+          print("\nMaximum number of re-optimization attempts has been exceeded.")
 
     # Get the value of the minimum chi2 from the fit.
     ndf = self.fits[0].model.ndf
@@ -130,7 +138,7 @@ class Optimizer:
 
   # ================================================================================================
 
-  def plot_chi2(self, output):
+  def plot_chi2(self, output = None):
 
     # Plot the chi2/ndf.
     plt.plot(self.times * 1000, self.chi2_ndf, 'o-')
@@ -166,7 +174,8 @@ class Optimizer:
     # plt.savefig(output)
     # plt.clf()
 
-    style.label_and_save("$t_0$ (ns)", r"Background $\chi^2$/ndf", output)
+    if output is not None:
+      style.label_and_save("$t_0$ (ns)", r"Background $\chi^2$/ndf", output)
 
   # ================================================================================================
 

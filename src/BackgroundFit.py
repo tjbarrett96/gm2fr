@@ -51,8 +51,8 @@ class BackgroundFit:
     self.cov = self.cosine_histogram.cov
 
     # Apply boundary mask to the fit data.
-    left_boundary = const.info["f"].magic - bg_space
-    right_boundary = const.info["f"].magic + bg_space
+    left_boundary = const.info["f"].magic - self.bg_space
+    right_boundary = const.info["f"].magic + self.bg_space
     self.mask = (self.x <= left_boundary) | (self.x >= right_boundary)
     self.masked_x = self.x[self.mask]
     self.masked_y = self.y[self.mask]
@@ -70,11 +70,11 @@ class BackgroundFit:
     elif model == "sinc":
       # self.model = Sinc(np.min(self.transform.heights), self.start - self.t0)
       self.model = Sinc(0.001, self.start_gap)
-      # self.model.seeds[0] /= self.harmonic**2
+      self.model.seeds[0] /= self.transform.harmonic**2
     elif model == "error":
       # self.model = Error(np.min(self.transform.heights), self.start - self.t0)
       self.model = Error(self.start_gap)
-      # self.model.seeds[0] /= self.harmonic**2
+      self.model.seeds[0] /= self.transform.harmonic**2
     elif isinstance(model, Template):
       self.model = copy.deepcopy(model)
     else:
