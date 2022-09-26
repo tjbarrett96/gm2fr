@@ -183,7 +183,7 @@ class Histogram1D:
     elif io.is_array(b):
       result.heights *= b
       if result.cov.ndim == 2:
-        result.cov = np.outer(b, b) * a.cov + np.outer(a.heights, a.heights)
+        result.cov = np.outer(b, b) * a.cov #+ np.outer(a.heights, a.heights)
       else:
         result.cov = b**2 * a.cov
     else:

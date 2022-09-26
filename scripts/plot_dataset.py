@@ -65,19 +65,29 @@ def plot_dataset(dataset, subset, variable, plot_lines = False):
   if plot_lines:
     style.draw_horizontal(nominal_value, c = "k", label = "Nominal")
 
-  # add the NA^2 weight curve for energy-binned c_e
+  # add the NA and NA^2 weight curves for energy-binned c_e
   if subset == "energy" and variable == "c_e":
+    NA = results["wg_N"] * results["wg_A"]
+    NA /= np.max(NA)
     NA_squared = results["wg_N"] * results["wg_A"]**2
     NA_squared /= np.max(NA_squared)
     ax = plt.gca()
     style.twinx()
     style.errorbar(
       results["index"],
+      NA,
+      None,
+      alpha = 0.25,
+      label = "$NA$ Weights",
+      color = "k"
+    )
+    style.errorbar(
+      results["index"],
       NA_squared,
       None,
       alpha = 0.25,
       label = "$NA^2$ Weights",
-      color = "k"
+      color = "tab:gray"
     )
     plt.legend(loc = "upper right")
     plt.sca(ax)
