@@ -114,11 +114,13 @@ def plot_dataset(dataset, subset, variable, plot_lines = False):
       prefix = "" if mode == "normal" else f"{mode}_"
 
       avg = np.average(results[variable], weights = weights)
+      avg_err = np.sqrt(np.sum((weights * results[f"err_{variable}"] / np.sum(weights))**2)
       std = np.sqrt(np.average((results[variable] - avg)**2, weights = weights))
       if variable == "t0":
         avg *= 1E3
         std *= 1E3
       results_dict[f"{prefix}avg_{variable}"] = avg
+      results_dict[f"{prefix}err_avg_{variable}"] = avg_err
       results_dict[f"{prefix}std_{variable}"] = std
       results_dict[f"{prefix}diff_{variable}"] = avg - nominal_value
 
