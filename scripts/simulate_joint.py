@@ -17,7 +17,7 @@ import argparse
 
 # ==================================================================================================
 
-def simulate_joint(filename, label, kinematics_type, time_units, smooth):
+def simulate_joint(filename, label, kinematics_type, time_units, smooth, kinematics_scale):
 
   input_file = root.TFile(f"{io.data_path}/correlation/{filename}.root")
   joint_dist = input_file.Get(label)
@@ -50,7 +50,8 @@ def simulate_joint(filename, label, kinematics_type, time_units, smooth):
     overwrite = True,
     joint_dist = joint_dist,
     kinematics_type = kinematics_type,
-    time_units = time_units
+    time_units = time_units,
+    kinematics_scale = kinematics_scale
   )
 
   simulation.simulate(muons = 1E9, end = 250)
@@ -66,10 +67,11 @@ if __name__ == "__main__":
   parser.add_argument("--label")
   parser.add_argument("--type")
   parser.add_argument("--time", type = float)
+  parser.add_argument("--scale", type = float, default = 1)
   parser.add_argument("--smooth", action = "store_true")
   args = parser.parse_args()
 
-  simulate_joint(args.file, args.label, args.type, args.time, args.smooth)
+  simulate_joint(args.file, args.label, args.type, args.time, args.smooth, args.scale)
 
 # ==================================================================================================
 

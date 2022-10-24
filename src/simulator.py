@@ -30,7 +30,8 @@ class Simulator:
     joint_dist = None,
     correlation = [0],
     kinematics_type = "f",
-    time_units = 1E-9 # nanoseconds by default
+    time_units = 1E-9, # nanoseconds by default
+    kinematics_scale = 1 # scale factor to apply to kinematics axis
   ):
 
     self.kinematics_dist = kinematics_dist
@@ -39,6 +40,7 @@ class Simulator:
     self.correlation = correlation
     self.kinematics_type = kinematics_type
     self.time_units = time_units
+    self.kinematics_scale = kinematics_scale
 
     if joint_dist is None and (kinematics_dist is None or time_dist is None):
       raise ValueError("Invalid input distributions.")
@@ -83,7 +85,7 @@ class Simulator:
 
     # Convert kinematics parameters to cyclotron frequencies.
     if self.kinematics_type in ("f", "x", "p", "dp_p0", "dp_p0_%"):
-      frequencies = const.info[self.kinematics_type].to_frequency(kinematics)
+      frequencies = const.info[self.kinematics_type].to_frequency(kinematics * self.kinematics_scale)
     else:
       raise ValueError(f"Kinematics variable '{self.kinematics_type}' not recognized.")
 
