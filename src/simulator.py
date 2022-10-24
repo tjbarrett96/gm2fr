@@ -29,7 +29,7 @@ class Simulator:
     time_dist = None,
     joint_dist = None,
     correlation = [0],
-    kinematics_type = "frequency",
+    kinematics_type = "f",
     time_units = 1E-9 # nanoseconds by default
   ):
 
@@ -82,7 +82,7 @@ class Simulator:
     offsets -= np.average(offsets)
 
     # Convert kinematics parameters to cyclotron frequencies.
-    if self.kinematics_type in ("f", "p", "dp_p0", "dp_p0_%"):
+    if self.kinematics_type in ("f", "x", "p", "dp_p0", "dp_p0_%"):
       frequencies = const.info[self.kinematics_type].to_frequency(kinematics)
     else:
       raise ValueError(f"Kinematics variable '{self.kinematics_type}' not recognized.")

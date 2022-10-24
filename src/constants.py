@@ -103,6 +103,7 @@ info["c_e"].from_frequency = lambda f, n = 0.108: 2*n*(1-n)*(info["beta"].magic 
 # Set the conversion functions to frequency (only useful for some variables).
 info["f"].to_frequency = lambda f: f
 info["r"].to_frequency = lambda r: info["beta"].magic * c / (2 * np.pi * r) # f = v/r, in kHz for r in mm
+info["x"].to_frequency = lambda x: info["r"].to_frequency(x + info["r"].magic)
 info["p"].to_frequency = lambda p, n = 0.108: info["f"].magic * (1 - (p / info["p"].magic - 1) / (1 - n))
 info["dp_p0"].to_frequency = lambda dp_p0, n = 0.108: info["p"].to_frequency(info["p"].magic * (1 + dp_p0), n)
 info["dp_p0_%"].to_frequency = lambda dp_p0, n = 0.108: info["dp_p0"].to_frequency(dp_p0 / 100, n)
