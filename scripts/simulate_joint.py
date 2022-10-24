@@ -24,8 +24,8 @@ def simulate_joint(filename, label, kinematics_type, time_units, smooth, kinemat
 
   time_bin_width = joint_dist.GetXaxis().GetBinWidth(1)
   freq_bin_width = abs(
-    const.info[kinematics_type].to_frequency(joint_dist.GetYaxis().GetBinCenter(2)) \
-    - const.info[kinematics_type].to_frequency(joint_dist.GetYaxis().GetBinCenter(1))
+    const.info[kinematics_type].to_frequency(joint_dist.GetYaxis().GetBinCenter(2) * kinematics_scale) \
+    - const.info[kinematics_type].to_frequency(joint_dist.GetYaxis().GetBinCenter(1) * kinematics_scale)
   )
 
   min_time_bin = 1E-9
