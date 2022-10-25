@@ -5,7 +5,7 @@ import gm2fr.src.constants as const
 import root_numpy as rnp
 from scipy.ndimage import gaussian_filter
 import numpy as np
-from scipy.interpolate import SmoothBivariateSpline
+from scipy.interpolate import RectBivariateSpline
 
 import matplotlib.pyplot as plt
 import gm2fr.src.style as style
@@ -37,13 +37,33 @@ def simulate_joint(filename, label, kinematics_type, time_units, smooth, kinemat
   joint_dist.Rebin2D(time_rebin_factor, kinematics_rebin_factor)
 
   if smooth:
-    data, edges = rnp.hist2array(joint_dist, return_edges = True)
+    data, (x_edges, y_edges) = rnp.hist2array(joint_dist, return_edges = True)
+    x_centers = (x_edges[:-1] + x_edges[1:]) / 2
+    y_centers = (y_edges[:-1] + y_edges[1:]) / 2
+    spline = RectBivariateSpline(x_centers, y_centers, data)
+    interp_factor = 2
+    new_x_edges = np.linspace(x_edges[0], x_edges[-1], len(x_edges) * interp_factor)
+    new_y_edges = np.linspace(y_edges[0], y_edges[-1], len(y_edges) * interp_factor)
+    new_x_centers = (new_x_edges[:-1] + new_x_edges[1:]) / 2
+    new_y_centers = (new_y_edges[:-1] + new_y_edges[1:]) / 2
+    new_data = spline.ev(new_x_centers, new_y_centers)
+    joint_dist = root.TH2D(
+      joint_dist.GetName(),
+      joint_dist.GetTitle(),
+      new_x_edges[0],
+      new_x_edges[-1],
+      len(new_x_centers),
+      new_y_edges[0],
+      new_y_edges[-1],
+      len(new_y_centers)
+    )
+    rnp.array2hist(new_data, joint_dist)
     # Ensure the frequency distribution goes to zero at the boundaries.
-    edge_mean = (np.mean(data[:, 0]) + np.mean(data[:, -1])) / 2
-    data -= edge_mean
+    # edge_mean = (np.mean(data[:, 0]) + np.mean(data[:, -1])) / 2
+    # data -= edge_mean
     # Smooth the distribution with Gaussian smearing.
-    smooth_data = gaussian_filter(data, sigma = (5, 3), truncate = 1)
-    rnp.array2hist(np.where(smooth_data < 0, 0, smooth_data), joint_dist)
+    # smooth_data = gaussian_filter(data, sigma = (5, 3), truncate = 1)
+    # rnp.array2hist(np.where(smooth_data < 0, 0, smooth_data), joint_dist)
 
   simulation = Simulator(
     f"{filename}_sim",
