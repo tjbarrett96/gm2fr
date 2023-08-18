@@ -561,7 +561,6 @@ class Histogram1D:
         edges = np.array([histogram.GetBinLowEdge(i + 1) for i in range(histogram.GetNbinsX() + 1)])
       except:
         raise FileNotFoundError()
-      edges = edges[0]
       cov = np.array([histogram.GetBinError(i + 1)**2 for i in range(histogram.GetNbinsX())])
       rootFile.Close()
     elif filename.endswith(".npz"):
