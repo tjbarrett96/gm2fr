@@ -11,7 +11,6 @@ import gm2fr.src.io as io
 import gm2fr.src.calculations as calc
 
 import ROOT as root
-import root_numpy as rnp
 
 # ==================================================================================================
 
@@ -543,7 +542,9 @@ class Histogram1D:
     sortedIndices = np.argsort(self.centers)
     heights, errors = self.heights[sortedIndices], self.errors[sortedIndices]
     histogram = root.TH1F(name, labels, self.length, array.array("f", list(edges)))
-    rnp.array2hist(heights, histogram, errors = errors)
+    for i in range(self.length):
+      histogram.SetBinContent(i + 1, heights[i])
+      histogram.SetBinError(i + 1, errors[i])
     histogram.ResetStats()
     return histogram
 
@@ -556,7 +557,8 @@ class Histogram1D:
       try:
         rootFile = root.TFile(filename)
         histogram = rootFile.Get(label)
-        heights, edges = rnp.hist2array(histogram, return_edges = True)
+        heights = np.array([histogram.GetBinContent(i + 1) for i in range(histogram.GetNbinsX())])
+        edges = np.array([histogram.GetBinLowEdge(i + 1) for i in range(histogram.GetNbinsX() + 1)])
       except:
         raise FileNotFoundError()
       edges = edges[0]

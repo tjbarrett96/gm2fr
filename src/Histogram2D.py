@@ -8,7 +8,6 @@ import gm2fr.src.io as io
 from gm2fr.src.Histogram1D import Histogram1D
 
 import ROOT as root
-import root_numpy as rnp
 
 class Histogram2D:
 
@@ -299,8 +298,12 @@ class Histogram2D:
     if filename.endswith(".root") and label is not None:
       rootFile = root.TFile(filename)
       histogram = rootFile.Get(label)
-      heights, edges = rnp.hist2array(histogram, return_edges = True)
-      x_edges, y_edges = edges[0], edges[1]
+      heights = np.array([
+        [histogram.GetBinContent(i + 1, j + 1) for j in range(histogram.GetNbinsY())]
+        for i in range(histogram.GetNbinsX())
+      ])
+      x_edges = np.array([histogram.GetXaxis().GetBinLowEdge(i + 1) for i in range(histogram.GetNbinsX())])
+      y_edges = np.array([histogram.GetXaxis().GetBinLowEdge(j + 1) for j in range(histogram.GetNbinsY())])
       errors = np.array([
         [histogram.GetBinError(i + 1, j + 1) for j in range(histogram.GetNbinsY())]
         for i in range(histogram.GetNbinsX())
@@ -326,6 +329,9 @@ class Histogram2D:
       self.x_length, array.array("f", list(self.x_edges)),
       self.y_length, array.array("f", list(self.y_edges))
     )
-    rnp.array2hist(self.heights, histogram, errors = self.errors)
+    for i in range(self.heights.shape[0]):
+      for j in range(self.heights.shape[1]):
+        histogram.SetBinContent(i + 1, j + 1, heights[i][j])
+        histogram.SetBinError(i + 1, j + 1, errors[i][j])
     histogram.ResetStats()
     return histogram
