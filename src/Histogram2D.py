@@ -138,7 +138,16 @@ class Histogram2D:
     for axis, function in enumerate(functions):
       if function is None:
         continue
-      self.edges[axis] = function(self.edges[axis])
+      new_edges = function(self.edges[axis])
+      #if np.all(np.diff(new_edges) > 0):
+      #  self.edges[axis] = new_edges
+      if np.all(np.diff(new_edges) < 0):
+        self.edges[axis] = np.flip(new_edges)
+        self.heights = np.flip(self.heights, axis = axis)
+        self.errors = np.flip(self.errors, axis = axis)
+      else:
+        self.edges[axis] = new_edges
+      #  raise ValueError("Cannot map bin edges using non-monotonic function.")
       self.update_bins(axis)
     return self
 

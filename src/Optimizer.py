@@ -71,7 +71,7 @@ class Optimizer:
 
   # ================================================================================================
 
-  def optimize(self, check_minimum = True, max_iterations = 10):
+  def optimize(self, check_minimum = True, max_iterations = 5):
 
     begin = time.time()
     self.times = np.linspace(self.seed - self.width / 2, self.seed + self.width / 2, self.steps)

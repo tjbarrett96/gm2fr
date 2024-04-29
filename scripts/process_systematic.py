@@ -16,8 +16,10 @@ systematics_folder = {
   "start": "StartTimeScan",
   "end": "EndTimeScan",
   "df": "FrequencySpacingScan",
-  "bg_width": "BackgroundWidthScan",
-  "bg_space": "BackgroundSpaceScan",
+  #"bg_width": "BackgroundWidthScan",
+  #"bg_space": "BackgroundSpaceScan",
+  "freq_width": "FrequencyWidthScan",
+  "inner_width": "InnerWidthScan",
   "fr_method": "FRMethodScan",
   "bg_model": "BGModelScan",
   "dt": "FRRebinScan"
@@ -49,6 +51,9 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
 
   data_x, data_y, data_err_y = data_results[systematic], data_results[variable], data_results[f"err_{variable}"]
 
+  err_median = np.median(data_err_y)
+  data_err_y[data_err_y > 10*err_median] = 0
+
   # plot the data trend
   data_errorbar = plot_trend(
     systematic,
@@ -69,6 +74,9 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
 
     sim_x, sim_y, sim_err_y = sim_results[systematic], sim_results[variable], sim_results[f"err_{variable}"]
 
+    sim_err_median = np.median(sim_err_y)
+    sim_err_y[sim_err_y > 10*sim_err_median] = 0
+    
     # plot the MC trend
     sim_errorbar = plot_trend(
       systematic,
@@ -144,7 +152,7 @@ def process_systematic(dataset, systematic, variable, output = None, folder = No
 
     # plot the trend, std. dev. band, and mean line
     style.errorbar(data_x, syst_y, syst_err_y)
-    style.horizontal_spread(syst_std, syst_mean, label = f"std. dev. = {syst_std:.2f} {y_unit}")
+    style.horizontal_spread(2*syst_std, syst_mean, label = f"std. dev. = {syst_std:.2f} {y_unit}")
     style.draw_horizontal(syst_mean, label = f"mean = {syst_mean:.2f} {y_unit}")
 
     # apply labels, legend, and save to output

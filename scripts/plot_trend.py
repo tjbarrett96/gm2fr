@@ -32,7 +32,7 @@ def plot_trend(x, y, results, label = None, ls = "-", color = None, skip = 1):
   errorbar = style.errorbar(
     x_data[::skip],
     y_data[::skip],
-    errors[::skip],
+    errors[::skip] if errors is not None else errors,
     ls = ls,
     label = label,
     color = color

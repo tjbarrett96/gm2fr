@@ -37,7 +37,7 @@ class BackgroundFit:
       self.cosine_histogram = self.transform.opt_cosine
 
     # The gap between the t0 time and the transform start time.
-    self.start_gap = self.transform.harmonic * (self.transform.start - self.t0)\
+    self.start_gap = self.transform.harmonic * (self.transform.start - self.t0)
 
     # If bg_space is provided, then use it, or else use the physical frequency limit.
     if bg_space is not None:
@@ -45,18 +45,7 @@ class BackgroundFit:
     else:
       self.bg_space = int(round(const.info["f"].max - const.info["f"].magic))
 
-    # Get the x, y, and covariance values from the transform histogram.
-    self.x = self.cosine_histogram.centers
-    self.y = self.cosine_histogram.heights
-    self.cov = self.cosine_histogram.cov
-
-    # Apply boundary mask to the fit data.
-    left_boundary = const.info["f"].magic - self.bg_space
-    right_boundary = const.info["f"].magic + self.bg_space
-    self.mask = (self.x <= left_boundary) | (self.x >= right_boundary)
-    self.masked_x = self.x[self.mask]
-    self.masked_y = self.y[self.mask]
-    self.masked_cov = self.cov[self.mask][:, self.mask]
+    self.update_data()
 
     # Extract the variance and normalized correlation matrix.
     # self.var = np.diag(self.cov)
@@ -81,6 +70,20 @@ class BackgroundFit:
       self.model = None
 
     self.result = None
+
+  def update_data(self):
+    # Get the x, y, and covariance values from the transform histogram.
+    self.x = self.cosine_histogram.centers
+    self.y = self.cosine_histogram.heights
+    self.cov = self.cosine_histogram.cov
+
+    # Apply boundary mask to the fit data.
+    left_boundary = const.info["f"].magic - self.bg_space
+    right_boundary = const.info["f"].magic + self.bg_space
+    self.mask = (self.x <= left_boundary) | (self.x >= right_boundary)
+    self.masked_x = self.x[self.mask]
+    self.masked_y = self.y[self.mask]
+    self.masked_cov = self.cov[self.mask][:, self.mask]
 
   def results(self):
     return self.model.results(prefix = "bg")
@@ -129,11 +132,11 @@ class BackgroundFit:
     )
 
     # Annotate the t_0 value and fit quality.
-    style.databox(
-      style.Entry(self.t0 * 1E3, "t_0", self.err_t0 * 1E3 if self.err_t0 else None, "ns"),
-      style.Entry(self.model.chi2_ndf, r"\chi^2/\mathrm{ndf}", self.model.err_chi2_ndf, None),
-      style.Entry(self.model.p_value, "p", None, None)
-    )
+    #style.databox(
+    #  style.Entry(self.t0 * 1E3, "t_0", self.err_t0 * 1E3 if self.err_t0 else None, "ns"),
+    #  style.Entry(self.model.chi2_ndf, r"\chi^2/\mathrm{ndf}", self.model.err_chi2_ndf, None),
+    #style.Entry(self.model.p_value, "p", None, None)
+    #)
 
     # Save to disk and clear the figure, if specified.
     if output is not None:

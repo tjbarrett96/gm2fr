@@ -6,15 +6,17 @@ systematics = [
   "start",
   "end",
   "df",
-  "bg_width",
-  "bg_space",
+  "freq_width",
+  "inner_width",
   "bg_model",
-  "fr_method"
+  "fr_method",
+  "dt"
 ]
 
 diff_mode = [
   "start",
-  "bg_width"
+  "freq_width",
+  "inner_width"
 ]
 
 variables = [

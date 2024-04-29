@@ -4,6 +4,7 @@ import numpy as np
 import gm2fr.src.io as io
 from merge_results import merge_results
 from gm2fr.src.Analyzer import Analyzer
+from gm2fr.src.Results import Results
 import argparse, re, inspect
 
 # ==================================================================================================
@@ -60,7 +61,7 @@ def analyze_dataset(dataset, subset = "nominal", label = None, constructor_arg_d
       subset_indices = io.find_indices(input_folders)
 
       # Construct the output group name (e.g. ByCalo) and output folders (e.g. [Calo1, Calo2, ...]).
-      output_group = f"By{subset.capitalize()}"
+      output_group = f"By{subset.capitalize()}{label if label is not None else ''}"
       output_folders = [f"{subset.capitalize()}{index}" for index in subset_indices]
 
   else:
@@ -76,12 +77,29 @@ def analyze_dataset(dataset, subset = "nominal", label = None, constructor_arg_d
   if "fr_method" not in analyze_arg_dict:
     analyze_arg_dict["fr_method"] = "nine" if subset != "sim" else None
 
+  # must save copy of argument conditions here, since constructor_arg_dict will change during loop!
+  rob_bunch = ("ref_filename" in constructor_arg_dict) and (constructor_arg_dict["ref_filename"] == "rob_bunch")
+  james_bunch = ("ref_filename" in constructor_arg_dict) and (constructor_arg_dict["ref_filename"] == "james_bunch")
+  rob_noSmooth = ("ref_filename" in constructor_arg_dict) and (constructor_arg_dict["ref_filename"] == "rob_noSmooth")
+
   # Run the analysis on each part of the subset (e.g. each calo).
   for input_folder, subset_index, output_folder in zip(input_folders, subset_indices, output_folders):
 
     # Special exclusions of subsets which don't behave well.
     if subset in ("energy", "threshold") and subset_index < 500:
       continue
+
+    # special case for correcting bunch-by-bunch in runs 2 and 3
+    if subset == "bunch":
+      if rob_bunch:
+        constructor_arg_dict["ref_filename"] = f"{io.data_path}/correlation/rob_bunch/{dataset}_Bunch{subset_index % 8}_smooth.root"
+        constructor_arg_dict["ref_t0"] = 0
+      elif rob_noSmooth:
+        constructor_arg_dict["ref_filename"] = f"{io.data_path}/correlation/rob_bunch/{dataset}_Bunch{subset_index % 8}_noSmooth.root"
+        constructor_arg_dict["ref_t0"] = 0
+      elif james_bunch:
+        constructor_arg_dict["ref_filename"] = f"{io.data_path}/correlation/james_bunch/{dataset}_Bunch{subset_index % 8}_smooth.root"
+        constructor_arg_dict["ref_t0"] = 0
 
     analyzer = Analyzer(
       filename = input_path,
@@ -114,8 +132,19 @@ if __name__ == "__main__":
   parser.add_argument("--dataset", "-d", required = True)
   parser.add_argument("--subsets", "-s", nargs = "*", default = [])
   parser.add_argument("--label", "-l", default = None)
+  parser.add_argument("--ref", "-r", default = None)
   parser.add_argument("--parameters", "-p", nargs = "*", default = [])
   args = parser.parse_args()
+
+  if args.ref is not None:
+    if args.ref not in ("rob_bunch", "rob_noSmooth", "james_bunch"):
+      ref_filename = f"{io.sim_path}/{args.ref}_sim/data.npz"
+      ref_t0 = float(Results.load(f"{io.results_path}/{args.ref}/Simulation/results.npy").get("t0"))
+    else:
+      ref_filename = args.ref
+      ref_t0 = 0
+    print(ref_filename, ref_t0)
+    args.parameters += [f"ref_filename:{ref_filename}", f"ref_t0:{ref_t0:.10f}"]
 
   # If one of the arguments was "all", then analyze all supported subset types.
   if len(args.subsets) == 0:
@@ -123,9 +152,9 @@ if __name__ == "__main__":
   elif "all" in args.subsets:
     args.subsets = ["nominal", "sim"] + list(subset_dir.keys())
 
-  if (args.label is not None) and (len(args.subsets) > 1 or (args.subsets[0] not in ("nominal", "sim"))):
-    print("Can only use 'label' with subset 'nominal' or 'sim'.")
-    exit()
+  # if (args.label is not None) and (len(args.subsets) > 1 or (args.subsets[0] not in ("nominal", "sim"))):
+  #   print("Can only use 'label' with subset 'nominal' or 'sim'.")
+  #   exit()
 
   allowed_constructor_args = inspect.getfullargspec(Analyzer.__init__).args
   allowed_analyze_args = inspect.getfullargspec(Analyzer.analyze).args

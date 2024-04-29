@@ -1,0 +1,1 @@
+python3 merge_results.py -o $gm2fr/studies/toy_mc -n rob_gm2ringsim_david_results -r $gm2fr/results/rob_*_12p/Simulation/results.npy $gm2fr/results/gm2ringsim_Run{2,3a,3b}/Simulation/results.npy $gm2fr/results/david_{2,3}*/Simulation/results.npy -i parent

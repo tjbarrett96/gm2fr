@@ -148,7 +148,8 @@ class Analyzer:
     fine_t0_steps = 10, # Number of steps for the subsequent fine t0 scan ranges.
     plot_level = 1, # Plotting option. 0 = nothing, 1 = main plots, 2 = more plots (slower).
     save_output = True,
-    rebin = 1 # Integer rebinning group size for the fast rotation signal.
+    rebin = 1, # Integer rebinning group size for the fast rotation signal.
+    tweak = False
   ):
 
     begin_time = time.time()
@@ -182,25 +183,50 @@ class Analyzer:
     self.transform.set_t0(t0, err_t0)
 
     # Copy the optimal cosine transform before the background correction.
-    corr_transform = self.transform.opt_cosine.copy()
+    distcorr_transform = self.transform.opt_cosine.copy()
 
     # TODO: if truth supplied, subtract distortion term HERE, before background fit. then fit, then divide A(f).
     # this should enable a better background fit!
+    # If reference data is supplied, calculate and apply corrections.
+    if self.ref_filename is not None:
+      self.corrector = Corrector(self.transform, distcorr_transform, self.ref_filename if self.ref_filename != "same" else self.filename, self.ref_t0, tweak)
+      self.corrector.correct(peak = False, distortion = False, background = False)
+      distcorr_transform = distcorr_transform.subtract(self.corrector.distortion.interpolate(distcorr_transform.centers))
+      # self.transform.opt_cosine = self.transform.opt_cosine.subtract(self.corrector.distortion.interpolate(corr_transform.centers))
+
+    # Copy the optimal cosine transform before the background correction.
+    corr_transform = self.transform.opt_cosine.copy()
 
     # Perform the background fit, and subtract it from the optimal cosine transform.
     if bg_model is not None:
-      self.bg_fit = BackgroundFit(self.transform, bg_model, bg_space = bg_space).fit()
+
+      # nominal background fit
+      self.bg_fit = BackgroundFit(self.transform, bg_model, bg_space = bg_space)
+      self.bg_fit.fit()
       corr_transform = self.transform.opt_cosine.subtract(self.bg_fit.result)
+
+      # background fit on distortion-subtracted transform
+      if self.ref_filename is not None:
+        dist_bg_fit = BackgroundFit(self.transform, bg_model, bg_space = bg_space)
+        dist_bg_fit.cosine_histogram = distcorr_transform
+        dist_bg_fit.update_data()
+        dist_bg_fit.fit()
+        distcorr_transform = distcorr_transform.subtract(dist_bg_fit.result)
+      # corr_transform = corr_transform.subtract(self.bg_fit.result)
       # If enabled, perform empirical iteration of the background fit.
-      if iterate:
-        self.bg_iterator = Iterator(self.transform, self.bg_fit)
-        corr_transform = self.bg_iterator.iterate(optimize_t0)
-        self.bg_fit = self.bg_iterator.fits[-1]
+      # if iterate:
+      #   self.bg_iterator = Iterator(self.transform, self.bg_fit)
+      #   corr_transform = self.bg_iterator.iterate(optimize_t0)
+      #   self.bg_fit = self.bg_iterator.fits[-1]
 
     # If reference data is supplied, calculate and apply corrections.
     if self.ref_filename is not None:
-      self.corrector = Corrector(self.transform, corr_transform, self.ref_filename if self.ref_filename != "same" else self.filename, self.ref_t0)
-      self.corrector.correct()
+      self.corrector = Corrector(self.transform, distcorr_transform, self.ref_filename if self.ref_filename != "same" else self.filename, self.ref_t0, tweak, plain_cosine = corr_transform)
+      self.corrector.correct(distortion = False, background = (bg_model is None))
+
+    n_data = None
+    if self.wiggle_fit is not None and len(self.wiggle_fit.model.p_opt) >= 8:
+      n_data = 1 - (1 - 1E3 * self.wiggle_fit.model.p_opt[7] / const.info["f"].magic)**2
 
     # Compile results.
     results = Results({
@@ -216,7 +242,7 @@ class Analyzer:
       "fr_method": self.fr_method,
       "dt": np.mean(self.fr_signal.width),
       "n_used": self.n,
-      "n_data": None if self.wiggle_fit is None else 1 - (1 - 1E3 * self.wiggle_fit.model.p_opt[7] / const.info["f"].magic)**2
+      "n_data": n_data
     })
 
     # Convert final transform to other units.
@@ -291,6 +317,17 @@ class Analyzer:
       for unit, transform in self.converted_transforms.items():
         transform.to_root(f"transform_{unit}", f";{const.info[unit].format_label()};").Write()
         numpy_dict.update(transform.collect(f"transform_{unit}"))
+
+      for unit, transform in self.converted_ref_distributions.items():
+        transform.to_root(f"ref_transform_{unit}", f";{const.info[unit].format_label()};").Write()
+        numpy_dict.update(transform.collect(f"ref_transform_{unit}"))
+
+      for unit, transform in self.converted_corrected_transforms.items():
+        transform.to_root(f"corr_transform_{unit}", f";{const.info[unit].format_label()};").Write()
+        numpy_dict.update(transform.collect(f"corr_transform_{unit}"))
+
+      self.transform.opt_cosine.to_root("opt_cosine", ";Frequency (kHz)").Write()
+      self.bg_fit.result.to_root("bg_fit", ";Frequency (kHz)").Write()
 
       np.savez(f"{self.output_path}/{self.output_prefix}transform.npz", **numpy_dict)
       root_file.Close()
@@ -414,8 +451,14 @@ class Analyzer:
 
     for i, parameter_set in enumerate(parameter_sets):
       print(f"\nWorking on step {i + 1} of {num_iterations}.")
+      
+      kwargs = {parameter: parameter_set[i] for i, parameter in enumerate(parameters)}
+      if "bg_space" in kwargs and "bg_width" in kwargs:
+        if kwargs["bg_space"] + kwargs["bg_width"] > 250:
+          continue
+      
       self.analyze(
-        **{parameter: parameter_set[i] for i, parameter in enumerate(parameters)},
+        **kwargs,
         save_output = False,
         # if the analyzer already knows a t0 seed, re-use it (it won't change with input parameters)
         t0_seed = self.coarse_t0_optimizer.seed if self.coarse_t0_optimizer is not None else None

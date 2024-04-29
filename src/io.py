@@ -125,6 +125,10 @@ def parse_parameter(arg):
         value = float(parameter_spec)
       elif parameter_spec.lower() == "none":
         value = None
+      elif parameter_spec.lower() == "true":
+        value = True
+      elif parameter_spec.lower() == "false":
+        value = False
       else:
         value = parameter_spec
 

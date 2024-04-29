@@ -105,11 +105,11 @@ def plot_fft(t, y, output = None):
 
 # ==================================================================================================
 
-def A(t, t0, f = const.info["f"].magic):
-  return np.cos(2 * np.pi * f * (t - t0) * const.kHz_us)
+def A(t, t0, f = const.info["f"].magic, harmonic = 1):
+  return np.cos(2 * np.pi * (harmonic * f) * (t - t0) * const.kHz_us)
 
-def B(t, t0, f = const.info["f"].magic):
-  return np.sin(2 * np.pi * f * (t - t0) * const.kHz_us)
+def B(t, t0, f = const.info["f"].magic, harmonic = 1):
+  return np.sin(2 * np.pi * (harmonic * f) * (t - t0) * const.kHz_us)
 
 # ==================================================================================================
 

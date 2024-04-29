@@ -24,7 +24,8 @@ def set_style(latex = False):
   plt.rcParams["legend.fontsize"] = size * 0.75
 
   # Rules for switching to scientific notation in axis tick labels.
-  plt.rcParams["axes.formatter.limits"] = (-2, 5)
+  plt.rcParams["axes.formatter.limits"] = (-2, 3)
+  plt.rcParams["axes.formatter.offset_threshold"] = 3
   plt.rcParams["axes.formatter.use_mathtext"] = True
 
   # Marker and line options.
@@ -75,12 +76,12 @@ def set_style(latex = False):
 # ==================================================================================================
 
 # Override plt.xlabel with automatic formatting.
-def xlabel(label):
-  return plt.xlabel(label, ha = "right", x = 1)
+def xlabel(label, offset = 0):
+  return plt.xlabel(label, ha = "right", x = 1 - offset)
 
 # Override plt.ylabel with automatic formatting.
-def ylabel(label):
-  return plt.ylabel(label, ha = "right", y = 1)
+def ylabel(label, offset = 0):
+  return plt.ylabel(label, ha = "right", y = 1 - offset)
 
 # ==================================================================================================
 
@@ -102,8 +103,8 @@ def colorbar(label = None, pad = 0.01, fraction = 0.10, aspect = 18, **kwargs):
 # ==================================================================================================
 
 # Override plt.errorbar with automatic formatting.
-def errorbar(x, y, yErr, xErr = None, ls = "-", marker = "o", ms = 4, **kwargs):
-  return plt.errorbar(x, y, yErr, xErr, fmt = f"{marker}{ls}", ms = ms, capsize = 2, lw = 0.75, elinewidth = 0.5, mew = 0.5, **kwargs)
+def errorbar(x, y, yErr, xErr = None, ls = "-", marker = "o", ms = 4, capsize = 0, **kwargs):
+  return plt.errorbar(x, y, yErr, xErr, fmt = f"{marker}{ls}", ms = ms, capsize = capsize, lw = 0.75, elinewidth = 0.5, mew = 0.5, **kwargs)
 
 # ==================================================================================================
 
@@ -247,7 +248,7 @@ def x_stats(avg, std, units = None, color = "k"):
   plt.ylim(yMin, yMax)
 
   # Return the plot objects and legend label.
-  label = f"${avg:.2f} \pm {std:.2f}$" + f" {units}" if units is not None else ""
+  label = rf"${avg:.2f} \pm {std:.2f}$" + f" {units}" if units is not None else ""
   return line, fill, label
 
 # ==================================================================================================
@@ -300,7 +301,7 @@ def y_stats(
   # Restore the original axis limits.
   plt.xlim(axLeft, axRight)
 
-  label = f"${avg:.2f} \pm {std:.2f}$" + f" {units}" if units is not None else ""
+  label = rf"${avg:.2f} \pm {std:.2f}$" + f" {units}" if units is not None else ""
   return line, fill, label
 
 # ==================================================================================================
