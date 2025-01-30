@@ -53,16 +53,19 @@ def plot_dataset(dataset, subset, variable, plot_lines = False, variant = ""):
     return
 
   # parse the dataset label to find the run number, e.g. "Run3a" -> 3, "2D" -> 2
-  run_number = io.find_index(re.match(r"(?:Run)?(\d[a-zA-Z]?)", dataset).group(1))
+  #run_number = io.find_index(re.match(r"(?:Run)?(\d[a-zA-Z]?)", dataset).group(1))
 
   results = np.load(f"{io.results_path}/{dataset}/By{subset.capitalize()}{variant}/{dataset}_{subset}_results.npy", allow_pickle = True)
   nominal_results = np.load(f"{io.results_path}/{dataset}/Nominal/results.npy", allow_pickle = True)
 
-  mask = (results["wg_N"] > 10_000) & (results["c_e"] < 1000)
+  mask = (results["wg_N"] > 10_000) & (results["c_e"] < 1000) #& (results["bg_chi2_ndf"] < 5)
   if subset == "bunch":
     mask = mask & (results["index"] < 8)
+  if subset == "energy":
+    mask = mask & (results["index"] > 500)
   results = results[mask]
-
+ 
+  plt.figure()
   errorbar = plot_trend(
     x = "index",
     y = variable,
@@ -104,7 +107,7 @@ def plot_dataset(dataset, subset, variable, plot_lines = False, variant = ""):
       label = "$NA^2$ Weights",
       color = "tab:gray"
     )
-    plt.legend(loc = "upper right")
+    plt.legend(loc = "upper right", fontsize = 6)
     plt.sca(ax)
 
   if subset != "threshold":
@@ -183,7 +186,7 @@ def plot_transforms(dataset, subset, variant = ""):
 def parse_dataset_arg(tokens):
   datasets = []
   for token in tokens:
-    if re.match("[1-9]\*", token):
+    if re.match(r"[1-9]\*", token):
       datasets += io.list_run_datasets(token[0])
     else:
       datasets.append(token)
@@ -198,7 +201,7 @@ if __name__ == "__main__":
   parser.add_argument("--subsets", "-s", nargs = "+", default = list(subset_labels.keys()))
   parser.add_argument("--label", "-l", default = None)
   parser.add_argument("--variant", default = "")
-  parser.add_argument("--variables", "-v", nargs = "*", default = ["x", "sig_x", "c_e", "t0", "bg_chi2_ndf"])
+  parser.add_argument("--variables", "-v", nargs = "*", default = ["x", "f", "tau", "sig_x", "c_e", "t0", "bg_chi2_ndf"])
   args = parser.parse_args()
 
   datasets = parse_dataset_arg(args.datasets)
@@ -230,8 +233,11 @@ if __name__ == "__main__":
 
     # plot overlaid transforms across subset (only used for single datasets)
     if len(datasets) == 1:
-      plot_transforms(datasets[0], subset)
-      style.label_and_save(const.info["x"].format_label(), "Arbitrary Units", pdf)
+      try:
+        plot_transforms(datasets[0], subset)
+        style.label_and_save(const.info["x"].format_label(), "Arbitrary Units", pdf)
+      except:
+        pass
 
     pdf.close()
 

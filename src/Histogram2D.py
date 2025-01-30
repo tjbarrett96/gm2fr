@@ -7,8 +7,9 @@ style.set_style()
 import gm2fr.src.io as io
 from gm2fr.src.Histogram1D import Histogram1D
 
-import ROOT as root
-import root_numpy as rnp
+# import ROOT as root
+# import root_numpy as rnp
+import uproot
 
 class Histogram2D:
 
@@ -282,9 +283,10 @@ class Histogram2D:
   # Save this histogram to disk.
   def save(self, filename, name = None, labels = ""):
     if filename.endswith(".root") and name is not None:
-      file = root.TFile(filename, "RECREATE")
-      self.to_root(name, labels).Write()
-      file.Close()
+      with uproot.recreate(filename) as root_file:
+        # file = root.TFile(filename, "RECREATE")
+        root_file[name] = self.to_root(name, labels)#.Write()
+        # file.Close()
     elif filename.endswith(".npz"):
       np.savez(filename, **self.collect())
     else:
@@ -304,17 +306,22 @@ class Histogram2D:
 
   # Load a histogram previously saved to disk.
   @staticmethod
-  def load(filename, label = None):
+  def load(filename, label = None, transpose = False):
     if filename.endswith(".root") and label is not None:
-      rootFile = root.TFile(filename)
-      histogram = rootFile.Get(label)
-      heights, edges = rnp.hist2array(histogram, return_edges = True)
-      x_edges, y_edges = edges[0], edges[1]
-      errors = np.array([
-        [histogram.GetBinError(i + 1, j + 1) for j in range(histogram.GetNbinsY())]
-        for i in range(histogram.GetNbinsX())
-      ])
-      rootFile.Close()
+      with uproot.open(filename) as root_file:
+        # rootFile = root.TFile(filename)
+        # histogram = rootFile.Get(label)
+        # heights, edges = rnp.hist2array(histogram, return_edges = True)
+        # x_edges, y_edges = edges[0], edges[1]
+        # errors = np.array([
+        #   [histogram.GetBinError(i + 1, j + 1) for j in range(histogram.GetNbinsY())]
+        #   for i in range(histogram.GetNbinsX())
+        # ])
+        histogram = root_file[label]
+        heights, errors = histogram.values(), histogram.errors()
+        x_edges = histogram.axis(0).edges()
+        y_edges = histogram.axis(1).edges()
+        # rootFile.Close()
     elif filename.endswith(".npz"):
       prefix = "" if label is None else f"{label}/"
       data = np.load(filename)
@@ -322,6 +329,9 @@ class Histogram2D:
       y_edges = data[f'{prefix}y_edges']
       heights = data[f'{prefix}heights']
       errors = data[f'{prefix}errors']
+      if transpose:
+        heights = heights.T
+        errors = errors.T
     else:
       raise ValueError(f"Could not load histogram from '{filename}' with label '{label}'.")
     return Histogram2D(x_edges, y_edges, heights = heights, errors = errors)
@@ -329,12 +339,13 @@ class Histogram2D:
   # ================================================================================================
 
   # Convert this Histogram2D to a TH2F.
-  def to_root(self, name, labels = ""):
-    histogram = root.TH2F(
-      name, labels,
-      self.x_length, array.array("f", list(self.x_edges)),
-      self.y_length, array.array("f", list(self.y_edges))
-    )
-    rnp.array2hist(self.heights, histogram, errors = self.errors)
-    histogram.ResetStats()
-    return histogram
+  def to_root(self, name = "", labels = ""):
+    # histogram = root.TH2F(
+    #   name, labels,
+    #   self.x_length, array.array("f", list(self.x_edges)),
+    #   self.y_length, array.array("f", list(self.y_edges))
+    # )
+    # rnp.array2hist(self.heights, histogram, errors = self.errors)
+    # histogram.ResetStats()
+    # return histogram
+    return (self.heights, self.x_edges, self.y_edges)

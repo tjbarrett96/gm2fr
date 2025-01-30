@@ -27,7 +27,8 @@ class Results:
   # ============================================================================
 
   def append(self, result):
-    self.table = self.table.append(result.table)
+    # self.table = self.table.append(result.table)
+    self.table = pd.concat((self.table, result.table), ignore_index = True)
 
   # ============================================================================
 

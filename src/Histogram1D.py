@@ -10,8 +10,9 @@ style.set_style()
 import gm2fr.src.io as io
 import gm2fr.src.calculations as calc
 
-import ROOT as root
-import root_numpy as rnp
+# import ROOT as root
+# import root_numpy as rnp
+import uproot
 
 # ==================================================================================================
 
@@ -516,9 +517,10 @@ class Histogram1D:
   # TODO: match ROOT format
   def save(self, filename, name = None, labels = ""):
     if filename.endswith(".root") and name is not None:
-      file = root.TFile(filename, "RECREATE")
-      self.to_root(name, labels).Write()
-      file.Close()
+      with uproot.recreate(filename) as root_file:
+        # file = root.TFile(filename, "RECREATE")
+        root_file[name] = self.to_root(name, labels)#.Write()
+        # file.Close()
     elif filename.endswith(".npz"):
       np.savez(filename, **self.collect())
     else:
@@ -538,14 +540,15 @@ class Histogram1D:
 
   # ================================================================================================
 
-  def to_root(self, name, labels = ""):
+  def to_root(self, name = "", labels = ""):
     edges = np.sort(self.edges)
     sortedIndices = np.argsort(self.centers)
     heights, errors = self.heights[sortedIndices], self.errors[sortedIndices]
-    histogram = root.TH1F(name, labels, self.length, array.array("f", list(edges)))
-    rnp.array2hist(heights, histogram, errors = errors)
-    histogram.ResetStats()
-    return histogram
+    # histogram = root.TH1F(name, labels, self.length, array.array("f", list(edges)))
+    # rnp.array2hist(heights, histogram, errors = errors)
+    # histogram.ResetStats()
+    # return histogram
+    return (heights, edges)
 
   # ================================================================================================
 
@@ -554,14 +557,16 @@ class Histogram1D:
   def load(filename, label = None):
     if filename.endswith(".root") and label is not None:
       try:
-        rootFile = root.TFile(filename)
-        histogram = rootFile.Get(label)
-        heights, edges = rnp.hist2array(histogram, return_edges = True)
+        with uproot.open(filename) as root_file:
+          # rootFile = root.TFile(filename)
+          histogram = root_file[label]
+          # heights, edges = rnp.hist2array(histogram, return_edges = True)
+          heights, edges, cov = histogram.values(), histogram.axis().edges(), histogram.errors()**2
       except:
         raise FileNotFoundError()
-      edges = edges[0]
-      cov = np.array([histogram.GetBinError(i + 1)**2 for i in range(histogram.GetNbinsX())])
-      rootFile.Close()
+      # edges = edges[0]
+      # cov = np.array([histogram.GetBinError(i + 1)**2 for i in range(histogram.GetNbinsX())])
+      # rootFile.Close()
     elif filename.endswith(".npz"):
       prefix = "" if label is None else f"{label}/"
       try:

@@ -1,5 +1,6 @@
 import sys
-import ROOT as root
+# import ROOT as root
+import uproot
 import numpy as np
 import gm2fr.src.io as io
 from merge_results import merge_results
@@ -50,12 +51,14 @@ def analyze_dataset(dataset, subset = "nominal", label = None, constructor_arg_d
     else:
 
       # Get a list of subdirectories inside the input parent directory for this subset.
-      input_file = root.TFile(input_path)
-      input_folders = [
-        f"FastRotation/{subset_dir[subset]}/{item.GetName()}"
-        for item in input_file.Get(f"FastRotation/{subset_dir[subset]}").GetListOfKeys()
-      ]
-      input_file.Close()
+      # input_file = root.TFile(input_path)
+      # input_folders = [
+      #   f"FastRotation/{subset_dir[subset]}/{item.GetName()}"
+      #   for item in input_file.Get(f"FastRotation/{subset_dir[subset]}").GetListOfKeys()
+      # ]
+      # input_file.Close()
+      with uproot.open(input_path) as root_file:
+        input_folders = [f"FastRotation/{subset_dir[subset]}/{dir_name}" for dir_name in root_file[f"FastRotation/{subset_dir[subset]}"].keys(recursive = False, cycle = False)]
 
       # Look in each subdirectory name for an identifying numerical index (e.g. calo number).
       subset_indices = io.find_indices(input_folders)
@@ -75,12 +78,15 @@ def analyze_dataset(dataset, subset = "nominal", label = None, constructor_arg_d
     # constructor_arg_dict["ref_t0"] = None
 
   if "fr_method" not in analyze_arg_dict:
-    analyze_arg_dict["fr_method"] = "nine" if subset != "sim" else None
+    analyze_arg_dict["fr_method"] = "five" if subset != "sim" else None
 
   # must save copy of argument conditions here, since constructor_arg_dict will change during loop!
   rob_bunch = ("ref_filename" in constructor_arg_dict) and (constructor_arg_dict["ref_filename"] == "rob_bunch")
   james_bunch = ("ref_filename" in constructor_arg_dict) and (constructor_arg_dict["ref_filename"] == "james_bunch")
   rob_noSmooth = ("ref_filename" in constructor_arg_dict) and (constructor_arg_dict["ref_filename"] == "rob_noSmooth")
+  elia_bunch = ("ref_filename" in constructor_arg_dict) and (constructor_arg_dict["ref_filename"] == "elia_bunch")
+
+  print(input_folders)
 
   # Run the analysis on each part of the subset (e.g. each calo).
   for input_folder, subset_index, output_folder in zip(input_folders, subset_indices, output_folders):
@@ -90,9 +96,13 @@ def analyze_dataset(dataset, subset = "nominal", label = None, constructor_arg_d
       continue
 
     # special case for correcting bunch-by-bunch in runs 2 and 3
-    if subset == "bunch":
+    if subset == "bunch" or (subset == "nominal" and elia_bunch):
       if rob_bunch:
         constructor_arg_dict["ref_filename"] = f"{io.data_path}/correlation/rob_bunch/{dataset}_Bunch{subset_index % 8}_smooth.root"
+        constructor_arg_dict["ref_t0"] = 0
+      elif elia_bunch:
+        bunch_index = 8 if subset == "nominal" else (subset_index % 8)
+        constructor_arg_dict["ref_filename"] = f"{io.data_path}/correlation/elia_bunch/{dataset}_Bunch{bunch_index}_smooth.root"
         constructor_arg_dict["ref_t0"] = 0
       elif rob_noSmooth:
         constructor_arg_dict["ref_filename"] = f"{io.data_path}/correlation/rob_bunch/{dataset}_Bunch{subset_index % 8}_noSmooth.root"
@@ -100,6 +110,8 @@ def analyze_dataset(dataset, subset = "nominal", label = None, constructor_arg_d
       elif james_bunch:
         constructor_arg_dict["ref_filename"] = f"{io.data_path}/correlation/james_bunch/{dataset}_Bunch{subset_index % 8}_smooth.root"
         constructor_arg_dict["ref_t0"] = 0
+      elif constructor_arg_dict["ref_filename"]:
+        constructor_arg_dict["ref_filename"] = re.sub(r"bunch\d+", f"bunch{subset_index % 8}", constructor_arg_dict["ref_filename"])
 
     analyzer = Analyzer(
       filename = input_path,
@@ -137,7 +149,7 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   if args.ref is not None:
-    if args.ref not in ("rob_bunch", "rob_noSmooth", "james_bunch"):
+    if args.ref not in ("rob_bunch", "rob_noSmooth", "james_bunch", "elia_bunch") and not args.ref.endswith(".root"):
       ref_filename = f"{io.sim_path}/{args.ref}_sim/data.npz"
       ref_t0 = float(Results.load(f"{io.results_path}/{args.ref}/Simulation/results.npy").get("t0"))
     else:

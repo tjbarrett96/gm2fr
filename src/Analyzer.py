@@ -14,7 +14,8 @@ from gm2fr.src.BackgroundFit import BackgroundFit
 from gm2fr.src.Iterator import Iterator
 from gm2fr.src.Corrector import Corrector
 
-import ROOT as root
+# import ROOT as root
+import uproot
 
 # import warnings
 # warnings.filterwarnings("error")
@@ -165,6 +166,7 @@ class Analyzer:
       bg_space = int(round(const.info["f"].max - const.info["f"].magic))
 
     # Compute the Fourier transform of the fast rotation signal, masked between the requested times.
+    print("Computing transform.")
     self.transform = Transform(self.fr_signal, start, end, df, bg_space + bg_width, harmonic)
 
     # Determine whether or not to optimize t0. If t0 value supplied, then use it; otherwise, optimize.
@@ -172,9 +174,11 @@ class Analyzer:
 
     if optimize_t0:
 
+      print("Running coarse optimization.")
       self.coarse_t0_optimizer = Optimizer(self.transform, bg_model, coarse_t0_width * 1E-3, coarse_t0_steps, seed = t0_seed, bg_space = bg_space)
       t0 = self.coarse_t0_optimizer.optimize()
 
+      print("Running fine optimization.")
       self.fine_t0_optimizer = Optimizer(self.transform, bg_model, fine_t0_width * 1E-3, fine_t0_steps, seed = t0, bg_space = bg_space)
       t0 = self.fine_t0_optimizer.optimize()
       err_t0 = self.fine_t0_optimizer.err_t0
@@ -199,6 +203,8 @@ class Analyzer:
 
     # Perform the background fit, and subtract it from the optimal cosine transform.
     if bg_model is not None:
+
+      print("Running background fit.")
 
       # nominal background fit
       self.bg_fit = BackgroundFit(self.transform, bg_model, bg_space = bg_space)
@@ -227,6 +233,8 @@ class Analyzer:
     n_data = None
     if self.wiggle_fit is not None and len(self.wiggle_fit.model.p_opt) >= 8:
       n_data = 1 - (1 - 1E3 * self.wiggle_fit.model.p_opt[7] / const.info["f"].magic)**2
+
+    print("Compiling results.")
 
     # Compile results.
     results = Results({
@@ -295,6 +303,8 @@ class Analyzer:
     self.transforms.append(self.converted_transforms["f"])
     self.bg_fits.append(self.bg_fit)
 
+    print("Saving results.")
+
     # Save the results to disk.
     if save_output:
       self.save()
@@ -311,26 +321,33 @@ class Analyzer:
       self.fr_signal.save(f"{self.output_path}/{self.output_prefix}signal.npz")
       self.fr_signal.save(f"{self.output_path}/{self.output_prefix}signal.root", "signal")
 
-      root_file = root.TFile(f"{self.output_path}/{self.output_prefix}transform.root", "RECREATE")
+      # root_file = root.TFile(f"{self.output_path}/{self.output_prefix}transform.root", "RECREATE")
       numpy_dict = dict()
 
-      for unit, transform in self.converted_transforms.items():
-        transform.to_root(f"transform_{unit}", f";{const.info[unit].format_label()};").Write()
-        numpy_dict.update(transform.collect(f"transform_{unit}"))
+      with uproot.recreate(f"{self.output_path}/{self.output_prefix}transform.root") as root_file:
 
-      for unit, transform in self.converted_ref_distributions.items():
-        transform.to_root(f"ref_transform_{unit}", f";{const.info[unit].format_label()};").Write()
-        numpy_dict.update(transform.collect(f"ref_transform_{unit}"))
+        for unit, transform in self.converted_transforms.items():
+          # transform.to_root(f"transform_{unit}", f";{const.info[unit].format_label()};").Write()
+          root_file[f"transform_{unit}"] = transform.to_root()
+          numpy_dict.update(transform.collect(f"transform_{unit}"))
 
-      for unit, transform in self.converted_corrected_transforms.items():
-        transform.to_root(f"corr_transform_{unit}", f";{const.info[unit].format_label()};").Write()
-        numpy_dict.update(transform.collect(f"corr_transform_{unit}"))
+        for unit, transform in self.converted_ref_distributions.items():
+          # transform.to_root(f"ref_transform_{unit}", f";{const.info[unit].format_label()};").Write()
+          root_file[f"ref_transform_{unit}"] = transform.to_root()
+          numpy_dict.update(transform.collect(f"ref_transform_{unit}"))
 
-      self.transform.opt_cosine.to_root("opt_cosine", ";Frequency (kHz)").Write()
-      self.bg_fit.result.to_root("bg_fit", ";Frequency (kHz)").Write()
+        for unit, transform in self.converted_corrected_transforms.items():
+          # transform.to_root(f"corr_transform_{unit}", f";{const.info[unit].format_label()};").Write()
+          root_file[f"corr_transform_{unit}"] = transform.to_root()
+          numpy_dict.update(transform.collect(f"corr_transform_{unit}"))
+
+        # self.transform.opt_cosine.to_root("opt_cosine", ";Frequency (kHz)").Write()
+        # self.bg_fit.result.to_root("bg_fit", ";Frequency (kHz)").Write()
+        root_file["opt_cosine"] = self.transform.opt_cosine.to_root()
+        root_file["bg_fit"] = self.bg_fit.result.to_root()
 
       np.savez(f"{self.output_path}/{self.output_prefix}transform.npz", **numpy_dict)
-      root_file.Close()
+      # root_file.Close()
 
       self.results.save(self.output_path, filename = f"{self.output_prefix}results")
 

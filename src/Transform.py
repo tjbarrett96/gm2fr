@@ -35,7 +35,8 @@ class Transform:
     self.err_t0 = None
     self.opt_cosine = None
     self.opt_sine = None
-
+    
+    print("Running internal transform.")
     self.transform()
 
   # ================================================================================================
@@ -46,17 +47,20 @@ class Transform:
     time, signal, errors = self.signal.centers, self.signal.heights, self.signal.errors
 
     # Compute the cosine transform, and subtract the s(f) wiggle function.
+    print("Computing cosine transform.")
     cosTransform = calc.np_transform(np.cos, self.harmonic * self.raw_cosine.centers, signal, time)
     cos_wiggle = self.scale * calc.s(self.harmonic * self.raw_cosine.centers, self.start, self.end)
     cosTransform -= cos_wiggle
     self.raw_cosine.set_heights(cosTransform)
 
     # Compute the sine transform, and subtract the c(f) wiggle function.
+    print("Computing sine transform.")
     sinTransform = calc.np_transform(np.sin, self.harmonic * self.raw_sine.centers, signal, time)
     sinTransform += self.scale * calc.c(self.harmonic * self.raw_sine.centers, self.start, self.end)
     self.raw_sine.set_heights(sinTransform)
 
     # Compute the covariance matrix for both transforms.
+    print("Computing covariance matrix.")
     fDiff = self.harmonic * (self.raw_cosine.centers - self.raw_cosine.centers[0])
     cov = 0.5 * lg.toeplitz(calc.np_transform(np.cos, fDiff, errors**2, time))
     self.raw_cosine.set_cov(cov)

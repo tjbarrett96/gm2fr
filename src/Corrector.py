@@ -23,10 +23,14 @@ class Corrector:
     self.bg_transform = bg_transform
     self.plain_cosine = plain_cosine
 
-    self.ref_joint = Histogram2D.load(ref_filename, "joint")
-    self.ref_tau = Histogram1D.load(ref_filename, "profile")
+    self.ref_joint = Histogram2D.load(ref_filename, "joint").normalize()
+    self.ref_tau = Histogram1D.load(ref_filename, "profile").normalize()
     self.ref_frequency = Histogram1D.load(ref_filename, "frequencies").normalize()
     #self.ref_t0 = ref_t0 if ref_t0 is not None else self.transform.t0
+
+    self.ref_joint.errors = np.zeros(self.ref_joint.heights.shape)
+    self.ref_frequency.cov = np.zeros((len(self.ref_frequency.heights), len(self.ref_frequency.heights)))
+    self.ref_frequency.update_errors()
 
     # A(f) and B(f) coefficients, as defined in the derivation note.
     self.A = None
@@ -156,8 +160,8 @@ class Corrector:
 
     bad_indices = []
     for i in range(len(self.corrected_transform.heights)):
-      A_bad = (0 < np.abs(self.A_interpolated.heights[i]) < 0.15)
-      # A_bad = (np.abs(self.A_interpolated.heights[i]) < 0.01)
+      # A_bad = (0 < np.abs(self.A_interpolated.heights[i]) < 0.05)
+      A_bad = (np.abs(self.A_interpolated.heights[i]) < 0.1)
       # B_bad = (np.abs(self.corrected_before_division.heights[i]) < 0.1 * np.max(self.corrected_before_division.heights))
       #B_bad = False
       if A_bad:# and B_bad:

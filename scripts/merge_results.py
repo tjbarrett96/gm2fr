@@ -23,7 +23,7 @@ def merge_results(results, output_dir = None, output_name = None, indices = None
   merged_results = Results()
   merged_transforms = {}
 
-  unique_indices = indices if len(np.unique(indices)) == len(indices) else np.arange(len(indices))
+  unique_indices = [*indices] if len(np.unique(indices)) == len(indices) else np.arange(len(indices))
 
   # Loop through the folders, load each results file, and merge them into a cumulative array.
   for i, result in enumerate(results):

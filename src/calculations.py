@@ -3,6 +3,7 @@ import gm2fr.src.constants as const
 import scipy.stats
 import scipy.sparse as sparse
 import matplotlib.pyplot as plt
+import fitting.reference as ref
 import gm2fr.src.style as style
 style.set_style()
 
@@ -91,16 +92,19 @@ def plot_fft(t, y, output = None):
   f, transform = fft(t, y)
   mag = np.abs(transform)
 
+  f = f / 1000
+
   # Plot the FFT magnitude.
   plt.plot(f, mag)
 
   # Use a logarithmic vertical scale, and set the limits appropriately.
   plt.yscale("log")
-  plt.xlim(0, 8000)
-  plt.ylim(np.min(mag[(f < 8000)]), None)
+  plt.xlim(0, 8)
+  plt.ylim(np.min(mag[(f < 8)]), None)
 
-  plt.axvspan(const.info["f"].min, const.info["f"].max, color = "k", alpha = 0.1, label = "Cyclotron Acceptance")
+  plt.axvspan(const.info["f"].min / 1000, const.info["f"].max / 1000, color = "k", alpha = 0.1, label = "Cyclotron Acceptance")
 
+  ref.format_fft(y = 10, binning = 0.001)
   style.label_and_save("Frequency (kHz)", "Arbitrary Units", output)
 
 # ==================================================================================================
@@ -114,4 +118,13 @@ def B(t, t0, f = const.info["f"].magic, harmonic = 1):
 # ==================================================================================================
 
 def np_transform(trig, f, S, t):
-  return np.einsum("i, ki -> k", S, trig(2 * np.pi * np.outer(f, t) * const.kHz_us))
+  #print("Computing arg.")
+  #print(f"f: {f.dtype}, {len(f)}, t: {t.dtype}, {len(t)}")
+  #arg = trig(2 * np.pi * np.outer(f, t) * const.kHz_us)
+  print("Computing summation.")
+  result = np.zeros(len(f))
+  for i, f_i in enumerate(f):
+    result[i] = np.sum(S * trig(2 * np.pi * f_i * t * const.kHz_us))
+  return result
+  # TODO: this np.outer(f, t) became extremely slow suddenly after python and OS upgrades? not sure the cause
+  #return np.einsum("i, ki -> k", S, arg)

@@ -1,9 +1,9 @@
 from gm2fr.src.mixture import GaussianMixture
-from gm2fr.src.simulator import Simulator
+#from gm2fr.src.simulator import Simulator
 from gm2fr.src.Histogram2D import Histogram2D
 import gm2fr.src.io as io
 import gm2fr.src.constants as const
-import root_numpy as rnp
+# import root_numpy as rnp
 from scipy.ndimage import gaussian_filter
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
@@ -13,13 +13,14 @@ import matplotlib.pyplot as plt
 import gm2fr.src.style as style
 style.set_style()
 
-import ROOT as root
+# import ROOT as root
+import uproot
 
 import argparse
 
 # ==================================================================================================
 
-def smooth_joint(filename, label, output_filename, kinematics_type, time_units, kinematics_scale, interp_factor):
+def smooth_joint(filename, label, output_filename, kinematics_type, time_units, kinematics_scale, interp_factor, transpose):
 
   # # open ROOT file and get joint histogram
   # input_file = root.TFile(f"{io.data_path}/correlation/{filename}.root")
@@ -27,7 +28,7 @@ def smooth_joint(filename, label, output_filename, kinematics_type, time_units, 
   pdf = style.make_pdf(f"{io.data_path}/correlation/{output_filename}.pdf")
 
   # load joint distribution from file
-  joint = Histogram2D.load(f"{io.data_path}/correlation/{filename}.root", label)
+  joint = Histogram2D.load(f"{io.data_path}/correlation/{filename}", label, transpose = transpose)
 
   # convert kinematics (y) axis to frequency, and time (x) axis to nanoseconds
   joint.map(
@@ -43,11 +44,11 @@ def smooth_joint(filename, label, output_filename, kinematics_type, time_units, 
 
     # check if we should rebin the time axis
     min_time_bin = 6E-9
-    time_rebin_factor = int(np.floor(min_time_bin / (time_bin_width * time_units)))
+    time_rebin_factor = max(1, int(np.floor(min_time_bin / (time_bin_width * time_units))))
 
     # check if we should rebin the frequency axis
     min_freq_bin = 4
-    kinematics_rebin_factor = int(np.floor(min_freq_bin / freq_bin_width))
+    kinematics_rebin_factor = max(1, int(np.floor(min_freq_bin / freq_bin_width)))
 
     # rebin the distribution
     if (time_rebin_factor > 1) or (kinematics_rebin_factor > 1):
@@ -76,33 +77,42 @@ def smooth_joint(filename, label, output_filename, kinematics_type, time_units, 
 
     new_joint = Histogram2D(x_bins = joint.x_edges, y_bins = joint.y_edges, heights = joint.heights)
   
-  joint.map(y = lambda y: const.info["dp_p0"].from_frequency(y))
-  new_joint.map(y = lambda y: const.info["dp_p0"].from_frequency(y)) 
+  #joint.map(y = lambda y: const.info["dp_p0"].from_frequency(y))
+  #new_joint.map(y = lambda y: const.info["dp_p0"].from_frequency(y)) 
 
   # plot the original distribution
   joint.plot()
-  #style.ylabel("Frequency (kHz)")
-  style.ylabel("Relative Momentum Offset")
+  style.ylabel("Frequency (kHz)")
+  #style.ylabel("Relative Momentum Offset")
   style.xlabel("Injection Time (ns)")
   pdf.savefig()
   
   plt.figure()
   new_joint.plot()
-  #style.ylabel("Frequency (kHz)")
-  style.ylabel("Relative Momentum Offset")
+  plt.xlim(-75, 75)
+  style.ylabel("Frequency (kHz)")
+  #style.ylabel("Relative Momentum Offset")
   style.xlabel("Injection Time (ns)")
   pdf.savefig()
   
-  new_joint = new_joint.to_root("joint")
-  time_profile = new_joint.ProjectionX("time")
+  new_joint_heights, new_joint_x, new_joint_y = new_joint.to_root("joint")
+  # time_profile = new_joint.ProjectionX("time")
   #freq_profile = new_joint.ProjectionY("frequencies")
-  freq_profile = new_joint.ProjectionY("dp_p0")
+  # freq_profile = new_joint.ProjectionY("dp_p0")
+  time_profile = (np.sum(new_joint_heights, axis = 1), new_joint_x)
+  freq_profile = (np.sum(new_joint_heights, axis = 0), new_joint_y)
 
-  output_file = root.TFile(f"{io.data_path}/correlation/{output_filename}.root", "RECREATE")
-  new_joint.Write()
-  time_profile.Write()
-  freq_profile.Write()
-  output_file.Close()
+  # output_file = root.TFile(f"{io.data_path}/correlation/{output_filename}.root", "RECREATE")
+  # new_joint.Write()
+  # time_profile.Write()
+  # freq_profile.Write()
+  # output_file.Close()
+  with uproot.recreate(f"{io.data_path}/correlation/{output_filename}.root") as root_file:
+    root_file["joint"] = (new_joint_heights, new_joint_x, new_joint_y)
+    root_file["profile"] = time_profile
+    root_file["frequencies"] = freq_profile
+    #root_file["time"] = time_profile
+    #root_file["dp_p0"] = freq_profile
 
   pdf.close()
 
@@ -115,12 +125,13 @@ if __name__ == "__main__":
   parser.add_argument("--label")
   parser.add_argument("--output")
   parser.add_argument("--type")
+  parser.add_argument("--transpose", action="store_true")
   parser.add_argument("--factor", type = int, default = 3)
   parser.add_argument("--time", type = float)
   parser.add_argument("--scale", type = float, default = 1)
   args = parser.parse_args()
 
-  smooth_joint(args.file, args.label, args.output, args.type, args.time, args.scale, args.factor)
+  smooth_joint(args.file, args.label, args.output, args.type, args.time, args.scale, args.factor, args.transpose)
 
 # ==================================================================================================
 
