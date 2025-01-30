@@ -544,11 +544,20 @@ class Histogram1D:
     edges = np.sort(self.edges)
     sortedIndices = np.argsort(self.centers)
     heights, errors = self.heights[sortedIndices], self.errors[sortedIndices]
+<<<<<<< HEAD
     # histogram = root.TH1F(name, labels, self.length, array.array("f", list(edges)))
     # rnp.array2hist(heights, histogram, errors = errors)
     # histogram.ResetStats()
     # return histogram
     return (heights, edges)
+=======
+    histogram = root.TH1F(name, labels, self.length, array.array("f", list(edges)))
+    for i in range(self.length):
+      histogram.SetBinContent(i + 1, heights[i])
+      histogram.SetBinError(i + 1, errors[i])
+    histogram.ResetStats()
+    return histogram
+>>>>>>> origin/master
 
   # ================================================================================================
 
@@ -557,6 +566,7 @@ class Histogram1D:
   def load(filename, label = None):
     if filename.endswith(".root") and label is not None:
       try:
+<<<<<<< HEAD
         with uproot.open(filename) as root_file:
           # rootFile = root.TFile(filename)
           histogram = root_file[label]
@@ -567,6 +577,16 @@ class Histogram1D:
       # edges = edges[0]
       # cov = np.array([histogram.GetBinError(i + 1)**2 for i in range(histogram.GetNbinsX())])
       # rootFile.Close()
+=======
+        rootFile = root.TFile(filename)
+        histogram = rootFile.Get(label)
+        heights = np.array([histogram.GetBinContent(i + 1) for i in range(histogram.GetNbinsX())])
+        edges = np.array([histogram.GetBinLowEdge(i + 1) for i in range(histogram.GetNbinsX() + 1)])
+      except:
+        raise FileNotFoundError()
+      cov = np.array([histogram.GetBinError(i + 1)**2 for i in range(histogram.GetNbinsX())])
+      rootFile.Close()
+>>>>>>> origin/master
     elif filename.endswith(".npz"):
       prefix = "" if label is None else f"{label}/"
       try:
