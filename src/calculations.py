@@ -3,7 +3,6 @@ import gm2fr.src.constants as const
 import scipy.stats
 import scipy.sparse as sparse
 import matplotlib.pyplot as plt
-import fitting.reference as ref
 import gm2fr.src.style as style
 style.set_style()
 
@@ -104,7 +103,6 @@ def plot_fft(t, y, output = None):
 
   plt.axvspan(const.info["f"].min / 1000, const.info["f"].max / 1000, color = "k", alpha = 0.1, label = "Cyclotron Acceptance")
 
-  ref.format_fft(y = 10, binning = 0.001)
   style.label_and_save("Frequency (kHz)", "Arbitrary Units", output)
 
 # ==================================================================================================

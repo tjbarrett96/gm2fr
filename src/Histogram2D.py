@@ -308,7 +308,6 @@ class Histogram2D:
   @staticmethod
   def load(filename, label = None, transpose = False):
     if filename.endswith(".root") and label is not None:
-<<<<<<< HEAD
       with uproot.open(filename) as root_file:
         # rootFile = root.TFile(filename)
         # histogram = rootFile.Get(label)
@@ -323,21 +322,6 @@ class Histogram2D:
         x_edges = histogram.axis(0).edges()
         y_edges = histogram.axis(1).edges()
         # rootFile.Close()
-=======
-      rootFile = root.TFile(filename)
-      histogram = rootFile.Get(label)
-      heights = np.array([
-        [histogram.GetBinContent(i + 1, j + 1) for j in range(histogram.GetNbinsY())]
-        for i in range(histogram.GetNbinsX())
-      ])
-      x_edges = np.array([histogram.GetXaxis().GetBinLowEdge(i + 1) for i in range(histogram.GetNbinsX())])
-      y_edges = np.array([histogram.GetXaxis().GetBinLowEdge(j + 1) for j in range(histogram.GetNbinsY())])
-      errors = np.array([
-        [histogram.GetBinError(i + 1, j + 1) for j in range(histogram.GetNbinsY())]
-        for i in range(histogram.GetNbinsX())
-      ])
-      rootFile.Close()
->>>>>>> origin/master
     elif filename.endswith(".npz"):
       prefix = "" if label is None else f"{label}/"
       data = np.load(filename)
@@ -355,7 +339,6 @@ class Histogram2D:
   # ================================================================================================
 
   # Convert this Histogram2D to a TH2F.
-<<<<<<< HEAD
   def to_root(self, name = "", labels = ""):
     # histogram = root.TH2F(
     #   name, labels,
@@ -366,17 +349,3 @@ class Histogram2D:
     # histogram.ResetStats()
     # return histogram
     return (self.heights, self.x_edges, self.y_edges)
-=======
-  def to_root(self, name, labels = ""):
-    histogram = root.TH2F(
-      name, labels,
-      self.x_length, array.array("f", list(self.x_edges)),
-      self.y_length, array.array("f", list(self.y_edges))
-    )
-    for i in range(self.heights.shape[0]):
-      for j in range(self.heights.shape[1]):
-        histogram.SetBinContent(i + 1, j + 1, heights[i][j])
-        histogram.SetBinError(i + 1, j + 1, errors[i][j])
-    histogram.ResetStats()
-    return histogram
->>>>>>> origin/master
